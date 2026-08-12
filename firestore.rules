@@ -1,0 +1,57 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function isSignedIn() {
+      return request.auth != null;
+    }
+    function myRole() {
+      return get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role;
+    }
+    function isAdmin() {
+      return isSignedIn() && myRole() == 'admin';
+    }
+
+    // Hồ sơ vai trò của từng người dùng (admin / user)
+    match /users/{uid} {
+      allow read: if isSignedIn();
+      // Cho phép tự tạo hồ sơ CỦA CHÍNH MÌNH lần đầu đăng nhập (mặc định role=user
+      // được set cứng phía client). Chỉ Admin mới được sửa/nâng quyền cho người khác.
+      allow create: if isSignedIn() && request.auth.uid == uid;
+      allow update, delete: if isAdmin();
+    }
+
+    match /projects/{id} {
+      allow read: if isSignedIn();
+      allow create, update: if isSignedIn();
+      allow delete: if isAdmin();
+    }
+
+    match /transactions/{id} {
+      allow read: if isSignedIn();
+      allow create, update: if isSignedIn();
+      allow delete: if isAdmin();
+    }
+
+    match /paymentOrders/{id} {
+      allow read: if isSignedIn();
+      allow create: if isSignedIn();
+      // User thường chỉ được sửa lệnh chi khi trạng thái vẫn đang "pending"
+      // và không được đổi sang trạng thái khác; Admin thì sửa/duyệt tự do.
+      allow update: if isAdmin() ||
+        (isSignedIn() && resource.data.status == 'pending' && request.resource.data.status == 'pending');
+      allow delete: if isAdmin();
+    }
+
+    match /employees/{id} {
+      allow read: if isSignedIn();
+      allow write: if isAdmin();
+    }
+
+    match /timesheets/{id} {
+      allow read: if isSignedIn();
+      allow create, update: if isSignedIn();
+      allow delete: if isAdmin();
+    }
+  }
+}
