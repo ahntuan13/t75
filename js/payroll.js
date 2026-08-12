@@ -83,8 +83,8 @@ function renderEmployeesTable(){
       <td>${escapeHtml(e.position||'—')}</td>
       <td class="num">${fmtVND(e.baseSalary)}</td>
       <td><div class="row-actions">
-        <button class="icon-btn" data-edit-emp="${e.id}" title="Sửa">✎</button>
-        <button class="icon-btn" data-del-emp="${e.id}" title="Xóa">🗑</button>
+        ${isAdmin() ? `<button class="icon-btn" data-edit-emp="${e.id}" title="Sửa">✎</button>
+        <button class="icon-btn" data-del-emp="${e.id}" title="Xóa">🗑</button>` : '<span class="helper-text">Chỉ Admin</span>'}
       </div></td>
     </tr>`).join('')}</tbody>`;
 }
@@ -178,7 +178,7 @@ function renderTimesheetTable(){
       <td>${escapeHtml(t.note||'—')}</td>
       <td><div class="row-actions">
         <button class="icon-btn" data-edit-ts="${t.id}" title="Sửa">✎</button>
-        <button class="icon-btn" data-del-ts="${t.id}" title="Xóa">🗑</button>
+        ${isAdmin() ? `<button class="icon-btn" data-del-ts="${t.id}" title="Xóa">🗑</button>` : ''}
       </div></td>
     </tr>`).join('')}</tbody>`;
 }

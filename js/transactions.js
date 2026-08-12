@@ -141,7 +141,7 @@ function renderTxTable(){
       <td>
         <div class="row-actions">
           <button class="icon-btn" data-edit-tx="${t.id}" title="Sửa">✎</button>
-          <button class="icon-btn" data-del-tx="${t.id}" title="Xóa">🗑</button>
+          ${isAdmin() ? `<button class="icon-btn" data-del-tx="${t.id}" title="Xóa">🗑</button>` : ''}
         </div>
       </td>
     </tr>`).join('')}</tbody>`;

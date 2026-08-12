@@ -67,7 +67,7 @@ function renderProjectsTable(){
       <td>
         <div class="row-actions">
           <button class="icon-btn" data-edit-project="${p.id}" title="Sửa">✎</button>
-          <button class="icon-btn" data-del-project="${p.id}" title="Xóa">🗑</button>
+          ${isAdmin() ? `<button class="icon-btn" data-del-project="${p.id}" title="Xóa">🗑</button>` : ''}
         </div>
       </td>
     </tr>`;

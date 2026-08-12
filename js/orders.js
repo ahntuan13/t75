@@ -24,6 +24,10 @@ function openOrderModal(id){
   document.getElementById('order-requester').value = o.requester || (auth.currentUser ? auth.currentUser.email : '');
   document.getElementById('order-approver').value = o.approver || '';
   document.getElementById('order-note').value = o.note || '';
+  const statusField = document.getElementById('order-status');
+  statusField.disabled = !isAdmin();
+  if(!isAdmin() && !id) statusField.value = 'pending';
+  document.getElementById('order-status-hint').style.display = isAdmin() ? 'none' : 'block';
   openModal('modal-order');
 }
 
@@ -99,7 +103,7 @@ function renderOrdersTable(){
         <div class="row-actions">
           <button class="icon-btn" data-print-order="${o.id}" title="In">🖨</button>
           <button class="icon-btn" data-edit-order="${o.id}" title="Sửa">✎</button>
-          <button class="icon-btn" data-del-order="${o.id}" title="Xóa">🗑</button>
+          ${isAdmin() ? `<button class="icon-btn" data-del-order="${o.id}" title="Xóa">🗑</button>` : ''}
         </div>
       </td>
     </tr>`).join('')}</tbody>`;

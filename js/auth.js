@@ -26,12 +26,13 @@ document.getElementById('logout-btn').addEventListener('click', ()=>{
   auth.signOut();
 });
 
-auth.onAuthStateChanged((user)=>{
+auth.onAuthStateChanged(async (user)=>{
   if(user){
     document.getElementById('login-screen').style.display = 'none';
     document.getElementById('app-screen').style.display = 'block';
     document.getElementById('user-email').textContent = user.email;
     document.getElementById('user-avatar').textContent = (user.email||'?').charAt(0).toUpperCase();
+    if(window.ensureUserRole) await ensureUserRole();
     if(window.__initApp) window.__initApp();
   } else {
     document.getElementById('login-screen').style.display = 'flex';

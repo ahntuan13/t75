@@ -58,9 +58,8 @@ document.addEventListener('click', (e)=>{
     const backdrop = e.target.closest('.modal-backdrop');
     if(backdrop) backdrop.classList.remove('open');
   }
-  if(e.target.classList && e.target.classList.contains('modal-backdrop')){
-    e.target.classList.remove('open');
-  }
+  // Lưu ý: KHÔNG đóng modal khi bấm vào vùng nền (backdrop) ngoài ý muốn,
+  // chỉ đóng qua nút "Hủy" hoặc nút "✕" để tránh mất dữ liệu đang nhập dở.
 });
 
 function el(html){
