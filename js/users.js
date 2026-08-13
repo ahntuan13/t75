@@ -3,6 +3,7 @@
 // =============================================================
 
 let CURRENT_ROLE = 'user'; // 'admin' | 'user' — mặc định an toàn là user
+let CURRENT_USER_NAME = '';
 let APP_USERS = [];
 
 function isAdmin(){ return CURRENT_ROLE === 'admin'; }
@@ -17,12 +18,14 @@ async function ensureUserRole(){
     const snap = await ref.get();
     if(snap.exists){
       CURRENT_ROLE = snap.data().role === 'admin' ? 'admin' : 'user';
+      CURRENT_USER_NAME = snap.data().name || email.split('@')[0];
     } else {
       // Tài khoản đăng nhập lần đầu -> tự tạo hồ sơ với quyền User (an toàn).
       // Quyền Admin phải được một Admin khác gán tay (hoặc admin đầu tiên tự
       // gán 1 lần qua Firestore Console, xem README).
+      CURRENT_USER_NAME = email.split('@')[0];
       await ref.set({
-        email, role:'user', name: email.split('@')[0],
+        email, role:'user', name: CURRENT_USER_NAME,
         createdAt: firebase.firestore.FieldValue.serverTimestamp()
       });
       CURRENT_ROLE = 'user';
@@ -30,6 +33,7 @@ async function ensureUserRole(){
   }catch(err){
     console.error('ensureUserRole error', err);
     CURRENT_ROLE = 'user';
+    CURRENT_USER_NAME = email.split('@')[0];
   }
   applyRolePermissions();
   if(isAdmin()) listenAppUsers();
