@@ -1,242 +1,332 @@
-// =============================================================
-// DASHBOARD + REPORTS (cashflow by period, P&L by quarter/year)
-// =============================================================
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=IBM+Plex+Mono:wght@500;600&display=swap');
 
-let chartCashflowTrend, chartProjectRevenue, chartReport, chartPnl;
+:root{
+  --bg:#F4F6FB;
+  --bg-soft:#EEF1FA;
+  --card:#FFFFFF;
+  --ink:#1E2433;
+  --ink-dim:#6B7280;
+  --ink-faint:#9AA1B1;
+  --line:#E9ECF5;
 
-// ---------- WELCOME CARD (lời chào real-time + thông tin người dùng) ----------
-function greetingByHour(){
-  const h = new Date().getHours();
-  if(h < 11) return 'Chào buổi sáng,';
-  if(h < 13) return 'Chào buổi trưa,';
-  if(h < 18) return 'Chào buổi chiều,';
-  return 'Chào buổi tối,';
+  --primary:#4F6EF7;
+  --primary-dim:#EAF0FE;
+  --primary-dark:#3B57D9;
+
+  --teal:#12B8A6;
+  --teal-dim:#E3FBF6;
+  --gold:#F5A524;
+  --gold-dim:#FEF3E0;
+  --red:#F5455C;
+  --red-dim:#FEE9EC;
+  --purple:#8B5CF6;
+  --purple-dim:#F2ECFE;
+  --blue:#3B9DF6;
+  --blue-dim:#E9F4FE;
+  --pink:#F754A2;
+  --pink-dim:#FEEBF5;
+
+  --sidebar-bg:#FFFFFF;
+  --radius:14px;
+  --shadow: 0 1px 2px rgba(31,41,64,.04), 0 8px 24px rgba(31,41,64,.06);
 }
 
-function renderWelcomeCard(){
-  const nameEl = document.getElementById('welcome-name');
-  if(!nameEl) return;
-  const name = CURRENT_USER_NAME || (auth.currentUser ? auth.currentUser.email.split('@')[0] : 'bạn');
-  document.getElementById('welcome-greet').textContent = greetingByHour();
-  document.getElementById('welcome-name').textContent = name;
-  document.getElementById('welcome-avatar').textContent = name.charAt(0).toUpperCase();
-  const roleLabel = isAdmin() ? 'Quản trị viên' : 'Thành viên';
-  const dateStr = new Date().toLocaleDateString('vi-VN', {weekday:'long', day:'2-digit', month:'2-digit', year:'numeric'});
-  document.getElementById('welcome-sub').textContent = `${roleLabel} · ${dateStr}`;
-
-  const today = todayISO();
-  const txToday = TRANSACTIONS.filter(t=>t.date===today).length;
-  const pendingOrders = (typeof ORDERS!=='undefined' ? ORDERS : []).filter(o=>o.status==='pending').length;
-  const activeProjects = PROJECTS.filter(p=>p.status==='active').length;
-  document.getElementById('welcome-pills').innerHTML = `
-    <div class="welcome-pill">📌 Giao dịch hôm nay <b>${fmtNum(txToday)}</b></div>
-    <div class="welcome-pill">📝 Lệnh chi chờ duyệt <b>${fmtNum(pendingOrders)}</b></div>
-    <div class="welcome-pill">▣ Dự án đang chạy <b>${fmtNum(activeProjects)}</b></div>
-  `;
+/* ---------- Dark mode ---------- */
+html.dark{
+  --bg:#0E1320;
+  --bg-soft:#171E2E;
+  --card:#161C2B;
+  --ink:#EAEDF5;
+  --ink-dim:#A7AEC0;
+  --ink-faint:#6E7791;
+  --line:#262E42;
+  --sidebar-bg:#12172A;
+  --primary-dim:#1D2954;
+  --teal-dim:#0E2C28;
+  --gold-dim:#2E2510;
+  --red-dim:#301621;
+  --purple-dim:#241E3D;
+  --blue-dim:#16233D;
+  --pink-dim:#2E1830;
+  --shadow: 0 1px 2px rgba(0,0,0,.2), 0 8px 24px rgba(0,0,0,.28);
+}
+html.dark #login-screen{
+  background:
+    radial-gradient(circle at 15% 15%, rgba(139,92,246,.28), transparent 45%),
+    radial-gradient(circle at 85% 85%, rgba(79,110,247,.32), transparent 45%),
+    linear-gradient(160deg,#0E1320,#141A2C 60%, #101526);
 }
 
-// ---------- DASHBOARD ----------
-function renderDashboard(){
-  renderWelcomeCard();
-  const kpiBox = document.getElementById('dash-kpis');
-  if(!kpiBox) return;
-
-  const totalIn = TRANSACTIONS.filter(t=>t.type==='IN').reduce((s,t)=>s+Number(t.amount||0),0);
-  const totalOut = TRANSACTIONS.filter(t=>t.type==='OUT').reduce((s,t)=>s+Number(t.amount||0),0);
-  const net = totalIn - totalOut;
-
-  const thisMonth = todayISO().slice(0,7);
-  const monthIn = TRANSACTIONS.filter(t=>t.type==='IN' && monthKey(t.date)===thisMonth).reduce((s,t)=>s+Number(t.amount||0),0);
-  const monthOut = TRANSACTIONS.filter(t=>t.type==='OUT' && monthKey(t.date)===thisMonth).reduce((s,t)=>s+Number(t.amount||0),0);
-
-  kpiBox.innerHTML =
-    kpiCard('💰','teal','Tổng thu (lũy kế)', `<span class="pos">${fmtVND(totalIn)}</span>`) +
-    kpiCard('💸','red','Tổng chi (lũy kế)', `<span class="neg">${fmtVND(totalOut)}</span>`) +
-    kpiCard('📊','blue','Dòng tiền ròng', `<span class="${net>=0?'pos':'neg'}">${fmtVND(net)}</span>`) +
-    kpiCard('▣','purple','Số dự án đang chạy', fmtNum(PROJECTS.filter(p=>p.status==='active').length)) +
-    kpiCard('📈','teal','Thu tháng này', `<span class="pos">${fmtVND(monthIn)}</span>`) +
-    kpiCard('📉','gold','Chi tháng này', `<span class="neg">${fmtVND(monthOut)}</span>`);
-
-  // 12-month trend
-  const months = [];
-  const d = new Date();
-  for(let i=11;i>=0;i--){
-    const dt = new Date(d.getFullYear(), d.getMonth()-i, 1);
-    months.push(dt.toISOString().slice(0,7));
-  }
-  const inSeries = months.map(m=> TRANSACTIONS.filter(t=>t.type==='IN' && monthKey(t.date)===m).reduce((s,t)=>s+Number(t.amount||0),0));
-  const outSeries = months.map(m=> TRANSACTIONS.filter(t=>t.type==='OUT' && monthKey(t.date)===m).reduce((s,t)=>s+Number(t.amount||0),0));
-
-  const ctx1 = document.getElementById('chart-cashflow-trend');
-  if(chartCashflowTrend) chartCashflowTrend.destroy();
-  chartCashflowTrend = new Chart(ctx1, {
-    type:'bar',
-    data:{ labels: months.map(m=>m.slice(5)+'/'+m.slice(2,4)),
-      datasets:[
-        {label:'Thu', data:inSeries, backgroundColor:CHART_COLORS.teal, borderRadius:4},
-        {label:'Chi', data:outSeries, backgroundColor:CHART_COLORS.red, borderRadius:4}
-      ]},
-    options:{responsive:true, maintainAspectRatio:false,
-      scales:{ x:{grid:{display:false}}, y:{grid:{color:CHART_COLORS.grid}, ticks:{callback:v=>fmtNum(v)}} },
-      plugins:{legend:{position:'bottom', labels:{boxWidth:10}}}}
-  });
-
-  // revenue by project
-  const projRev = PROJECTS.map(p=>({
-    name: p.name,
-    val: TRANSACTIONS.filter(t=>t.projectId===p.id && t.type==='IN').reduce((s,t)=>s+Number(t.amount||0),0)
-  })).filter(p=>p.val>0).sort((a,b)=>b.val-a.val).slice(0,8);
-
-  const ctx2 = document.getElementById('chart-project-revenue');
-  if(chartProjectRevenue) chartProjectRevenue.destroy();
-  chartProjectRevenue = new Chart(ctx2, {
-    type:'bar',
-    data:{ labels: projRev.map(p=>p.name), datasets:[{label:'Doanh thu', data:projRev.map(p=>p.val), backgroundColor:CHART_COLORS.gold, borderRadius:4}]},
-    options:{indexAxis:'y', responsive:true, maintainAspectRatio:false,
-      scales:{ x:{grid:{color:CHART_COLORS.grid}, ticks:{callback:v=>fmtNum(v)}}, y:{grid:{display:false}} },
-      plugins:{legend:{display:false}}}
-  });
-
-  // recent transactions
-  const recent = TRANSACTIONS.slice(0,8);
-  const rt = document.getElementById('dash-recent-table');
-  if(recent.length===0){
-    rt.innerHTML = `<tr><td><div class="empty-state"><div class="big">⇄</div>Chưa có giao dịch nào.</div></td></tr>`;
-  } else {
-    rt.innerHTML = `<thead><tr><th>Ngày</th><th>Loại</th><th>Dự án</th><th>Nội dung</th><th>Số tiền</th></tr></thead><tbody>
-      ${recent.map(t=>`<tr>
-        <td>${fmtDate(t.date)}</td>
-        <td>${t.type==='IN'?'<span class="tag tag-in">Thu</span>':'<span class="tag tag-out">Chi</span>'}</td>
-        <td>${escapeHtml(t.projectName||'—')}</td>
-        <td>${escapeHtml(t.content)}</td>
-        <td class="num" style="color:${t.type==='IN'?'var(--teal)':'var(--red)'}"><strong>${fmtVND(t.amount)}</strong></td>
-      </tr>`).join('')}</tbody>`;
-  }
+*{box-sizing:border-box;}
+html,body{height:100%;}
+body{
+  margin:0;
+  font-family:'Inter',system-ui,sans-serif;
+  background:var(--bg);
+  color:var(--ink);
+  -webkit-font-smoothing:antialiased;
 }
+.mono{font-family:'IBM Plex Mono',monospace;font-variant-numeric:tabular-nums;}
+button{font-family:inherit;cursor:pointer;}
+input,select,textarea{font-family:inherit;}
+::selection{background:var(--primary-dim);}
 
-// ---------- CASHFLOW REPORT (day/month/year) ----------
-function renderReports(){
-  const table = document.getElementById('rp-table');
-  if(!table) return;
-  const groupBy = document.getElementById('rp-groupby').value;
-  const project = document.getElementById('rp-filter-project').value;
-  const year = document.getElementById('rp-filter-year').value;
-
-  let rows = TRANSACTIONS.slice();
-  if(project) rows = rows.filter(t=>t.projectId===project);
-  if(year) rows = rows.filter(t=> yearKey(t.date)===String(year));
-
-  const keyFn = groupBy==='day' ? dayKey : groupBy==='month' ? monthKey : yearKey;
-  const map = {};
-  rows.forEach(t=>{
-    const k = keyFn(t.date);
-    if(!map[k]) map[k] = {key:k, in:0, out:0};
-    if(t.type==='IN') map[k].in += Number(t.amount||0); else map[k].out += Number(t.amount||0);
-  });
-  const data = sortByKeyAsc(Object.values(map));
-
-  const totalIn = rows.filter(t=>t.type==='IN').reduce((s,t)=>s+Number(t.amount||0),0);
-  const totalOut = rows.filter(t=>t.type==='OUT').reduce((s,t)=>s+Number(t.amount||0),0);
-  document.getElementById('rp-kpis').innerHTML =
-    kpiCard('💰','teal','Tổng thu', `<span class="pos">${fmtVND(totalIn)}</span>`) +
-    kpiCard('💸','red','Tổng chi', `<span class="neg">${fmtVND(totalOut)}</span>`) +
-    kpiCard('📊','blue','Dòng tiền ròng', `<span class="${totalIn-totalOut>=0?'pos':'neg'}">${fmtVND(totalIn-totalOut)}</span>`) +
-    kpiCard('🗓','purple','Số kỳ có phát sinh', fmtNum(data.length));
-
-  const ctx = document.getElementById('chart-report');
-  if(chartReport) chartReport.destroy();
-  chartReport = new Chart(ctx, {
-    type:'bar',
-    data:{ labels: data.map(d=>d.key), datasets:[
-      {label:'Thu', data:data.map(d=>d.in), backgroundColor:CHART_COLORS.teal, borderRadius:4},
-      {label:'Chi', data:data.map(d=>d.out), backgroundColor:CHART_COLORS.red, borderRadius:4}
-    ]},
-    options:{responsive:true, maintainAspectRatio:false,
-      scales:{ x:{grid:{display:false}}, y:{grid:{color:CHART_COLORS.grid}, ticks:{callback:v=>fmtNum(v)}} },
-      plugins:{legend:{position:'bottom', labels:{boxWidth:10}}}}
-  });
-
-  if(data.length===0){
-    table.innerHTML = `<tr><td><div class="empty-state"><div class="big">📊</div>Không có dữ liệu phù hợp.</div></td></tr>`;
-    return;
-  }
-  table.innerHTML = `<thead><tr><th>Kỳ</th><th>Thu</th><th>Chi</th><th>Dòng tiền ròng</th></tr></thead><tbody>
-    ${data.slice().reverse().map(d=>`<tr>
-      <td><strong>${d.key}</strong></td>
-      <td class="num" style="color:var(--teal)">${fmtVND(d.in)}</td>
-      <td class="num" style="color:var(--red)">${fmtVND(d.out)}</td>
-      <td class="num"><strong>${fmtVND(d.in-d.out)}</strong></td>
-    </tr>`).join('')}</tbody>`;
+/* ---------- Login ---------- */
+#login-screen{
+  min-height:100vh;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  background:
+    radial-gradient(circle at 15% 15%, rgba(139,92,246,.25), transparent 45%),
+    radial-gradient(circle at 85% 85%, rgba(79,110,247,.30), transparent 45%),
+    linear-gradient(160deg,#EEF1FF,#E4E9FD 60%, #DCE3FC);
+  padding:24px;
 }
-
-// ---------- P&L REPORT (quarter/year) ----------
-function renderPnl(){
-  const table = document.getElementById('pnl-table');
-  if(!table) return;
-  const groupBy = document.getElementById('pnl-groupby').value;
-  const project = document.getElementById('pnl-filter-project').value;
-  const year = document.getElementById('pnl-filter-year').value;
-
-  let rows = TRANSACTIONS.slice();
-  if(project) rows = rows.filter(t=>t.projectId===project);
-  if(year) rows = rows.filter(t=> yearKey(t.date)===String(year));
-
-  const keyFn = groupBy==='quarter' ? quarterKey : yearKey;
-  const map = {};
-  rows.forEach(t=>{
-    const k = keyFn(t.date);
-    if(!map[k]) map[k] = {key:k, revenue:0, cost:0};
-    if(t.type==='IN') map[k].revenue += Number(t.amount||0); else map[k].cost += Number(t.amount||0);
-  });
-  const data = Object.values(map).map(d=>({...d, lntt: d.revenue-d.cost}));
-  // sort: for quarter labels like Q1/2026, sort by year then quarter
-  data.sort((a,b)=>{
-    const pa = a.key.match(/Q(\d)\/(\d+)/), pb = b.key.match(/Q(\d)\/(\d+)/);
-    if(pa && pb){ return pa[2]-pb[2] || pa[1]-pb[1]; }
-    return a.key.localeCompare(b.key);
-  });
-
-  const totalRevenue = data.reduce((s,d)=>s+d.revenue,0);
-  const totalCost = data.reduce((s,d)=>s+d.cost,0);
-  const totalLntt = totalRevenue-totalCost;
-  const margin = totalRevenue ? (totalLntt/totalRevenue*100) : 0;
-  document.getElementById('pnl-kpis').innerHTML =
-    kpiCard('💰','teal','Tổng doanh thu', `<span class="pos">${fmtVND(totalRevenue)}</span>`) +
-    kpiCard('💸','red','Tổng chi phí', `<span class="neg">${fmtVND(totalCost)}</span>`) +
-    kpiCard('📈','blue','Lợi nhuận trước thuế', `<span class="${totalLntt>=0?'pos':'neg'}">${fmtVND(totalLntt)}</span>`) +
-    kpiCard('🎯','gold','Biên lợi nhuận', `${margin.toFixed(1)}%`);
-
-  const ctx = document.getElementById('chart-pnl');
-  if(chartPnl) chartPnl.destroy();
-  chartPnl = new Chart(ctx, {
-    type:'bar',
-    data:{ labels: data.map(d=>d.key), datasets:[
-      {label:'Doanh thu', data:data.map(d=>d.revenue), backgroundColor:CHART_COLORS.teal, borderRadius:4},
-      {label:'Chi phí', data:data.map(d=>d.cost), backgroundColor:CHART_COLORS.red, borderRadius:4},
-      {label:'LNTT', data:data.map(d=>d.lntt), backgroundColor:CHART_COLORS.gold, borderRadius:4}
-    ]},
-    options:{responsive:true, maintainAspectRatio:false,
-      scales:{ x:{grid:{display:false}}, y:{grid:{color:CHART_COLORS.grid}, ticks:{callback:v=>fmtNum(v)}} },
-      plugins:{legend:{position:'bottom', labels:{boxWidth:10}}}}
-  });
-
-  if(data.length===0){
-    table.innerHTML = `<tr><td><div class="empty-state"><div class="big">📈</div>Không có dữ liệu phù hợp.</div></td></tr>`;
-    return;
-  }
-  table.innerHTML = `<thead><tr><th>Kỳ</th><th>Doanh thu</th><th>Chi phí</th><th>LNTT</th><th>Biên LN</th></tr></thead><tbody>
-    ${data.map(d=>`<tr>
-      <td><strong>${d.key}</strong></td>
-      <td class="num" style="color:var(--teal)">${fmtVND(d.revenue)}</td>
-      <td class="num" style="color:var(--red)">${fmtVND(d.cost)}</td>
-      <td class="num"><strong style="color:${d.lntt>=0?'var(--teal)':'var(--red)'}">${fmtVND(d.lntt)}</strong></td>
-      <td class="num">${d.revenue ? (d.lntt/d.revenue*100).toFixed(1) : '0.0'}%</td>
-    </tr>`).join('')}</tbody>`;
+.login-card{
+  width:100%;max-width:380px;
+  background:var(--card);
+  border-radius:20px;
+  padding:40px 32px 32px;
+  box-shadow:0 24px 60px rgba(79,110,247,.18);
 }
+.login-brand{
+  display:flex;align-items:center;gap:10px;margin-bottom:28px;
+}
+.login-brand .mark{
+  width:40px;height:40px;border-radius:12px;
+  background:linear-gradient(135deg,var(--primary),var(--purple));
+  display:flex;align-items:center;justify-content:center;
+  color:#fff;font-weight:800;font-size:13px;letter-spacing:-.5px;
+  box-shadow:0 8px 18px rgba(79,110,247,.35);
+}
+.login-brand .name{font-weight:800;font-size:17px;letter-spacing:-.3px;color:var(--ink);}
+.login-brand .sub{font-size:11px;color:var(--ink-faint);text-transform:uppercase;letter-spacing:.08em;}
+.login-card h1{font-size:20px;margin:0 0 4px;font-weight:700;}
+.login-card p.hint{margin:0 0 24px;color:var(--ink-dim);font-size:13.5px;}
+.field{margin-bottom:16px;}
+.field label{display:block;font-size:12.5px;font-weight:600;color:var(--ink-dim);margin-bottom:6px;}
+.field input,.field select,.field textarea{
+  width:100%;padding:10px 12px;border:1.5px solid var(--line);border-radius:10px;
+  font-size:14px;color:var(--ink);background:var(--bg-soft);transition:border-color .15s,background .15s;
+}
+.field input:focus,.field select:focus,.field textarea:focus{outline:none;border-color:var(--primary);background:var(--card);}
+.btn{
+  display:inline-flex;align-items:center;justify-content:center;gap:6px;
+  padding:10px 18px;border-radius:10px;border:none;font-weight:600;font-size:14px;
+  transition:transform .08s, box-shadow .15s, background .15s;
+}
+.btn:active{transform:scale(.98);}
+.btn-primary{background:var(--primary);color:#fff;box-shadow:0 6px 16px rgba(79,110,247,.28);}
+.btn-primary:hover{background:var(--primary-dark);}
+.btn-block{width:100%;}
+.btn-ghost{background:transparent;color:var(--ink-dim);border:1.5px solid var(--line);}
+.btn-ghost:hover{border-color:var(--ink-faint);color:var(--ink);}
+.btn-danger{background:var(--red-dim);color:var(--red);}
+.btn-danger:hover{background:#fbd3d9;}
+.btn-sm{padding:6px 12px;font-size:12.5px;border-radius:8px;}
+.err-msg{color:var(--red);font-size:13px;margin-top:10px;min-height:16px;}
 
-['rp-groupby','rp-filter-project','rp-filter-year'].forEach(id=>{
-  document.getElementById(id).addEventListener('input', renderReports);
-});
-['pnl-groupby','pnl-filter-project','pnl-filter-year'].forEach(id=>{
-  document.getElementById(id).addEventListener('input', renderPnl);
-});
+/* ---------- App Shell ---------- */
+#app-screen{display:none;min-height:100vh;}
+.shell{display:grid;grid-template-columns:240px 1fr;min-height:100vh;}
+.sidebar{
+  background:var(--sidebar-bg);
+  color:var(--ink-dim);padding:20px 14px;display:flex;flex-direction:column;
+  position:sticky;top:0;height:100vh;
+  border-right:1px solid var(--line);
+}
+.sidebar .brand{display:flex;align-items:center;gap:10px;padding:6px 8px 22px;}
+.sidebar .brand .mark{
+  width:34px;height:34px;border-radius:10px;background:linear-gradient(135deg,var(--primary),var(--purple));
+  display:flex;align-items:center;justify-content:center;color:#fff;font-weight:800;font-size:12px;
+  box-shadow:0 6px 14px rgba(79,110,247,.3);
+}
+.sidebar .brand .name{font-weight:800;color:var(--ink);font-size:15px;letter-spacing:-.2px;}
+.nav-group{margin-bottom:6px;}
+.nav-label{font-size:10.5px;text-transform:uppercase;letter-spacing:.09em;color:var(--ink-faint);padding:14px 10px 6px;font-weight:700;}
+.nav-item{
+  display:flex;align-items:center;gap:10px;padding:9px 10px;border-radius:10px;
+  color:var(--ink-dim);font-size:13.5px;font-weight:600;cursor:pointer;margin-bottom:2px;
+  transition:background .12s,color .12s;
+}
+.nav-item .ic{width:19px;text-align:center;font-size:15px;opacity:.9;}
+.nav-item:hover{background:var(--bg-soft);color:var(--ink);}
+.nav-item.active{background:var(--primary);color:#fff;box-shadow:0 6px 14px rgba(79,110,247,.3);}
+.sidebar-foot{margin-top:auto;padding-top:14px;border-top:1px solid var(--line);}
+.user-chip{display:flex;align-items:center;gap:9px;padding:8px 8px;border-radius:10px;}
+.user-chip .av{width:30px;height:30px;border-radius:50%;background:linear-gradient(135deg,var(--gold),#F6C453);color:#5A3B00;font-weight:800;font-size:12px;display:flex;align-items:center;justify-content:center;}
+.user-chip .who{flex:1;min-width:0;}
+.user-chip .who .em{font-size:12px;color:var(--ink);font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.user-chip .who .role{font-size:10.5px;color:var(--ink-faint);}
+.logout-btn{background:none;border:none;color:var(--ink-faint);font-size:15px;padding:4px;}
+.logout-btn:hover{color:var(--red);}
+
+.main{padding:26px 32px 60px;max-width:1440px;}
+.topbar{display:flex;align-items:center;justify-content:space-between;margin-bottom:22px;flex-wrap:wrap;gap:12px;}
+.topbar h2{font-size:22px;font-weight:800;margin:0;letter-spacing:-.3px;color:var(--ink);}
+.topbar .sub{color:var(--ink-dim);font-size:13px;margin-top:3px;}
+.topbar-actions{display:flex;gap:10px;align-items:center;}
+
+.view{display:none;}
+.view.active{display:block;}
+
+/* ---------- Cards / KPI ---------- */
+.kpi-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:14px;margin-bottom:22px;}
+.kpi-card{
+  background:var(--card);border-radius:var(--radius);padding:18px 18px;box-shadow:var(--shadow);
+  border:1px solid var(--line);display:flex;flex-direction:column;gap:10px;
+}
+.kpi-card .top-row{display:flex;align-items:flex-start;justify-content:space-between;}
+.icon-badge{
+  width:38px;height:38px;border-radius:11px;display:flex;align-items:center;justify-content:center;
+  font-size:17px;flex-shrink:0;
+}
+.icon-badge.c-blue{background:var(--primary-dim);color:var(--primary);}
+.icon-badge.c-teal{background:var(--teal-dim);color:var(--teal);}
+.icon-badge.c-gold{background:var(--gold-dim);color:var(--gold);}
+.icon-badge.c-red{background:var(--red-dim);color:var(--red);}
+.icon-badge.c-purple{background:var(--purple-dim);color:var(--purple);}
+.icon-badge.c-pink{background:var(--pink-dim);color:var(--pink);}
+.kpi-card .lbl{font-size:12px;color:var(--ink-dim);font-weight:600;}
+.kpi-card .val{font-size:22px;font-weight:800;letter-spacing:-.4px;color:var(--ink);}
+.kpi-card .val.pos{color:var(--teal);}
+.kpi-card .val.neg{color:var(--red);}
+.pos{color:var(--teal);}
+.neg{color:var(--red);}
+.kpi-card .delta{font-size:12px;color:var(--ink-faint);}
+
+.card{background:var(--card);border-radius:var(--radius);padding:20px;box-shadow:var(--shadow);border:1px solid var(--line);margin-bottom:18px;}
+.card-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;flex-wrap:wrap;gap:10px;}
+.card-head h3{font-size:15px;font-weight:800;margin:0;color:var(--ink);}
+.card-head .actions{display:flex;gap:8px;}
+
+/* ---------- Table ---------- */
+.table-wrap{overflow-x:auto;}
+table.data{width:100%;border-collapse:collapse;font-size:13px;}
+table.data th{
+  text-align:left;padding:10px 12px;background:var(--bg-soft);color:var(--ink-dim);
+  font-weight:700;font-size:11.5px;text-transform:uppercase;letter-spacing:.04em;
+  border-bottom:1px solid var(--line);white-space:nowrap;
+}
+table.data th:first-child{border-top-left-radius:10px;border-bottom-left-radius:10px;}
+table.data th:last-child{border-top-right-radius:10px;border-bottom-right-radius:10px;}
+table.data td{padding:10px 12px;border-bottom:1px solid var(--line);vertical-align:middle;}
+table.data tr:hover td{background:#FAFBFF;}
+table.data td.num{text-align:right;font-family:'IBM Plex Mono',monospace;font-variant-numeric:tabular-nums;}
+.tag{display:inline-flex;align-items:center;padding:3px 10px;border-radius:999px;font-size:11px;font-weight:700;}
+.tag-in{background:var(--teal-dim);color:var(--teal);}
+.tag-out{background:var(--red-dim);color:var(--red);}
+.tag-blue{background:var(--blue-dim);color:var(--blue);}
+.tag-gold{background:var(--gold-dim);color:var(--gold);}
+.tag-gray{background:var(--bg-soft);color:var(--ink-dim);}
+.row-actions{display:flex;gap:6px;}
+.icon-btn{background:var(--bg-soft);border:none;color:var(--ink-dim);font-size:13px;padding:6px 8px;border-radius:8px;}
+.icon-btn:hover{background:var(--primary-dim);color:var(--primary);}
+.empty-state{text-align:center;padding:44px 20px;color:var(--ink-faint);}
+.empty-state .big{font-size:30px;margin-bottom:8px;}
+
+/* ---------- Filters bar ---------- */
+.filters-bar{display:flex;gap:10px;flex-wrap:wrap;margin-bottom:16px;align-items:center;}
+.filters-bar select, .filters-bar input{
+  padding:8px 12px;border:1.5px solid var(--line);border-radius:10px;font-size:13px;background:var(--card);color:var(--ink);
+}
+.filters-bar .spacer{flex:1;}
+
+/* ---------- Modal ---------- */
+.modal-backdrop{
+  position:fixed;inset:0;background:rgba(30,36,51,.45);backdrop-filter:blur(2px);
+  display:none;align-items:flex-start;justify-content:center;z-index:100;padding:40px 16px;overflow-y:auto;
+}
+.modal-backdrop.open{display:flex;}
+.modal{
+  background:var(--card);border-radius:18px;width:100%;max-width:560px;box-shadow:0 30px 80px rgba(0,0,0,.35);
+  animation:modalIn .16s ease-out;
+}
+@keyframes modalIn{from{opacity:0;transform:translateY(8px) scale(.98);}to{opacity:1;transform:none;}}
+.modal-head{display:flex;align-items:center;justify-content:space-between;padding:18px 22px;border-bottom:1px solid var(--line);}
+.modal-head h3{margin:0;font-size:16px;font-weight:800;color:var(--ink);}
+.modal-close{background:var(--bg-soft);border:none;font-size:15px;color:var(--ink-dim);width:28px;height:28px;border-radius:8px;}
+.modal-body{padding:20px 22px;max-height:70vh;overflow-y:auto;}
+.modal-foot{padding:16px 22px;border-top:1px solid var(--line);display:flex;justify-content:flex-end;gap:10px;}
+.form-grid{display:grid;grid-template-columns:1fr 1fr;gap:14px;}
+.form-grid .full{grid-column:1/-1;}
+.form-grid .field{margin-bottom:0;}
+.seg{display:flex;border:1.5px solid var(--line);border-radius:10px;overflow:hidden;}
+.seg button{flex:1;padding:9px;border:none;background:var(--card);font-size:13px;font-weight:700;color:var(--ink-dim);}
+.seg button.active-in{background:var(--teal-dim);color:var(--teal);}
+.seg button.active-out{background:var(--red-dim);color:var(--red);}
+
+/* ---------- Toast ---------- */
+#toast{
+  position:fixed;bottom:22px;right:22px;background:#1E2433;color:#fff;
+  padding:12px 18px;border-radius:12px;font-size:13.5px;box-shadow:0 10px 30px rgba(0,0,0,.35);
+  z-index:200;opacity:0;transform:translateY(10px);transition:all .2s;pointer-events:none;
+}
+#toast.show{opacity:1;transform:none;}
+
+/* ---------- Welcome card (Dashboard) ---------- */
+.welcome-card{
+  background:linear-gradient(120deg, var(--card), var(--primary-dim));
+  border:1px solid var(--line);
+  border-radius:var(--radius);
+  padding:20px 22px;
+  display:flex;align-items:center;justify-content:space-between;
+  gap:16px;flex-wrap:wrap;
+  margin-bottom:18px;
+  box-shadow:var(--shadow);
+}
+.welcome-left{display:flex;align-items:center;gap:14px;}
+.welcome-avatar{
+  width:52px;height:52px;border-radius:50%;
+  background:linear-gradient(135deg,var(--primary),var(--purple));
+  color:#fff;font-weight:800;font-size:19px;
+  display:flex;align-items:center;justify-content:center;
+  box-shadow:0 8px 20px rgba(79,110,247,.3);
+  flex-shrink:0;
+}
+.welcome-greet{font-size:12.5px;color:var(--ink-dim);font-weight:600;}
+.welcome-name{font-size:18px;font-weight:800;color:var(--ink);margin-top:1px;}
+.welcome-sub{font-size:12.5px;color:var(--ink-faint);margin-top:2px;}
+.welcome-pills{display:flex;gap:10px;flex-wrap:wrap;}
+.welcome-pill{
+  background:var(--card);border:1px solid var(--line);border-radius:12px;
+  padding:8px 14px;font-size:12.5px;color:var(--ink-dim);font-weight:600;
+  display:flex;align-items:center;gap:6px;white-space:nowrap;
+}
+.welcome-pill b{color:var(--ink);font-weight:800;}
+
+/* ---------- Theme toggle ---------- */
+.theme-toggle{
+  display:flex;align-items:center;justify-content:center;gap:8px;width:100%;
+  padding:9px 10px;border-radius:10px;border:1px solid var(--line);
+  background:var(--bg-soft);color:var(--ink-dim);font-size:12.5px;font-weight:600;
+  margin-bottom:10px;transition:background .12s,color .12s;
+}
+.theme-toggle:hover{background:var(--primary-dim);color:var(--primary);}
+
+/* ---------- Chart wrap ---------- */
+.chart-wrap{position:relative;height:280px;}
+.two-col{display:grid;grid-template-columns:1.3fr 1fr;gap:16px;}
+@media (max-width:980px){.two-col{grid-template-columns:1fr;}}
+
+/* ---------- Responsive ---------- */
+@media (max-width:840px){
+  .shell{grid-template-columns:1fr;}
+  .sidebar{position:fixed;left:-260px;width:240px;z-index:90;transition:left .2s;box-shadow:10px 0 30px rgba(31,41,64,.15);}
+  .sidebar.open{left:0;}
+  .main{padding:18px 16px 60px;}
+  .form-grid{grid-template-columns:1fr;}
+  #menu-toggle{display:inline-flex !important;}
+}
+#menu-toggle{display:none;background:var(--card);border:1px solid var(--line);border-radius:10px;width:36px;height:36px;align-items:center;justify-content:center;font-size:15px;color:var(--ink-dim);}
+
+.badge-count{background:var(--gold);color:#5A3B00;font-size:10px;font-weight:800;padding:1px 6px;border-radius:999px;margin-left:auto;}
+.helper-text{font-size:12px;color:var(--ink-faint);margin-top:4px;}
+.print-only{display:none;}
+@media print{
+  .sidebar,.topbar-actions,.filters-bar,.no-print{display:none !important;}
+  .main{padding:0;max-width:none;}
+  .print-only{display:block;}
+  body{background:#fff;}
+}
