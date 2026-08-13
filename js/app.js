@@ -33,3 +33,27 @@ window.__initApp = function(){
   listenOrders();
   listenPayroll();
 };
+
+// ---------------- Theme (sáng / tối) ----------------
+function applyTheme(theme){
+  document.documentElement.classList.toggle('dark', theme === 'dark');
+  document.getElementById('theme-icon').textContent = theme === 'dark' ? '☀️' : '🌙';
+  document.getElementById('theme-label').textContent = theme === 'dark' ? 'Chế độ sáng' : 'Chế độ tối';
+  localStorage.setItem('t75-theme', theme);
+}
+(function initTheme(){
+  const saved = localStorage.getItem('t75-theme') || 'light';
+  applyTheme(saved);
+})();
+document.getElementById('theme-toggle').addEventListener('click', ()=>{
+  const isDark = document.documentElement.classList.contains('dark');
+  applyTheme(isDark ? 'light' : 'dark');
+});
+
+// ---------------- Lời chào real-time ----------------
+// Cập nhật lại mỗi phút để câu chào (sáng/trưa/chiều/tối) luôn đúng thời điểm
+// dù người dùng để app mở lâu không thao tác gì.
+setInterval(()=>{
+  const dashView = document.getElementById('view-dashboard');
+  if(dashView && dashView.classList.contains('active') && window.renderWelcomeCard) renderWelcomeCard();
+}, 60000);
