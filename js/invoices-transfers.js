@@ -15,10 +15,10 @@ function renderInvoices(){
 
   const totalIn = rows.filter(t=>t.type==='IN').reduce((s,t)=>s+Number(t.amount||0),0);
   const totalOut = rows.filter(t=>t.type==='OUT').reduce((s,t)=>s+Number(t.amount||0),0);
-  kpiBox.innerHTML = `
-    <div class="kpi-card"><div class="lbl">Tổng số hóa đơn</div><div class="val">${fmtNum(rows.length)}</div></div>
-    <div class="kpi-card"><div class="lbl">Giá trị hóa đơn Thu</div><div class="val pos">${fmtVND(totalIn)}</div></div>
-    <div class="kpi-card"><div class="lbl">Giá trị hóa đơn Chi</div><div class="val neg">${fmtVND(totalOut)}</div></div>`;
+  kpiBox.innerHTML =
+    kpiCard('🧾','purple','Tổng số hóa đơn', fmtNum(rows.length)) +
+    kpiCard('💰','teal','Giá trị hóa đơn Thu', `<span class="pos">${fmtVND(totalIn)}</span>`) +
+    kpiCard('💸','red','Giá trị hóa đơn Chi', `<span class="neg">${fmtVND(totalOut)}</span>`);
 
   if(rows.length===0){
     table.innerHTML = `<tr><td><div class="empty-state"><div class="big">🧾</div>Chưa có giao dịch nào gắn hóa đơn.</div></td></tr>`;
