@@ -17,13 +17,13 @@ function renderDashboard(){
   const monthIn = TRANSACTIONS.filter(t=>t.type==='IN' && monthKey(t.date)===thisMonth).reduce((s,t)=>s+Number(t.amount||0),0);
   const monthOut = TRANSACTIONS.filter(t=>t.type==='OUT' && monthKey(t.date)===thisMonth).reduce((s,t)=>s+Number(t.amount||0),0);
 
-  kpiBox.innerHTML = `
-    <div class="kpi-card"><div class="lbl">Tổng thu (lũy kế)</div><div class="val pos">${fmtVND(totalIn)}</div></div>
-    <div class="kpi-card"><div class="lbl">Tổng chi (lũy kế)</div><div class="val neg">${fmtVND(totalOut)}</div></div>
-    <div class="kpi-card"><div class="lbl">Dòng tiền ròng</div><div class="val ${net>=0?'pos':'neg'}">${fmtVND(net)}</div></div>
-    <div class="kpi-card"><div class="lbl">Số dự án đang chạy</div><div class="val">${fmtNum(PROJECTS.filter(p=>p.status==='active').length)}</div></div>
-    <div class="kpi-card"><div class="lbl">Thu tháng này</div><div class="val pos">${fmtVND(monthIn)}</div></div>
-    <div class="kpi-card"><div class="lbl">Chi tháng này</div><div class="val neg">${fmtVND(monthOut)}</div></div>`;
+  kpiBox.innerHTML =
+    kpiCard('💰','teal','Tổng thu (lũy kế)', `<span class="pos">${fmtVND(totalIn)}</span>`) +
+    kpiCard('💸','red','Tổng chi (lũy kế)', `<span class="neg">${fmtVND(totalOut)}</span>`) +
+    kpiCard('📊','blue','Dòng tiền ròng', `<span class="${net>=0?'pos':'neg'}">${fmtVND(net)}</span>`) +
+    kpiCard('▣','purple','Số dự án đang chạy', fmtNum(PROJECTS.filter(p=>p.status==='active').length)) +
+    kpiCard('📈','teal','Thu tháng này', `<span class="pos">${fmtVND(monthIn)}</span>`) +
+    kpiCard('📉','gold','Chi tháng này', `<span class="neg">${fmtVND(monthOut)}</span>`);
 
   // 12-month trend
   const months = [];
@@ -105,11 +105,11 @@ function renderReports(){
 
   const totalIn = rows.filter(t=>t.type==='IN').reduce((s,t)=>s+Number(t.amount||0),0);
   const totalOut = rows.filter(t=>t.type==='OUT').reduce((s,t)=>s+Number(t.amount||0),0);
-  document.getElementById('rp-kpis').innerHTML = `
-    <div class="kpi-card"><div class="lbl">Tổng thu</div><div class="val pos">${fmtVND(totalIn)}</div></div>
-    <div class="kpi-card"><div class="lbl">Tổng chi</div><div class="val neg">${fmtVND(totalOut)}</div></div>
-    <div class="kpi-card"><div class="lbl">Dòng tiền ròng</div><div class="val ${totalIn-totalOut>=0?'pos':'neg'}">${fmtVND(totalIn-totalOut)}</div></div>
-    <div class="kpi-card"><div class="lbl">Số kỳ có phát sinh</div><div class="val">${fmtNum(data.length)}</div></div>`;
+  document.getElementById('rp-kpis').innerHTML =
+    kpiCard('💰','teal','Tổng thu', `<span class="pos">${fmtVND(totalIn)}</span>`) +
+    kpiCard('💸','red','Tổng chi', `<span class="neg">${fmtVND(totalOut)}</span>`) +
+    kpiCard('📊','blue','Dòng tiền ròng', `<span class="${totalIn-totalOut>=0?'pos':'neg'}">${fmtVND(totalIn-totalOut)}</span>`) +
+    kpiCard('🗓','purple','Số kỳ có phát sinh', fmtNum(data.length));
 
   const ctx = document.getElementById('chart-report');
   if(chartReport) chartReport.destroy();
@@ -168,11 +168,11 @@ function renderPnl(){
   const totalCost = data.reduce((s,d)=>s+d.cost,0);
   const totalLntt = totalRevenue-totalCost;
   const margin = totalRevenue ? (totalLntt/totalRevenue*100) : 0;
-  document.getElementById('pnl-kpis').innerHTML = `
-    <div class="kpi-card"><div class="lbl">Tổng doanh thu</div><div class="val pos">${fmtVND(totalRevenue)}</div></div>
-    <div class="kpi-card"><div class="lbl">Tổng chi phí</div><div class="val neg">${fmtVND(totalCost)}</div></div>
-    <div class="kpi-card"><div class="lbl">Lợi nhuận trước thuế</div><div class="val ${totalLntt>=0?'pos':'neg'}">${fmtVND(totalLntt)}</div></div>
-    <div class="kpi-card"><div class="lbl">Biên lợi nhuận</div><div class="val">${margin.toFixed(1)}%</div></div>`;
+  document.getElementById('pnl-kpis').innerHTML =
+    kpiCard('💰','teal','Tổng doanh thu', `<span class="pos">${fmtVND(totalRevenue)}</span>`) +
+    kpiCard('💸','red','Tổng chi phí', `<span class="neg">${fmtVND(totalCost)}</span>`) +
+    kpiCard('📈','blue','Lợi nhuận trước thuế', `<span class="${totalLntt>=0?'pos':'neg'}">${fmtVND(totalLntt)}</span>`) +
+    kpiCard('🎯','gold','Biên lợi nhuận', `${margin.toFixed(1)}%`);
 
   const ctx = document.getElementById('chart-pnl');
   if(chartPnl) chartPnl.destroy();
