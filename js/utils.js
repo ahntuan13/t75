@@ -84,10 +84,23 @@ function sortByKeyAsc(arr){
   return arr.sort((a,b)=> a.key < b.key ? -1 : a.key > b.key ? 1 : 0);
 }
 
+// Tạo 1 thẻ KPI có icon màu (dùng trong Dashboard, Báo cáo, Hóa đơn...)
+// color: 'blue' | 'teal' | 'gold' | 'red' | 'purple' | 'pink'
+function kpiCard(icon, color, label, valueHtml, deltaHtml){
+  return `<div class="kpi-card">
+    <div class="top-row">
+      <div class="icon-badge c-${color}">${icon}</div>
+    </div>
+    <div class="lbl">${label}</div>
+    <div class="val">${valueHtml}</div>
+    ${deltaHtml ? `<div class="delta">${deltaHtml}</div>` : ''}
+  </div>`;
+}
+
 // Color palette used across charts
 const CHART_COLORS = {
-  teal:'#0E7C66', tealDim:'rgba(14,124,102,.15)',
-  red:'#B23B3B', redDim:'rgba(178,59,59,.15)',
-  gold:'#B8863A', blue:'#2E5AAC',
-  grid:'#E2E5EA', text:'#5B6472'
+  teal:'#12B8A6', tealDim:'rgba(18,184,166,.15)',
+  red:'#F5455C', redDim:'rgba(245,69,92,.15)',
+  gold:'#F5A524', blue:'#4F6EF7', purple:'#8B5CF6',
+  grid:'#E9ECF5', text:'#6B7280'
 };
