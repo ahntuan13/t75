@@ -4,8 +4,40 @@
 
 let chartCashflowTrend, chartProjectRevenue, chartReport, chartPnl;
 
+// ---------- WELCOME CARD (lời chào real-time + thông tin người dùng) ----------
+function greetingByHour(){
+  const h = new Date().getHours();
+  if(h < 11) return 'Chào buổi sáng,';
+  if(h < 13) return 'Chào buổi trưa,';
+  if(h < 18) return 'Chào buổi chiều,';
+  return 'Chào buổi tối,';
+}
+
+function renderWelcomeCard(){
+  const nameEl = document.getElementById('welcome-name');
+  if(!nameEl) return;
+  const name = CURRENT_USER_NAME || (auth.currentUser ? auth.currentUser.email.split('@')[0] : 'bạn');
+  document.getElementById('welcome-greet').textContent = greetingByHour();
+  document.getElementById('welcome-name').textContent = name;
+  document.getElementById('welcome-avatar').textContent = name.charAt(0).toUpperCase();
+  const roleLabel = isAdmin() ? 'Quản trị viên' : 'Thành viên';
+  const dateStr = new Date().toLocaleDateString('vi-VN', {weekday:'long', day:'2-digit', month:'2-digit', year:'numeric'});
+  document.getElementById('welcome-sub').textContent = `${roleLabel} · ${dateStr}`;
+
+  const today = todayISO();
+  const txToday = TRANSACTIONS.filter(t=>t.date===today).length;
+  const pendingOrders = (typeof ORDERS!=='undefined' ? ORDERS : []).filter(o=>o.status==='pending').length;
+  const activeProjects = PROJECTS.filter(p=>p.status==='active').length;
+  document.getElementById('welcome-pills').innerHTML = `
+    <div class="welcome-pill">📌 Giao dịch hôm nay <b>${fmtNum(txToday)}</b></div>
+    <div class="welcome-pill">📝 Lệnh chi chờ duyệt <b>${fmtNum(pendingOrders)}</b></div>
+    <div class="welcome-pill">▣ Dự án đang chạy <b>${fmtNum(activeProjects)}</b></div>
+  `;
+}
+
 // ---------- DASHBOARD ----------
 function renderDashboard(){
+  renderWelcomeCard();
   const kpiBox = document.getElementById('dash-kpis');
   if(!kpiBox) return;
 
