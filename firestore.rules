@@ -11,6 +11,26 @@ service cloud.firestore {
     function isAdmin() {
       return isSignedIn() && myRole() == 'admin';
     }
+    function changedKeys() {
+      return request.resource.data.diff(resource.data).affectedKeys();
+    }
+    // User thường được phép tự đổi trạng thái Hóa đơn / Chuyển khoản (không đổi field khác)
+    function isSimpleStatusUpdate() {
+      return isSignedIn() && changedKeys().hasOnly(['invoiceStatus','transferStatus']);
+    }
+    // Bất kỳ ai cũng được GỬI DUYỆT một khoản Chi cho GĐ/PGĐ (chuyển trạng thái sang 'pending')
+    function isApprovalSubmit() {
+      return isSignedIn()
+        && changedKeys().hasOnly(['approvalStatus','approverRole','approverEmail','approvalSubmittedAt','approvedBy','approvedAt'])
+        && request.resource.data.approvalStatus == 'pending';
+    }
+    // Chỉ đúng email GĐ/PGĐ đã được gán (resource.data.approverEmail) mới được DUYỆT/TỪ CHỐI
+    function isApprovalDecision() {
+      return isSignedIn()
+        && changedKeys().hasOnly(['approvalStatus','approvedBy','approvedAt'])
+        && (request.resource.data.approvalStatus == 'approved' || request.resource.data.approvalStatus == 'rejected')
+        && resource.data.approverEmail == request.auth.token.email;
+    }
 
     // Hồ sơ vai trò của từng người dùng (admin / user)
     match /users/{uid} {
@@ -30,9 +50,17 @@ service cloud.firestore {
 
     match /transactions/{id} {
       allow read: if isSignedIn();
-      // User thường chỉ được NHẬP MỚI giao dịch, không được sửa/xóa giao dịch đã có.
+      // User thường chỉ được NHẬP MỚI giao dịch; sửa/xóa toàn bộ chỉ Admin;
+      // riêng đổi trạng thái Hóa đơn/Chuyển khoản và luồng Gửi duyệt/Duyệt/Từ chối Chi thì User cũng được (có kiểm soát field).
       allow create: if isSignedIn();
-      allow update, delete: if isAdmin();
+      allow update: if isAdmin() || isSimpleStatusUpdate() || isApprovalSubmit() || isApprovalDecision();
+      allow delete: if isAdmin();
+    }
+
+    // Cài đặt chung (VD: email GĐ/PGĐ duyệt chi) — ai cũng đọc được, chỉ Admin sửa
+    match /settings/{id} {
+      allow read: if isSignedIn();
+      allow write: if isAdmin();
     }
 
     match /paymentOrders/{id} {
