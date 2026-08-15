@@ -48,12 +48,12 @@
 
       <div class="nav-group">
         <div class="nav-item active" data-view="dashboard"><span class="ic">◈</span> Tổng quan</div>
-        <div class="nav-item" data-view="projects"><span class="ic">▣</span> Dự án</div>
-        <div class="nav-item" data-view="transactions"><span class="ic">⇄</span> Thu chi</div>
       </div>
 
       <div class="nav-label">Hồ sơ</div>
       <div class="nav-group">
+        <div class="nav-item" data-view="projects"><span class="ic">▣</span> Dự án</div>
+        <div class="nav-item" data-view="transactions"><span class="ic">⇄</span> Thu chi</div>
         <div class="nav-item" data-view="invoices"><span class="ic">🧾</span> Hóa đơn</div>
         <div class="nav-item" data-view="transfers"><span class="ic">🏦</span> Chuyển khoản</div>
       </div>
@@ -114,18 +114,16 @@
           <div class="welcome-pills" id="welcome-pills"></div>
         </div>
         <div class="kpi-grid" id="dash-kpis"></div>
-        <div class="two-col">
-          <div class="card">
-            <div class="card-head"><h3>Dòng tiền 12 tháng gần nhất</h3></div>
-            <div class="chart-wrap"><canvas id="chart-cashflow-trend"></canvas></div>
-          </div>
-          <div class="card">
-            <div class="card-head"><h3>Doanh thu thực tế theo dự án</h3></div>
-            <div class="chart-wrap"><canvas id="chart-project-revenue"></canvas></div>
-          </div>
+        <div class="card">
+          <div class="card-head"><h3>Dòng tiền 12 tháng gần nhất</h3></div>
+          <div class="chart-wrap"><canvas id="chart-cashflow-trend"></canvas></div>
         </div>
         <div class="card">
-          <div class="card-head"><h3>Giá trị hợp đồng đã ký theo dự án (dự toán)</h3></div>
+          <div class="card-head"><h3>Doanh thu thực tế</h3></div>
+          <div class="chart-wrap"><canvas id="chart-project-revenue"></canvas></div>
+        </div>
+        <div class="card">
+          <div class="card-head"><h3>Giá trị hợp đồng đã ký</h3></div>
           <div class="chart-wrap"><canvas id="chart-project-budget"></canvas></div>
         </div>
         <div class="card">
@@ -148,8 +146,8 @@
         <div class="topbar">
           <div><h2>Thu chi</h2><div class="sub">Ghi nhận dòng tiền vào/ra theo dự án</div></div>
           <div class="topbar-actions">
-            <button class="btn btn-ghost" id="btn-upload-thu">⬆ Upload Thu (Excel)</button>
-            <button class="btn btn-ghost" id="btn-upload-chi">⬆ Upload Chi (Excel)</button>
+            <button class="btn btn-ghost" id="btn-upload-thu" style="display:none;">⬆ Upload Thu (Excel)</button>
+            <button class="btn btn-ghost" id="btn-upload-chi" style="display:none;">⬆ Upload Chi (Excel)</button>
             <button class="btn btn-primary" id="btn-add-tx">+ Nhập giao dịch</button>
           </div>
           <input type="file" id="upload-thu-input" accept=".xlsx,.xls" style="display:none">
