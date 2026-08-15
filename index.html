@@ -93,6 +93,7 @@
     <!-- MAIN -->
     <div class="main">
       <button id="menu-toggle">☰</button>
+      <div id="approval-banner" style="display:none;"></div>
 
       <!-- DASHBOARD -->
       <div class="view active" id="view-dashboard">
@@ -201,8 +202,8 @@
           <select id="tr-filter-project"><option value="">Tất cả dự án</option></select>
           <select id="tr-filter-status">
             <option value="">Tất cả trạng thái</option>
-            <option value="done">✅ Đã chuyển khoản</option>
-            <option value="pending">⏳ Chưa chuyển khoản</option>
+            <option value="done">✅ Đã CK / Đã nhận</option>
+            <option value="pending">⏳ Chưa CK / Chưa nhận</option>
           </select>
           <input type="text" id="tr-search" placeholder="Tìm số TK / ngân hàng...">
         </div>
@@ -310,6 +311,17 @@
             <strong>Admin</strong> hay <strong>Thành viên</strong>.
           </p>
         </div>
+        <div class="card">
+          <div class="card-head"><h3>Người duyệt chi (GĐ / PGĐ)</h3></div>
+          <p class="helper-text" style="margin-bottom:14px;">
+            Nhập đúng email đăng nhập app của Giám đốc / Phó giám đốc. Khi một khoản Chi được gửi duyệt, đúng người này (đăng nhập bằng email dưới) mới thấy nút Duyệt/Từ chối.
+          </p>
+          <div class="form-grid">
+            <div class="field"><label>Email Giám đốc (GĐ)</label><input id="approver-gd-email" placeholder="gd@congty.com"></div>
+            <div class="field"><label>Email Phó giám đốc (PGĐ)</label><input id="approver-pgd-email" placeholder="pgd@congty.com"></div>
+          </div>
+          <button class="btn btn-primary btn-sm" id="save-approvers-btn">Lưu email duyệt chi</button>
+        </div>
         <div class="card"><div class="table-wrap"><table class="data" id="users-table"></table></div></div>
       </div>
 
@@ -369,8 +381,9 @@
           <button type="button" id="seg-in" data-type="IN">↓ Thu (IN)</button>
           <button type="button" id="seg-out" data-type="OUT">↑ Chi (OUT)</button>
         </div>
+        <div class="helper-text" id="tx-type-hint">Chọn Thu hoặc Chi để tiếp tục nhập thông tin.</div>
       </div>
-      <div class="form-grid">
+      <div class="form-grid" id="tx-form-fields" style="display:none;">
         <div class="field full"><label>Dự án *</label><select id="tx-project" required></select></div>
         <div class="field"><label>Ngày *</label><input type="date" id="tx-date" required></div>
         <div class="field"><label>Mã (code)</label>
@@ -412,10 +425,10 @@
         </div>
 
         <div class="field full" style="border-top:1px solid var(--line);padding-top:14px;margin-top:2px;">
-          <label style="font-size:13px;font-weight:700;color:var(--ink);">🏦 Thông tin chuyển khoản</label>
+          <label style="font-size:13px;font-weight:700;color:var(--ink);" id="tx-transfer-section-label">🏦 Thông tin chuyển khoản</label>
         </div>
         <div class="field full" style="margin-bottom:14px;">
-          <label>Trạng thái chuyển khoản</label>
+          <label id="tx-transfer-status-label">Trạng thái chuyển khoản</label>
           <div class="seg">
             <button type="button" id="seg-transfer-yes" data-transfer="done">✅ Đã chuyển khoản</button>
             <button type="button" id="seg-transfer-no" data-transfer="pending">⏳ Chưa chuyển khoản</button>
@@ -433,6 +446,17 @@
             <img id="tx-transfer-image-preview" style="display:none;max-width:150px;max-height:150px;border-radius:8px;border:1px solid var(--line);">
             <button type="button" class="btn btn-ghost btn-sm" id="tx-transfer-image-remove" style="display:none;">Xóa ảnh</button>
           </div>
+        </div>
+
+        <div class="field full" id="tx-approval-block" style="display:none;border-top:1px solid var(--line);padding-top:14px;margin-top:2px;">
+          <label style="font-size:13px;font-weight:700;color:var(--ink);">✅ Phê duyệt GĐ / PGĐ</label>
+          <div class="helper-text" style="margin-bottom:8px;">Gửi khoản Chi này cho GĐ hoặc PGĐ duyệt (đăng nhập đúng email đã cài đặt mới thấy nút duyệt).</div>
+          <select id="tx-approval-target">
+            <option value="">-- Chưa gửi duyệt --</option>
+            <option value="GD">Gửi Giám đốc (GĐ) duyệt</option>
+            <option value="PGD">Gửi Phó giám đốc (PGĐ) duyệt</option>
+          </select>
+          <div class="helper-text" id="tx-approval-current-status" style="margin-top:8px;"></div>
         </div>
 
         <div class="field full"><label>Ghi chú</label><textarea id="tx-note" rows="2"></textarea></div>
