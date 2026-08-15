@@ -1,0 +1,506 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Quản lý tài chính - T75</title>
+<link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+
+<!-- ================= LOGIN ================= -->
+<div id="login-screen">
+  <div class="login-card">
+    <div class="login-brand">
+      <div class="mark">T75</div>
+      <div>
+        <div class="name">Quản lý tài chính</div>
+        <div class="sub">T75</div>
+      </div>
+    </div>
+    <h1>Đăng nhập</h1>
+    <p class="hint">Dùng tài khoản được cấp để truy cập hệ thống.</p>
+    <form id="login-form">
+      <div class="field">
+        <label>Email</label>
+        <input type="email" id="login-email" required placeholder="ten@congty.com">
+      </div>
+      <div class="field">
+        <label>Mật khẩu</label>
+        <input type="password" id="login-password" required placeholder="••••••••">
+      </div>
+      <button type="submit" class="btn btn-primary btn-block">Đăng nhập</button>
+      <div class="err-msg" id="login-err"></div>
+    </form>
+  </div>
+</div>
+
+<!-- ================= APP ================= -->
+<div id="app-screen">
+  <div class="shell">
+
+    <!-- SIDEBAR -->
+    <div class="sidebar" id="sidebar">
+      <div class="brand">
+        <div class="mark">T75</div>
+        <div class="name">Quản lý tài chính</div>
+      </div>
+
+      <div class="nav-group">
+        <div class="nav-item active" data-view="dashboard"><span class="ic">◈</span> Tổng quan</div>
+        <div class="nav-item" data-view="projects"><span class="ic">▣</span> Dự án</div>
+        <div class="nav-item" data-view="transactions"><span class="ic">⇄</span> Thu chi</div>
+      </div>
+
+      <div class="nav-label">Hồ sơ</div>
+      <div class="nav-group">
+        <div class="nav-item" data-view="invoices"><span class="ic">🧾</span> Hóa đơn</div>
+        <div class="nav-item" data-view="transfers"><span class="ic">🏦</span> Chuyển khoản</div>
+      </div>
+
+      <div class="nav-label">Báo cáo</div>
+      <div class="nav-group">
+        <div class="nav-item" data-view="reports"><span class="ic">📊</span> Dòng tiền theo kỳ</div>
+        <div class="nav-item" data-view="pnl"><span class="ic">📈</span> Lãi lỗ quý/năm</div>
+      </div>
+
+      <div class="nav-label">Chi & lương</div>
+      <div class="nav-group">
+        <div class="nav-item" data-view="orders"><span class="ic">📝</span> Lệnh chi</div>
+        <div class="nav-item" data-view="payroll"><span class="ic">👥</span> Bảng lương / Chấm công</div>
+      </div>
+
+      <div class="nav-label">Quản trị</div>
+      <div class="nav-group">
+        <div class="nav-item" data-view="users" style="display:none"><span class="ic">🔐</span> Người dùng & phân quyền</div>
+      </div>
+
+      <div class="sidebar-foot">
+        <button class="theme-toggle" id="theme-toggle" title="Chuyển giao diện sáng/tối">
+          <span id="theme-icon">🌙</span> <span id="theme-label">Chế độ tối</span>
+        </button>
+        <div class="user-chip">
+          <div class="av" id="user-avatar">?</div>
+          <div class="who">
+            <div class="em" id="user-email">—</div>
+            <div class="role" id="user-role-label">Thành viên</div>
+          </div>
+          <button class="logout-btn" id="logout-btn" title="Đăng xuất">⏻</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- MAIN -->
+    <div class="main">
+      <button id="menu-toggle">☰</button>
+
+      <!-- DASHBOARD -->
+      <div class="view active" id="view-dashboard">
+        <div class="topbar">
+          <div>
+            <h2>Tổng quan</h2>
+            <div class="sub">Bức tranh dòng tiền toàn công ty</div>
+          </div>
+        </div>
+        <div class="welcome-card" id="welcome-card">
+          <div class="welcome-left">
+            <div class="welcome-avatar" id="welcome-avatar">?</div>
+            <div>
+              <div class="welcome-greet" id="welcome-greet">Chào bạn,</div>
+              <div class="welcome-name" id="welcome-name">—</div>
+              <div class="welcome-sub" id="welcome-sub">—</div>
+            </div>
+          </div>
+          <div class="welcome-pills" id="welcome-pills"></div>
+        </div>
+        <div class="kpi-grid" id="dash-kpis"></div>
+        <div class="two-col">
+          <div class="card">
+            <div class="card-head"><h3>Dòng tiền 12 tháng gần nhất</h3></div>
+            <div class="chart-wrap"><canvas id="chart-cashflow-trend"></canvas></div>
+          </div>
+          <div class="card">
+            <div class="card-head"><h3>Doanh thu thực tế theo dự án</h3></div>
+            <div class="chart-wrap"><canvas id="chart-project-revenue"></canvas></div>
+          </div>
+        </div>
+        <div class="card">
+          <div class="card-head"><h3>Giá trị hợp đồng đã ký theo dự án (dự toán)</h3></div>
+          <div class="chart-wrap"><canvas id="chart-project-budget"></canvas></div>
+        </div>
+        <div class="card">
+          <div class="card-head"><h3>Giao dịch gần đây</h3></div>
+          <div class="table-wrap"><table class="data" id="dash-recent-table"></table></div>
+        </div>
+      </div>
+
+      <!-- PROJECTS -->
+      <div class="view" id="view-projects">
+        <div class="topbar">
+          <div><h2>Dự án</h2><div class="sub">Danh sách dự án & giá trị hợp đồng dự toán</div></div>
+          <div class="topbar-actions"><button class="btn btn-primary" id="btn-add-project">+ Thêm dự án</button></div>
+        </div>
+        <div class="card"><div class="table-wrap"><table class="data" id="projects-table"></table></div></div>
+      </div>
+
+      <!-- TRANSACTIONS -->
+      <div class="view" id="view-transactions">
+        <div class="topbar">
+          <div><h2>Thu chi</h2><div class="sub">Ghi nhận dòng tiền vào/ra theo dự án</div></div>
+          <div class="topbar-actions"><button class="btn btn-primary" id="btn-add-tx">+ Nhập giao dịch</button></div>
+        </div>
+        <div class="filters-bar">
+          <select id="tx-filter-project"><option value="">Tất cả dự án</option></select>
+          <select id="tx-filter-type">
+            <option value="">Tất cả loại</option>
+            <option value="IN">Thu (IN)</option>
+            <option value="OUT">Chi (OUT)</option>
+          </select>
+          <select id="tx-filter-code">
+            <option value="">Tất cả mã</option>
+            <option value="QL">QL - Quản lý</option>
+            <option value="VTC">VTC - Vật tư chính</option>
+            <option value="VTP">VTP - Vật tư phụ</option>
+            <option value="NC">NC - Nhân công</option>
+          </select>
+          <input type="month" id="tx-filter-month">
+          <div class="spacer"></div>
+          <input type="text" id="tx-search" placeholder="Tìm nội dung...">
+        </div>
+        <div class="card"><div class="table-wrap"><table class="data" id="tx-table"></table></div></div>
+      </div>
+
+      <!-- INVOICES -->
+      <div class="view" id="view-invoices">
+        <div class="topbar">
+          <div><h2>Hóa đơn</h2><div class="sub">Thống kê các giao dịch có hóa đơn</div></div>
+        </div>
+        <div class="filters-bar">
+          <select id="inv-filter-project"><option value="">Tất cả dự án</option></select>
+          <input type="text" id="inv-search" placeholder="Tìm số hóa đơn...">
+        </div>
+        <div class="kpi-grid" id="inv-kpis"></div>
+        <div class="card"><div class="table-wrap"><table class="data" id="inv-table"></table></div></div>
+      </div>
+
+      <!-- TRANSFERS -->
+      <div class="view" id="view-transfers">
+        <div class="topbar">
+          <div><h2>Chuyển khoản</h2><div class="sub">Thông tin các giao dịch chuyển khoản ngân hàng</div></div>
+        </div>
+        <div class="filters-bar">
+          <select id="tr-filter-project"><option value="">Tất cả dự án</option></select>
+          <input type="text" id="tr-search" placeholder="Tìm số TK / ngân hàng...">
+        </div>
+        <div class="card"><div class="table-wrap"><table class="data" id="tr-table"></table></div></div>
+      </div>
+
+      <!-- REPORTS -->
+      <div class="view" id="view-reports">
+        <div class="topbar">
+          <div><h2>Dòng tiền theo kỳ</h2><div class="sub">Thống kê thu / chi theo ngày, tháng, năm</div></div>
+        </div>
+        <div class="filters-bar">
+          <select id="rp-groupby">
+            <option value="day">Theo ngày</option>
+            <option value="month" selected>Theo tháng</option>
+            <option value="year">Theo năm</option>
+          </select>
+          <select id="rp-filter-project"><option value="">Tất cả dự án</option></select>
+          <input type="number" id="rp-filter-year" placeholder="Năm (vd 2026)" style="width:110px;">
+        </div>
+        <div class="kpi-grid" id="rp-kpis"></div>
+        <div class="card">
+          <div class="card-head"><h3>Biểu đồ dòng tiền</h3></div>
+          <div class="chart-wrap"><canvas id="chart-report"></canvas></div>
+        </div>
+        <div class="card"><div class="table-wrap"><table class="data" id="rp-table"></table></div></div>
+      </div>
+
+      <!-- P&L -->
+      <div class="view" id="view-pnl">
+        <div class="topbar">
+          <div><h2>Báo cáo lãi lỗ</h2><div class="sub">Theo quý / năm, toàn công ty hoặc theo dự án</div></div>
+        </div>
+        <div class="filters-bar">
+          <select id="pnl-groupby">
+            <option value="quarter" selected>Theo quý</option>
+            <option value="year">Theo năm</option>
+          </select>
+          <select id="pnl-filter-project"><option value="">Tất cả dự án (tổng công ty)</option></select>
+          <input type="number" id="pnl-filter-year" placeholder="Năm (vd 2026)" style="width:110px;">
+        </div>
+        <div class="kpi-grid" id="pnl-kpis"></div>
+        <div class="card">
+          <div class="card-head"><h3>Biểu đồ Doanh thu — Chi phí — LNTT</h3></div>
+          <div class="chart-wrap"><canvas id="chart-pnl"></canvas></div>
+        </div>
+        <div class="card"><div class="table-wrap"><table class="data" id="pnl-table"></table></div></div>
+      </div>
+
+      <!-- PAYMENT ORDERS -->
+      <div class="view" id="view-orders">
+        <div class="topbar">
+          <div><h2>Lệnh chi</h2><div class="sub">Đề nghị & duyệt chi tiền</div></div>
+          <div class="topbar-actions"><button class="btn btn-primary" id="btn-add-order">+ Tạo lệnh chi</button></div>
+        </div>
+        <div class="filters-bar">
+          <select id="ord-filter-status">
+            <option value="">Tất cả trạng thái</option>
+            <option value="pending">Chờ duyệt</option>
+            <option value="approved">Đã duyệt</option>
+          </select>
+          <select id="ord-filter-project"><option value="">Tất cả dự án</option></select>
+        </div>
+        <div class="card"><div class="table-wrap"><table class="data" id="orders-table"></table></div></div>
+      </div>
+
+      <!-- PAYROLL -->
+      <div class="view" id="view-payroll">
+        <div class="topbar">
+          <div><h2>Bảng lương / Chấm công</h2><div class="sub">Ghi nhận công theo ngày & tổng hợp lương theo tháng</div></div>
+          <div class="topbar-actions">
+            <button class="btn btn-ghost" id="btn-add-employee">+ Thêm nhân viên</button>
+            <button class="btn btn-primary" id="btn-add-timesheet">+ Chấm công</button>
+          </div>
+        </div>
+        <div class="filters-bar">
+          <input type="month" id="pr-filter-month">
+          <select id="pr-filter-employee"><option value="">Tất cả nhân viên</option></select>
+        </div>
+        <div class="card">
+          <div class="card-head"><h3>Bảng chấm công theo ngày</h3></div>
+          <div class="table-wrap"><table class="data" id="timesheet-table"></table></div>
+        </div>
+        <div class="card">
+          <div class="card-head"><h3>Tổng hợp lương theo tháng</h3></div>
+          <div class="table-wrap"><table class="data" id="payroll-summary-table"></table></div>
+        </div>
+        <div class="card">
+          <div class="card-head"><h3>Danh sách nhân viên</h3></div>
+          <div class="table-wrap"><table class="data" id="employees-table"></table></div>
+        </div>
+      </div>
+
+      <!-- USERS & PERMISSIONS (admin only) -->
+      <div class="view" id="view-users">
+        <div class="topbar">
+          <div><h2>Người dùng & phân quyền</h2><div class="sub">Chỉ Admin thấy được trang này</div></div>
+          <div class="topbar-actions"><button class="btn btn-primary" id="btn-add-user">+ Gán quyền người dùng</button></div>
+        </div>
+        <div class="card">
+          <p class="helper-text" style="margin-bottom:14px;font-size:13px;">
+            App không tự tạo được tài khoản đăng nhập — bạn vẫn tạo tài khoản (email/mật khẩu) như cũ trong
+            <strong>Firebase Console → Authentication → Users → Add user</strong>. Sau khi tạo xong, copy cột
+            <strong>User UID</strong> của tài khoản đó, quay lại đây bấm "+ Gán quyền người dùng" để chọn họ là
+            <strong>Admin</strong> hay <strong>Thành viên</strong>.
+          </p>
+        </div>
+        <div class="card"><div class="table-wrap"><table class="data" id="users-table"></table></div></div>
+      </div>
+
+    </div>
+  </div>
+</div>
+
+<!-- ================= MODALS ================= -->
+<div class="modal-backdrop" id="modal-project">
+  <div class="modal">
+    <div class="modal-head"><h3 id="project-modal-title">Thêm dự án</h3><button class="modal-close" data-close>✕</button></div>
+    <div class="modal-body">
+      <input type="hidden" id="project-id">
+      <div class="form-grid">
+        <div class="field full"><label>Tên dự án *</label><input id="project-name" required></div>
+        <div class="field"><label>Mã dự án</label><input id="project-code" placeholder="VD: NTGLOBAL"></div>
+        <div class="field"><label>Khách hàng</label><input id="project-customer"></div>
+        <div class="field"><label>Giá trị hợp đồng (đã VAT)</label><input type="text" id="project-contract-value" placeholder="0"></div>
+        <div class="field"><label>Chi phí dự toán</label><input type="text" id="project-cost-budget" placeholder="0"></div>
+        <div class="field"><label>Doanh thu dự toán</label><input type="text" id="project-revenue-budget" placeholder="0"></div>
+        <div class="field"><label>Trạng thái</label>
+          <select id="project-status"><option value="active">Đang thực hiện</option><option value="warranty">Còn giữ 5% bảo hành</option><option value="done">Hoàn thành</option><option value="paused">Tạm dừng</option></select>
+        </div>
+        <div class="field full"><label>Ghi chú</label><textarea id="project-note" rows="2"></textarea></div>
+      </div>
+    </div>
+    <div class="modal-foot"><button class="btn btn-ghost" data-close>Hủy</button><button class="btn btn-primary" id="save-project-btn">Lưu dự án</button></div>
+  </div>
+</div>
+
+<div class="modal-backdrop" id="modal-tx">
+  <div class="modal">
+    <div class="modal-head"><h3 id="tx-modal-title">Nhập giao dịch thu chi</h3><button class="modal-close" data-close>✕</button></div>
+    <div class="modal-body">
+      <input type="hidden" id="tx-id">
+      <div class="field full" style="margin-bottom:14px;">
+        <label>Loại giao dịch *</label>
+        <div class="seg">
+          <button type="button" id="seg-in" data-type="IN">↓ Thu (IN)</button>
+          <button type="button" id="seg-out" data-type="OUT">↑ Chi (OUT)</button>
+        </div>
+      </div>
+      <div class="form-grid">
+        <div class="field full"><label>Dự án *</label><select id="tx-project" required></select></div>
+        <div class="field"><label>Ngày *</label><input type="date" id="tx-date" required></div>
+        <div class="field"><label>Mã (code)</label>
+          <select id="tx-code">
+            <option value="">-- Chọn mã --</option>
+            <option value="QL">QL - Quản lý</option>
+            <option value="VTC">VTC - Vật tư chính</option>
+            <option value="VTP">VTP - Vật tư phụ</option>
+            <option value="NC">NC - Nhân công</option>
+          </select>
+        </div>
+        <div class="field full"><label>Nội dung *</label><input id="tx-content" required placeholder="VD: Thanh toán chi phí vật tư"></div>
+        <div class="field full"><label>Diễn giải</label><input id="tx-desc" placeholder="Chi tiết diễn giải"></div>
+        <div class="field"><label>ĐVT</label><input id="tx-unit" placeholder="lot, m2, cái..."></div>
+        <div class="field"><label>Số lượng</label><input type="number" id="tx-qty" placeholder="1"></div>
+        <div class="field"><label>Đơn giá</label><input type="text" id="tx-unitprice" placeholder="0"></div>
+        <div class="field"><label>Thành tiền *</label><input type="text" id="tx-amount" required placeholder="0"></div>
+
+        <div class="field full" style="border-top:1px solid var(--line);padding-top:14px;margin-top:2px;">
+          <label style="font-size:13px;font-weight:700;color:var(--ink);">🧾 Thông tin hóa đơn (nếu có)</label>
+        </div>
+        <div class="field"><label>Số hóa đơn</label><input id="tx-invoice-number"></div>
+        <div class="field"><label>Ngày hóa đơn</label><input type="date" id="tx-invoice-date"></div>
+        <div class="field full">
+          <label>Ảnh hóa đơn (tùy chọn)</label>
+          <input type="file" id="tx-invoice-image" accept="image/*">
+          <div class="helper-text">Ảnh sẽ tự động được nén nhỏ lại trước khi lưu.</div>
+          <div style="margin-top:8px;">
+            <img id="tx-invoice-image-preview" style="display:none;max-width:150px;max-height:150px;border-radius:8px;border:1px solid var(--line);">
+            <button type="button" class="btn btn-ghost btn-sm" id="tx-invoice-image-remove" style="display:none;">Xóa ảnh</button>
+          </div>
+        </div>
+
+        <div class="field full" style="border-top:1px solid var(--line);padding-top:14px;margin-top:2px;">
+          <label style="font-size:13px;font-weight:700;color:var(--ink);">🏦 Thông tin chuyển khoản (nếu có)</label>
+        </div>
+        <div class="field"><label>Ngân hàng</label><input id="tx-bank-name"></div>
+        <div class="field"><label>Số tài khoản</label><input id="tx-bank-account"></div>
+        <div class="field"><label>Tên chủ TK</label><input id="tx-bank-holder"></div>
+        <div class="field"><label>Ngày chuyển khoản</label><input type="date" id="tx-transfer-date"></div>
+        <div class="field full">
+          <label>Ảnh chuyển khoản (tùy chọn)</label>
+          <input type="file" id="tx-transfer-image" accept="image/*">
+          <div class="helper-text">Ảnh sẽ tự động được nén nhỏ lại trước khi lưu.</div>
+          <div style="margin-top:8px;">
+            <img id="tx-transfer-image-preview" style="display:none;max-width:150px;max-height:150px;border-radius:8px;border:1px solid var(--line);">
+            <button type="button" class="btn btn-ghost btn-sm" id="tx-transfer-image-remove" style="display:none;">Xóa ảnh</button>
+          </div>
+        </div>
+
+        <div class="field full"><label>Ghi chú</label><textarea id="tx-note" rows="2"></textarea></div>
+      </div>
+    </div>
+    <div class="modal-foot"><button class="btn btn-ghost" data-close>Hủy</button><button class="btn btn-primary" id="save-tx-btn">Lưu giao dịch</button></div>
+  </div>
+</div>
+
+<div class="modal-backdrop" id="modal-order">
+  <div class="modal">
+    <div class="modal-head"><h3 id="order-modal-title">Tạo lệnh chi</h3><button class="modal-close" data-close>✕</button></div>
+    <div class="modal-body">
+      <input type="hidden" id="order-id">
+      <div class="form-grid">
+        <div class="field"><label>Ngày đề nghị *</label><input type="date" id="order-date" required></div>
+        <div class="field"><label>Dự án</label><select id="order-project"><option value="">— Không thuộc dự án —</option></select></div>
+        <div class="field full"><label>Người/đơn vị nhận chi *</label><input id="order-payee" required></div>
+        <div class="field full"><label>Lý do chi *</label><input id="order-reason" required placeholder="VD: Thanh toán vật tư đợt 2"></div>
+        <div class="field"><label>Số tiền *</label><input type="text" id="order-amount" required placeholder="0"></div>
+        <div class="field"><label>Trạng thái</label>
+          <select id="order-status"><option value="pending">Chờ duyệt</option><option value="approved">Đã duyệt</option></select>
+          <div class="helper-text">Khi chuyển sang "Đã duyệt", hệ thống tự động ghi khoản chi này vào mục Thu chi.</div>
+          <div class="helper-text" id="order-status-hint" style="display:none;">Chỉ Admin mới được duyệt/đổi trạng thái lệnh chi.</div>
+        </div>
+        <div class="field"><label>Người đề nghị</label><input id="order-requester"></div>
+        <div class="field"><label>Người duyệt</label><input id="order-approver"></div>
+        <div class="field full"><label>Ghi chú</label><textarea id="order-note" rows="2"></textarea></div>
+      </div>
+    </div>
+    <div class="modal-foot"><button class="btn btn-ghost" data-close>Hủy</button><button class="btn btn-primary" id="save-order-btn">Lưu lệnh chi</button></div>
+  </div>
+</div>
+
+<div class="modal-backdrop" id="modal-employee">
+  <div class="modal">
+    <div class="modal-head"><h3>Thêm nhân viên</h3><button class="modal-close" data-close>✕</button></div>
+    <div class="modal-body">
+      <input type="hidden" id="emp-id">
+      <div class="form-grid">
+        <div class="field full"><label>Họ tên *</label><input id="emp-name" required></div>
+        <div class="field"><label>Chức vụ</label><input id="emp-position"></div>
+        <div class="field"><label>Lương cơ bản / tháng</label><input type="text" id="emp-salary" placeholder="0"></div>
+        <div class="field full"><label>Ghi chú</label><textarea id="emp-note" rows="2"></textarea></div>
+      </div>
+    </div>
+    <div class="modal-foot"><button class="btn btn-ghost" data-close>Hủy</button><button class="btn btn-primary" id="save-emp-btn">Lưu nhân viên</button></div>
+  </div>
+</div>
+
+<div class="modal-backdrop" id="modal-timesheet">
+  <div class="modal">
+    <div class="modal-head"><h3>Chấm công</h3><button class="modal-close" data-close>✕</button></div>
+    <div class="modal-body">
+      <input type="hidden" id="ts-id">
+      <div class="form-grid">
+        <div class="field full"><label>Nhân viên *</label><select id="ts-employee" required></select></div>
+        <div class="field"><label>Ngày *</label><input type="date" id="ts-date" required></div>
+        <div class="field"><label>Loại công</label>
+          <select id="ts-worktype">
+            <option value="full">Đủ công (1.0)</option>
+            <option value="half">Nửa công (0.5)</option>
+            <option value="ot">Tăng ca</option>
+            <option value="leave">Nghỉ có phép (0)</option>
+            <option value="absent">Nghỉ không phép (0)</option>
+          </select>
+        </div>
+        <div class="field"><label>Giờ vào</label><input type="time" id="ts-checkin"></div>
+        <div class="field"><label>Giờ ra</label><input type="time" id="ts-checkout"></div>
+        <div class="field full"><label>Ghi chú</label><input id="ts-note"></div>
+      </div>
+    </div>
+    <div class="modal-foot"><button class="btn btn-ghost" data-close>Hủy</button><button class="btn btn-primary" id="save-ts-btn">Lưu chấm công</button></div>
+  </div>
+</div>
+
+<div class="modal-backdrop" id="modal-user">
+  <div class="modal">
+    <div class="modal-head"><h3 id="user-modal-title">Gán quyền người dùng</h3><button class="modal-close" data-close>✕</button></div>
+    <div class="modal-body">
+      <div class="field" style="margin-bottom:14px;">
+        <label>User UID *</label>
+        <input id="user-uid" placeholder="Copy từ Firebase Console > Authentication > Users">
+        <div class="helper-text">Vào Firebase Console → Authentication → Users, copy cột "User UID" của tài khoản cần gán quyền.</div>
+      </div>
+      <div class="form-grid">
+        <div class="field full"><label>Email *</label><input id="user-email-input" placeholder="ten@congty.com"></div>
+        <div class="field"><label>Tên hiển thị</label><input id="user-name"></div>
+        <div class="field"><label>Vai trò *</label>
+          <select id="user-role"><option value="user">Thành viên (User)</option><option value="admin">Quản trị viên (Admin)</option></select>
+        </div>
+      </div>
+    </div>
+    <div class="modal-foot"><button class="btn btn-ghost" data-close>Hủy</button><button class="btn btn-primary" id="save-user-btn">Lưu quyền</button></div>
+  </div>
+</div>
+
+<div id="toast"></div>
+
+<!-- ================= SCRIPTS ================= -->
+<script src="https://www.gstatic.com/firebasejs/10.7.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.7.0/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.7.0/firebase-firestore-compat.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+<script src="js/firebase-config.js"></script>
+<script src="js/utils.js"></script>
+<script src="js/auth.js"></script>
+<script src="js/projects.js"></script>
+<script src="js/transactions.js"></script>
+<script src="js/invoices-transfers.js"></script>
+<script src="js/reports.js"></script>
+<script src="js/orders.js"></script>
+<script src="js/payroll.js"></script>
+<script src="js/users.js"></script>
+<script src="js/app.js"></script>
+</body>
+</html>
