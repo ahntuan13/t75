@@ -188,6 +188,7 @@ input,select,textarea{font-family:inherit;}
 .icon-badge.c-red{background:var(--red-dim);color:var(--red);}
 .icon-badge.c-purple{background:var(--purple-dim);color:var(--purple);}
 .icon-badge.c-pink{background:var(--pink-dim);color:var(--pink);}
+.icon-badge.c-gray{background:var(--bg-soft);color:var(--ink-dim);}
 .kpi-card .lbl{font-size:12px;color:var(--ink-dim);font-weight:600;}
 .kpi-card .val{font-size:22px;font-weight:800;letter-spacing:-.4px;color:var(--ink);}
 .kpi-card .val.pos{color:var(--teal);}
@@ -266,6 +267,8 @@ tr td.tx-subhead-empty{color:var(--ink-faint);font-style:italic;font-size:12.5px
 .seg button{flex:1;padding:9px;border:none;background:var(--card);font-size:13px;font-weight:700;color:var(--ink-dim);}
 .seg button.active-in{background:var(--teal-dim);color:var(--teal);}
 .seg button.active-out{background:var(--red-dim);color:var(--red);}
+.seg button.active-gold{background:var(--gold-dim);color:var(--gold);}
+.seg button.active-gray{background:var(--bg-soft);color:var(--ink-dim);}
 
 /* ---------- Toast ---------- */
 #toast{
