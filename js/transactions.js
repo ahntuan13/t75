@@ -6,6 +6,24 @@ let TRANSACTIONS = []; // cache
 let currentTxType = 'IN';
 let currentInvoiceImage = '';
 let currentTransferImage = '';
+let currentInvoiceStatus = 'pending';
+let currentTransferStatus = 'pending';
+
+function setInvoiceStatus(status){
+  currentInvoiceStatus = status;
+  document.getElementById('seg-invoice-yes').className = status==='issued' ? 'active-gold' : '';
+  document.getElementById('seg-invoice-no').className = status==='pending' ? 'active-gray' : '';
+}
+document.getElementById('seg-invoice-yes').addEventListener('click', ()=> setInvoiceStatus('issued'));
+document.getElementById('seg-invoice-no').addEventListener('click', ()=> setInvoiceStatus('pending'));
+
+function setTransferStatus(status){
+  currentTransferStatus = status;
+  document.getElementById('seg-transfer-yes').className = status==='done' ? 'active-gold' : '';
+  document.getElementById('seg-transfer-no').className = status==='pending' ? 'active-gray' : '';
+}
+document.getElementById('seg-transfer-yes').addEventListener('click', ()=> setTransferStatus('done'));
+document.getElementById('seg-transfer-no').addEventListener('click', ()=> setTransferStatus('pending'));
 
 function setImagePreview(kind, dataUrl){
   const img = document.getElementById(`tx-${kind}-image-preview`);
@@ -94,6 +112,8 @@ function openTxModal(id){
   document.getElementById('tx-transfer-image').value = '';
   setImagePreview('invoice', currentInvoiceImage);
   setImagePreview('transfer', currentTransferImage);
+  setInvoiceStatus(t.invoiceStatus || 'pending');
+  setTransferStatus(t.transferStatus || 'pending');
   openModal('modal-tx');
 }
 
@@ -147,6 +167,8 @@ document.getElementById('save-tx-btn').addEventListener('click', async ()=>{
     note: document.getElementById('tx-note').value.trim(),
     invoiceImage: currentInvoiceImage,
     transferImage: currentTransferImage,
+    invoiceStatus: currentInvoiceStatus,
+    transferStatus: currentTransferStatus,
   };
   try{
     if(id){
@@ -190,7 +212,7 @@ function txRowHtml(t){
       <td>
         <div class="row-actions">
           <button class="icon-btn" data-view-tx="${t.id}" title="Xem chi tiết">👁</button>
-          <button class="icon-btn" data-edit-tx="${t.id}" title="Sửa">✎</button>
+          ${isAdmin() ? `<button class="icon-btn" data-edit-tx="${t.id}" title="Sửa">✎</button>` : ''}
           ${isAdmin() ? `<button class="icon-btn" data-del-tx="${t.id}" title="Xóa">🗑</button>` : ''}
         </div>
       </td>
@@ -266,21 +288,19 @@ function openTxViewModal(id){
     ${row('Thành tiền', '<strong style="color:'+(t.type==='IN'?'var(--teal)':'var(--red)')+'">'+fmtVND(t.amount)+'</strong>')}
   </dl>`;
 
-  if(t.invoiceNumber || t.invoiceDate || t.invoiceImage){
-    html += `<div class="tx-view-section"><h5>🧾 Thông tin hóa đơn</h5><dl class="tx-view-grid">
-      ${row('Số hóa đơn', escapeHtml(t.invoiceNumber||''))}
-      ${row('Ngày hóa đơn', t.invoiceDate ? fmtDate(t.invoiceDate) : '')}
-    </dl>${t.invoiceImage ? `<div class="tx-view-images"><img src="${t.invoiceImage}" data-lightbox="${t.invoiceImage}"></div>` : ''}</div>`;
-  }
+  html += `<div class="tx-view-section"><h5>🧾 Thông tin hóa đơn</h5><dl class="tx-view-grid">
+    ${row('Trạng thái', (t.invoiceStatus||'pending')==='issued' ? '<span class="tag tag-gold">✅ Đã xuất hóa đơn</span>' : '<span class="tag tag-gray">⏳ Chưa xuất hóa đơn</span>')}
+    ${row('Số hóa đơn', escapeHtml(t.invoiceNumber||''))}
+    ${row('Ngày hóa đơn', t.invoiceDate ? fmtDate(t.invoiceDate) : '')}
+  </dl>${t.invoiceImage ? `<div class="tx-view-images"><img src="${t.invoiceImage}" data-lightbox="${t.invoiceImage}"></div>` : ''}</div>`;
 
-  if(t.bankName || t.bankAccount || t.bankHolder || t.transferDate || t.transferImage){
-    html += `<div class="tx-view-section"><h5>🏦 Thông tin chuyển khoản</h5><dl class="tx-view-grid">
-      ${row('Ngân hàng', escapeHtml(t.bankName||''))}
-      ${row('Số tài khoản', escapeHtml(t.bankAccount||''))}
-      ${row('Tên chủ TK', escapeHtml(t.bankHolder||''))}
-      ${row('Ngày chuyển khoản', t.transferDate ? fmtDate(t.transferDate) : '')}
-    </dl>${t.transferImage ? `<div class="tx-view-images"><img src="${t.transferImage}" data-lightbox="${t.transferImage}"></div>` : ''}</div>`;
-  }
+  html += `<div class="tx-view-section"><h5>🏦 Thông tin chuyển khoản</h5><dl class="tx-view-grid">
+    ${row('Trạng thái', (t.transferStatus||'pending')==='done' ? '<span class="tag tag-gold">✅ Đã chuyển khoản</span>' : '<span class="tag tag-gray">⏳ Chưa chuyển khoản</span>')}
+    ${row('Ngân hàng', escapeHtml(t.bankName||''))}
+    ${row('Số tài khoản', escapeHtml(t.bankAccount||''))}
+    ${row('Tên chủ TK', escapeHtml(t.bankHolder||''))}
+    ${row('Ngày chuyển khoản', t.transferDate ? fmtDate(t.transferDate) : '')}
+  </dl>${t.transferImage ? `<div class="tx-view-images"><img src="${t.transferImage}" data-lightbox="${t.transferImage}"></div>` : ''}</div>`;
 
   if(t.note){
     html += `<div class="tx-view-section"><h5>📝 Ghi chú</h5><div class="tx-view-note">${escapeHtml(t.note)}</div></div>`;
@@ -288,6 +308,7 @@ function openTxViewModal(id){
 
   document.getElementById('tx-view-body').innerHTML = html;
   document.getElementById('tx-view-edit-btn').dataset.editTx = t.id;
+  document.getElementById('tx-view-edit-btn').style.display = isAdmin() ? '' : 'none';
   openModal('modal-tx-view');
 }
 
