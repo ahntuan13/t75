@@ -76,8 +76,8 @@ function renderDashboard(){
         {label:'Thu', data:inSeries, backgroundColor:CHART_COLORS.teal, borderRadius:4},
         {label:'Chi', data:outSeries, backgroundColor:CHART_COLORS.red, borderRadius:4}
       ]},
-    options:{responsive:true, maintainAspectRatio:false,
-      scales:{ x:{grid:{display:false}}, y:{grid:{color:CHART_COLORS.grid}, ticks:{callback:v=>fmtNum(v)}} },
+    options:{indexAxis:'y', responsive:true, maintainAspectRatio:false,
+      scales:{ x:{grid:{color:CHART_COLORS.grid}, ticks:{callback:v=>fmtNum(v)}}, y:{grid:{display:false}} },
       plugins:{legend:{position:'bottom', labels:{boxWidth:10}}}}
   });
 
@@ -116,8 +116,8 @@ function renderDashboard(){
       {label:'Chi phí dự toán', data:budgetData.map(p=>p.cost), backgroundColor:CHART_COLORS.red, borderRadius:4},
       {label:'Lợi nhuận dự toán', data:budgetData.map(p=>p.profit), backgroundColor:CHART_COLORS.gold, borderRadius:4}
     ]},
-    options:{responsive:true, maintainAspectRatio:false,
-      scales:{ x:{grid:{display:false}}, y:{grid:{color:CHART_COLORS.grid}, ticks:{callback:v=>fmtNum(v)}} },
+    options:{indexAxis:'y', responsive:true, maintainAspectRatio:false,
+      scales:{ x:{grid:{color:CHART_COLORS.grid}, ticks:{callback:v=>fmtNum(v)}}, y:{grid:{display:false}} },
       plugins:{legend:{position:'bottom', labels:{boxWidth:10}}}}
   });
 
@@ -175,8 +175,8 @@ function renderReports(){
       {label:'Thu', data:data.map(d=>d.in), backgroundColor:CHART_COLORS.teal, borderRadius:4},
       {label:'Chi', data:data.map(d=>d.out), backgroundColor:CHART_COLORS.red, borderRadius:4}
     ]},
-    options:{responsive:true, maintainAspectRatio:false,
-      scales:{ x:{grid:{display:false}}, y:{grid:{color:CHART_COLORS.grid}, ticks:{callback:v=>fmtNum(v)}} },
+    options:{indexAxis:'y', responsive:true, maintainAspectRatio:false,
+      scales:{ x:{grid:{color:CHART_COLORS.grid}, ticks:{callback:v=>fmtNum(v)}}, y:{grid:{display:false}} },
       plugins:{legend:{position:'bottom', labels:{boxWidth:10}}}}
   });
 
@@ -239,8 +239,8 @@ function renderPnl(){
       {label:'Chi phí', data:data.map(d=>d.cost), backgroundColor:CHART_COLORS.red, borderRadius:4},
       {label:'LNTT', data:data.map(d=>d.lntt), backgroundColor:CHART_COLORS.gold, borderRadius:4}
     ]},
-    options:{responsive:true, maintainAspectRatio:false,
-      scales:{ x:{grid:{display:false}}, y:{grid:{color:CHART_COLORS.grid}, ticks:{callback:v=>fmtNum(v)}} },
+    options:{indexAxis:'y', responsive:true, maintainAspectRatio:false,
+      scales:{ x:{grid:{color:CHART_COLORS.grid}, ticks:{callback:v=>fmtNum(v)}}, y:{grid:{display:false}} },
       plugins:{legend:{position:'bottom', labels:{boxWidth:10}}}}
   });
 
