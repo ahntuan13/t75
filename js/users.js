@@ -52,16 +52,14 @@ function applyRolePermissions(){
   if(btnUploadChi) btnUploadChi.style.display = isAdmin() ? '' : 'none';
 }
 
-// ---------------- Người duyệt chi (GĐ / PGĐ) ----------------
-let APPROVERS = { gdEmail: '', pgdEmail: '' };
+// ---------------- Người duyệt chi (Giám đốc) ----------------
+let APPROVERS = { gdEmail: '' };
 
 function listenApprovers(){
   db.collection('settings').doc('approvers').onSnapshot((snap)=>{
-    APPROVERS = snap.exists ? (snap.data()||{}) : { gdEmail:'', pgdEmail:'' };
+    APPROVERS = snap.exists ? (snap.data()||{}) : { gdEmail:'' };
     const gdEl = document.getElementById('approver-gd-email');
-    const pgdEl = document.getElementById('approver-pgd-email');
     if(gdEl) gdEl.value = APPROVERS.gdEmail || '';
-    if(pgdEl) pgdEl.value = APPROVERS.pgdEmail || '';
     if(window.renderTxTable) renderTxTable();
     if(window.renderApprovalBanner) renderApprovalBanner();
   }, (err)=> console.error('approvers listen error', err));
@@ -69,9 +67,8 @@ function listenApprovers(){
 
 document.getElementById('save-approvers-btn')?.addEventListener('click', async ()=>{
   const gdEmail = document.getElementById('approver-gd-email').value.trim().toLowerCase();
-  const pgdEmail = document.getElementById('approver-pgd-email').value.trim().toLowerCase();
   try{
-    await db.collection('settings').doc('approvers').set({ gdEmail, pgdEmail }, {merge:true});
+    await db.collection('settings').doc('approvers').set({ gdEmail }, {merge:true});
     toast('Đã lưu email duyệt chi');
   }catch(err){ toast('Lỗi: '+err.message); }
 });
