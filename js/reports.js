@@ -2,7 +2,7 @@
 // DASHBOARD + REPORTS (cashflow by period, P&L by quarter/year)
 // =============================================================
 
-let chartCashflowTrend, chartProjectRevenue, chartProjectBudget, chartReport, chartPnl;
+let chartCashflowTrend, chartProjectRevenue, chartProjectCost, chartProjectProfit, chartProjectBudget, chartReport, chartPnl;
 
 // ---------- WELCOME CARD (lời chào real-time + thông tin người dùng) ----------
 function greetingByHour(){
@@ -70,14 +70,14 @@ function renderDashboard(){
   const ctx1 = document.getElementById('chart-cashflow-trend');
   if(chartCashflowTrend) chartCashflowTrend.destroy();
   chartCashflowTrend = new Chart(ctx1, {
-    type:'bar',
+    type:'line',
     data:{ labels: months.map(m=>m.slice(5)+'/'+m.slice(2,4)),
       datasets:[
-        {label:'Thu', data:inSeries, backgroundColor:CHART_COLORS.teal, borderRadius:4},
-        {label:'Chi', data:outSeries, backgroundColor:CHART_COLORS.red, borderRadius:4}
+        {label:'Thu', data:inSeries, borderColor:CHART_COLORS.teal, backgroundColor:CHART_COLORS.teal, tension:.35, pointRadius:3, pointHoverRadius:5, fill:false},
+        {label:'Chi', data:outSeries, borderColor:CHART_COLORS.red, backgroundColor:CHART_COLORS.red, tension:.35, pointRadius:3, pointHoverRadius:5, fill:false}
       ]},
-    options:{indexAxis:'y', responsive:true, maintainAspectRatio:false,
-      scales:{ x:{grid:{color:CHART_COLORS.grid}, ticks:{callback:v=>fmtNum(v)}}, y:{grid:{display:false}} },
+    options:{responsive:true, maintainAspectRatio:false,
+      scales:{ x:{grid:{display:false}}, y:{grid:{color:CHART_COLORS.grid}, ticks:{callback:v=>fmtNum(v)}} },
       plugins:{legend:{position:'bottom', labels:{boxWidth:10}}}}
   });
 
@@ -92,6 +92,40 @@ function renderDashboard(){
   chartProjectRevenue = new Chart(ctx2, {
     type:'bar',
     data:{ labels: projRev.map(p=>p.name), datasets:[{label:'Doanh thu', data:projRev.map(p=>p.val), backgroundColor:CHART_COLORS.gold, borderRadius:4}]},
+    options:{indexAxis:'y', responsive:true, maintainAspectRatio:false,
+      scales:{ x:{grid:{color:CHART_COLORS.grid}, ticks:{callback:v=>fmtNum(v)}}, y:{grid:{display:false}} },
+      plugins:{legend:{display:false}}}
+  });
+
+  // chi phí thực tế theo dự án
+  const projCost = PROJECTS.map(p=>({
+    name: p.name,
+    val: TRANSACTIONS.filter(t=>t.projectId===p.id && t.type==='OUT').reduce((s,t)=>s+Number(t.amount||0),0)
+  })).filter(p=>p.val>0).sort((a,b)=>b.val-a.val).slice(0,8);
+
+  const ctx2b = document.getElementById('chart-project-cost');
+  if(chartProjectCost) chartProjectCost.destroy();
+  chartProjectCost = new Chart(ctx2b, {
+    type:'bar',
+    data:{ labels: projCost.map(p=>p.name), datasets:[{label:'Chi phí', data:projCost.map(p=>p.val), backgroundColor:CHART_COLORS.red, borderRadius:4}]},
+    options:{indexAxis:'y', responsive:true, maintainAspectRatio:false,
+      scales:{ x:{grid:{color:CHART_COLORS.grid}, ticks:{callback:v=>fmtNum(v)}}, y:{grid:{display:false}} },
+      plugins:{legend:{display:false}}}
+  });
+
+  // lợi nhuận thực tế theo dự án = doanh thu thực tế - chi phí thực tế
+  const projProfit = PROJECTS.map(p=>{
+    const rev = TRANSACTIONS.filter(t=>t.projectId===p.id && t.type==='IN').reduce((s,t)=>s+Number(t.amount||0),0);
+    const cost = TRANSACTIONS.filter(t=>t.projectId===p.id && t.type==='OUT').reduce((s,t)=>s+Number(t.amount||0),0);
+    return {name: p.name, val: rev-cost, hasData: rev>0 || cost>0};
+  }).filter(p=>p.hasData).sort((a,b)=>b.val-a.val).slice(0,8);
+
+  const ctx2c = document.getElementById('chart-project-profit');
+  if(chartProjectProfit) chartProjectProfit.destroy();
+  chartProjectProfit = new Chart(ctx2c, {
+    type:'bar',
+    data:{ labels: projProfit.map(p=>p.name), datasets:[{label:'Lợi nhuận', data:projProfit.map(p=>p.val),
+      backgroundColor: projProfit.map(p=> p.val>=0 ? CHART_COLORS.teal : CHART_COLORS.red), borderRadius:4}]},
     options:{indexAxis:'y', responsive:true, maintainAspectRatio:false,
       scales:{ x:{grid:{color:CHART_COLORS.grid}, ticks:{callback:v=>fmtNum(v)}}, y:{grid:{display:false}} },
       plugins:{legend:{display:false}}}
