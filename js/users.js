@@ -46,6 +46,10 @@ function applyRolePermissions(){
   if(navUsers) navUsers.style.display = isAdmin() ? '' : 'none';
   const btnAddEmp = document.getElementById('btn-add-employee');
   if(btnAddEmp) btnAddEmp.style.display = isAdmin() ? '' : 'none';
+  const btnUploadThu = document.getElementById('btn-upload-thu');
+  if(btnUploadThu) btnUploadThu.style.display = isAdmin() ? '' : 'none';
+  const btnUploadChi = document.getElementById('btn-upload-chi');
+  if(btnUploadChi) btnUploadChi.style.display = isAdmin() ? '' : 'none';
 }
 
 // ---------------- User management (Admin only) ----------------
