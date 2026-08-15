@@ -99,17 +99,17 @@ function openTxModal(id){
 
 document.getElementById('btn-add-tx').addEventListener('click', ()=> openTxModal(null));
 
-// auto-calc thành tiền = SL * đơn giá (nếu cả 2 có giá trị và người dùng chưa gõ tay)
+// auto-calc thành tiền = SL * đơn giá (nếu có đơn giá; SL bỏ trống mặc định tính là 1)
 document.getElementById('tx-unitprice').addEventListener('input', ()=>{
   formatMoneyInput(document.getElementById('tx-unitprice'));
-  const qty = Number(document.getElementById('tx-qty').value)||0;
+  const qty = Number(document.getElementById('tx-qty').value) || 1;
   const price = parseMoneyInput(document.getElementById('tx-unitprice'));
-  if(qty && price) setMoneyInputValue(document.getElementById('tx-amount'), qty*price);
+  if(price) setMoneyInputValue(document.getElementById('tx-amount'), qty*price);
 });
 document.getElementById('tx-qty').addEventListener('input', ()=>{
-  const qty = Number(document.getElementById('tx-qty').value)||0;
+  const qty = Number(document.getElementById('tx-qty').value) || 1;
   const price = parseMoneyInput(document.getElementById('tx-unitprice'));
-  if(qty && price) setMoneyInputValue(document.getElementById('tx-amount'), qty*price);
+  if(price) setMoneyInputValue(document.getElementById('tx-amount'), qty*price);
 });
 document.getElementById('tx-amount').addEventListener('input', ()=> formatMoneyInput(document.getElementById('tx-amount')));
 
@@ -226,10 +226,9 @@ function renderTxTable(){
 
   wrap.innerHTML = order.map(key=>{
     const g = groups[key];
-    const ins = g.items.filter(t=>t.type==='IN').sort((a,b)=> (a.date||'').localeCompare(b.date||''));
-    const outs = g.items.filter(t=>t.type==='OUT').sort((a,b)=> (a.date||'').localeCompare(b.date||''));
-    const sumIn = ins.reduce((s,t)=>s+Number(t.amount||0),0);
-    const sumOut = outs.reduce((s,t)=>s+Number(t.amount||0),0);
+    const items = [...g.items].sort((a,b)=> (b.date||'').localeCompare(a.date||''));
+    const sumIn = items.filter(t=>t.type==='IN').reduce((s,t)=>s+Number(t.amount||0),0);
+    const sumOut = items.filter(t=>t.type==='OUT').reduce((s,t)=>s+Number(t.amount||0),0);
     return `
     <div class="card tx-project-block">
       <div class="tx-project-head">
@@ -243,12 +242,7 @@ function renderTxTable(){
       <div class="table-wrap">
         <table class="data">
           ${theadHtml}
-          <tbody>
-            <tr class="tx-subhead tx-subhead-in"><td colspan="8">▲ THU (${ins.length})</td></tr>
-            ${ins.length ? ins.map(txRowHtml).join('') : '<tr><td colspan="8" class="tx-subhead-empty">Không có khoản thu</td></tr>'}
-            <tr class="tx-subhead tx-subhead-out"><td colspan="8">▼ CHI (${outs.length})</td></tr>
-            ${outs.length ? outs.map(txRowHtml).join('') : '<tr><td colspan="8" class="tx-subhead-empty">Không có khoản chi</td></tr>'}
-          </tbody>
+          <tbody>${items.map(txRowHtml).join('')}</tbody>
         </table>
       </div>
     </div>`;
