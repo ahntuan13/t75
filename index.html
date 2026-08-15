@@ -181,7 +181,12 @@
         </div>
         <div class="filters-bar">
           <select id="inv-filter-project"><option value="">Tất cả dự án</option></select>
-          <input type="text" id="inv-search" placeholder="Tìm số hóa đơn...">
+          <select id="inv-filter-status">
+            <option value="">Tất cả trạng thái</option>
+            <option value="issued">✅ Đã xuất hóa đơn</option>
+            <option value="pending">⏳ Chưa xuất hóa đơn</option>
+          </select>
+          <input type="text" id="inv-search" placeholder="Tìm số hóa đơn / nội dung...">
         </div>
         <div class="kpi-grid" id="inv-kpis"></div>
         <div class="card"><div class="table-wrap"><table class="data" id="inv-table"></table></div></div>
@@ -194,6 +199,11 @@
         </div>
         <div class="filters-bar">
           <select id="tr-filter-project"><option value="">Tất cả dự án</option></select>
+          <select id="tr-filter-status">
+            <option value="">Tất cả trạng thái</option>
+            <option value="done">✅ Đã chuyển khoản</option>
+            <option value="pending">⏳ Chưa chuyển khoản</option>
+          </select>
           <input type="text" id="tr-search" placeholder="Tìm số TK / ngân hàng...">
         </div>
         <div class="card"><div class="table-wrap"><table class="data" id="tr-table"></table></div></div>
@@ -380,7 +390,14 @@
         <div class="field"><label>Thành tiền *</label><input type="text" id="tx-amount" required placeholder="0"></div>
 
         <div class="field full" style="border-top:1px solid var(--line);padding-top:14px;margin-top:2px;">
-          <label style="font-size:13px;font-weight:700;color:var(--ink);">🧾 Thông tin hóa đơn (nếu có)</label>
+          <label style="font-size:13px;font-weight:700;color:var(--ink);">🧾 Thông tin hóa đơn</label>
+        </div>
+        <div class="field full" style="margin-bottom:14px;">
+          <label>Trạng thái hóa đơn</label>
+          <div class="seg">
+            <button type="button" id="seg-invoice-yes" data-invoice="issued">✅ Đã xuất hóa đơn</button>
+            <button type="button" id="seg-invoice-no" data-invoice="pending">⏳ Chưa xuất hóa đơn</button>
+          </div>
         </div>
         <div class="field"><label>Số hóa đơn</label><input id="tx-invoice-number"></div>
         <div class="field"><label>Ngày hóa đơn</label><input type="date" id="tx-invoice-date"></div>
@@ -395,7 +412,14 @@
         </div>
 
         <div class="field full" style="border-top:1px solid var(--line);padding-top:14px;margin-top:2px;">
-          <label style="font-size:13px;font-weight:700;color:var(--ink);">🏦 Thông tin chuyển khoản (nếu có)</label>
+          <label style="font-size:13px;font-weight:700;color:var(--ink);">🏦 Thông tin chuyển khoản</label>
+        </div>
+        <div class="field full" style="margin-bottom:14px;">
+          <label>Trạng thái chuyển khoản</label>
+          <div class="seg">
+            <button type="button" id="seg-transfer-yes" data-transfer="done">✅ Đã chuyển khoản</button>
+            <button type="button" id="seg-transfer-no" data-transfer="pending">⏳ Chưa chuyển khoản</button>
+          </div>
         </div>
         <div class="field"><label>Ngân hàng</label><input id="tx-bank-name"></div>
         <div class="field"><label>Số tài khoản</label><input id="tx-bank-account"></div>
