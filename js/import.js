@@ -50,11 +50,14 @@ function matchProjectByExcelName(rawName){
 function excelValueToISODate(v){
   if(!v) return '';
   if(v instanceof Date && !isNaN(v)) {
-    const y = v.getFullYear(), m = String(v.getMonth()+1).padStart(2,'0'), d = String(v.getDate()).padStart(2,'0');
+    // QUAN TRỌNG: dùng UTC getters (không phải local getters) vì thư viện đọc Excel (SheetJS)
+    // luôn dựng đối tượng Date theo mốc 00:00 UTC của đúng ngày trong file Excel.
+    // Nếu đọc lại bằng giờ địa phương (local) sẽ bị lệch mất 1 ngày tùy theo múi giờ máy đang chạy.
+    const y = v.getUTCFullYear(), m = String(v.getUTCMonth()+1).padStart(2,'0'), d = String(v.getUTCDate()).padStart(2,'0');
     return `${y}-${m}-${d}`;
   }
   if(typeof v === 'number'){
-    // Excel serial date (epoch 1899-12-30)
+    // Excel serial date (epoch 1899-12-30) — cũng quy đổi ra mốc UTC để đồng nhất với nhánh trên
     const d = new Date(Math.round((v - 25569) * 86400 * 1000));
     if(!isNaN(d)) return excelValueToISODate(d);
   }
@@ -268,4 +271,52 @@ document.getElementById('upload-chi-input').addEventListener('change', async (e)
   const file = e.target.files[0];
   e.target.value = '';
   await runImport(file, 'OUT');
+});
+
+// ---------------- Xuất Excel (theo đúng bộ lọc đang áp dụng ở bảng Thu Chi) ----------------
+document.getElementById('btn-export-tx').addEventListener('click', ()=>{
+  const rows = getFilteredTx();
+  if(rows.length === 0){ toast('Không có giao dịch nào phù hợp bộ lọc để xuất'); return; }
+
+  const sorted = rows.slice().sort((a,b)=>{
+    const pc = (a.projectName||'').localeCompare(b.projectName||'', 'vi');
+    if(pc !== 0) return pc;
+    return (a.date||'').localeCompare(b.date||'');
+  });
+
+  const data = sorted.map(t => ({
+    'Dự án': t.projectName || '',
+    'Loại': t.type === 'IN' ? 'Thu' : 'Chi',
+    'Ngày': t.date || '',
+    'Mã': t.code || '',
+    'Nội dung': t.content || '',
+    'Diễn giải': t.description || '',
+    'ĐVT': t.unit || '',
+    'SL': t.qty || 0,
+    'Đơn giá': t.unitPrice || 0,
+    'Thành tiền': t.amount || 0,
+    'Trạng thái hóa đơn': (t.invoiceStatus||'pending')==='issued' ? 'Đã xuất' : 'Chưa xuất',
+    'Số hóa đơn': t.invoiceNumber || '',
+    'Ngày hóa đơn': t.invoiceDate || '',
+    [t.type==='IN' ? 'Trạng thái nhận tiền' : 'Trạng thái CK']: (t.transferStatus||'pending')==='done' ? (t.type==='IN'?'Đã nhận':'Đã CK') : (t.type==='IN'?'Chưa nhận':'Chưa CK'),
+    'Ngân hàng': t.bankName || '',
+    'Số TK': t.bankAccount || '',
+    'Chủ TK': t.bankHolder || '',
+    'Ngày CK': t.transferDate || '',
+    'Trạng thái duyệt chi': t.type==='OUT' ? (t.approvalStatus==='approved' ? 'Đã duyệt' : t.approvalStatus==='rejected' ? 'Từ chối' : t.approvalStatus==='pending' ? 'Chờ duyệt' : '') : '',
+    'Ghi chú': t.note || '',
+    'Nhập từ Excel': t.importedFromExcel ? 'Có' : '',
+    'Người tạo': t.createdBy || '',
+  }));
+
+  const ws = XLSX.utils.json_to_sheet(data);
+  ws['!cols'] = [
+    {wch:18},{wch:6},{wch:11},{wch:6},{wch:30},{wch:30},{wch:8},{wch:8},{wch:14},{wch:14},
+    {wch:16},{wch:14},{wch:12},{wch:16},{wch:14},{wch:16},{wch:18},{wch:12},{wch:16},{wch:16},{wch:30},{wch:10},{wch:22}
+  ];
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, 'ThuChi');
+  const stamp = new Date().toISOString().slice(0,10);
+  XLSX.writeFile(wb, `ThuChi_XuatFile_${stamp}.xlsx`);
+  toast(`Đã xuất ${rows.length} giao dịch ra file Excel`);
 });
