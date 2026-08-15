@@ -12,10 +12,10 @@
 <div id="login-screen">
   <div class="login-card">
     <div class="login-brand">
-      <div class="mark">T75</div>
+      <div class="mark logo-mark"><img src="assets/logo-t75.jpg" alt="TUAN75 Insulation"></div>
       <div>
         <div class="name">Quản lý tài chính</div>
-        <div class="sub">T75</div>
+        <div class="sub">TUAN75 INSULATION</div>
       </div>
     </div>
     <h1>Đăng nhập</h1>
@@ -42,7 +42,7 @@
     <!-- SIDEBAR -->
     <div class="sidebar" id="sidebar">
       <div class="brand">
-        <div class="mark">T75</div>
+        <div class="mark logo-mark"><img src="assets/logo-t75.jpg" alt="TUAN75 Insulation"></div>
         <div class="name">Quản lý tài chính</div>
       </div>
 
@@ -122,6 +122,14 @@
         <div class="card">
           <div class="card-head"><h3>Doanh thu thực tế</h3></div>
           <div class="chart-wrap"><canvas id="chart-project-revenue"></canvas></div>
+        </div>
+        <div class="card">
+          <div class="card-head"><h3>Chi phí thực tế</h3></div>
+          <div class="chart-wrap"><canvas id="chart-project-cost"></canvas></div>
+        </div>
+        <div class="card">
+          <div class="card-head"><h3>Lợi nhuận thực tế</h3></div>
+          <div class="chart-wrap"><canvas id="chart-project-profit"></canvas></div>
         </div>
         <div class="card">
           <div class="card-head"><h3>Giá trị hợp đồng đã ký</h3></div>
@@ -312,13 +320,12 @@
           </p>
         </div>
         <div class="card">
-          <div class="card-head"><h3>Người duyệt chi (GĐ / PGĐ)</h3></div>
+          <div class="card-head"><h3>Người duyệt chi (Giám đốc)</h3></div>
           <p class="helper-text" style="margin-bottom:14px;">
-            Nhập đúng email đăng nhập app của Giám đốc / Phó giám đốc. Khi một khoản Chi được gửi duyệt, đúng người này (đăng nhập bằng email dưới) mới thấy nút Duyệt/Từ chối.
+            Nhập đúng email đăng nhập app của Giám đốc. Khi một khoản Chi được gửi duyệt, đúng người này (đăng nhập bằng email dưới) mới thấy nút Duyệt/Từ chối.
           </p>
           <div class="form-grid">
             <div class="field"><label>Email Giám đốc (GĐ)</label><input id="approver-gd-email" placeholder="gd@congty.com"></div>
-            <div class="field"><label>Email Phó giám đốc (PGĐ)</label><input id="approver-pgd-email" placeholder="pgd@congty.com"></div>
           </div>
           <button class="btn btn-primary btn-sm" id="save-approvers-btn">Lưu email duyệt chi</button>
         </div>
@@ -449,12 +456,11 @@
         </div>
 
         <div class="field full" id="tx-approval-block" style="display:none;border-top:1px solid var(--line);padding-top:14px;margin-top:2px;">
-          <label style="font-size:13px;font-weight:700;color:var(--ink);">✅ Phê duyệt GĐ / PGĐ</label>
-          <div class="helper-text" style="margin-bottom:8px;">Gửi khoản Chi này cho GĐ hoặc PGĐ duyệt (đăng nhập đúng email đã cài đặt mới thấy nút duyệt).</div>
+          <label style="font-size:13px;font-weight:700;color:var(--ink);">✅ Phê duyệt Giám đốc</label>
+          <div class="helper-text" style="margin-bottom:8px;">Gửi khoản Chi này cho Giám đốc duyệt (đăng nhập đúng email đã cài đặt mới thấy nút duyệt).</div>
           <select id="tx-approval-target">
             <option value="">-- Chưa gửi duyệt --</option>
-            <option value="GD">Gửi Giám đốc (GĐ) duyệt</option>
-            <option value="PGD">Gửi Phó giám đốc (PGĐ) duyệt</option>
+            <option value="GD">Gửi Giám đốc duyệt</option>
           </select>
           <div class="helper-text" id="tx-approval-current-status" style="margin-top:8px;"></div>
         </div>
