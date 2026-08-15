@@ -24,6 +24,11 @@ document.getElementById('menu-toggle').addEventListener('click', ()=>{
   document.getElementById('sidebar').classList.toggle('open');
 });
 
+// ---------------- Định dạng các ô nhập tiền có dấu phẩy ----------------
+['project-contract-value','project-cost-budget','project-revenue-budget',
+ 'order-amount','emp-salary'].forEach(bindMoneyInput);
+// tx-unitprice và tx-amount đã có listener riêng (auto-calc thành tiền) trong transactions.js
+
 let __appInitialized = false;
 window.__initApp = function(){
   if(__appInitialized) return; // avoid duplicate listeners across auth state flickers
@@ -32,6 +37,7 @@ window.__initApp = function(){
   listenTransactions();
   listenOrders();
   listenPayroll();
+  listenApprovers();
 };
 
 // ---------------- Theme (sáng / tối) ----------------
