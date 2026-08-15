@@ -3,12 +3,12 @@
 // =============================================================
 
 function fmtVND(n){
-  n = Number(n) || 0;
-  return n.toLocaleString('vi-VN') + ' đ';
+  n = Math.round(Number(n) || 0);
+  return n.toLocaleString('vi-VN', {maximumFractionDigits:0}) + ' đ';
 }
 function fmtNum(n){
-  n = Number(n) || 0;
-  return n.toLocaleString('vi-VN');
+  n = Math.round(Number(n) || 0);
+  return n.toLocaleString('vi-VN', {maximumFractionDigits:0});
 }
 function fmtDate(d){
   if(!d) return '—';
@@ -103,10 +103,10 @@ function formatMoneyInput(el){
   el.value = raw ? Number(raw).toLocaleString('vi-VN') : '';
 }
 function parseMoneyInput(el){
-  return Number((el.value||'').replace(/[^\d]/g,'')) || 0;
+  return Math.round(Number((el.value||'').replace(/[^\d]/g,'')) || 0);
 }
 function setMoneyInputValue(el, num){
-  const n = Number(num)||0;
+  const n = Math.round(Number(num)||0);
   el.value = n ? n.toLocaleString('vi-VN') : '';
 }
 function bindMoneyInput(id){
