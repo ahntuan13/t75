@@ -70,9 +70,9 @@ function excelValueToISODate(v){
 
 function toNumber(v){
   if(v === null || v === undefined || v === '') return 0;
-  if(typeof v === 'number') return v;
+  if(typeof v === 'number') return Math.round(v);
   const n = Number(String(v).replace(/[^\d.-]/g, ''));
-  return isNaN(n) ? 0 : n;
+  return isNaN(n) ? 0 : Math.round(n);
 }
 
 // Tìm dòng header (chứa cột "DỰ ÁN") trong vài dòng đầu của sheet
@@ -123,35 +123,33 @@ function parseImportWorkbook(workbook){
     const projectRaw = getCell(r, colMap.project);
     const amountRaw = getCell(r, colMap.amount);
     const dateRaw = getCell(r, colMap.date);
+    const contentRaw = getCell(r, colMap.content);
 
-    // bỏ qua dòng rác kiểu "Name" / "Content.ColumnX" do export power query để lại
+    // chỉ bỏ qua dòng rác kiểu "Name" / "Content.ColumnX" do export power query để lại,
+    // hoặc dòng trống hoàn toàn không có bất kỳ dữ liệu nào
     const projectStr = String(projectRaw || '').trim();
     const isJunkRow = /^Content\./i.test(projectStr) || /^Name$/i.test(projectStr);
+    const hasAnyData = (projectStr && !isJunkRow) || amountRaw !== undefined || dateRaw !== undefined || (contentRaw !== undefined && String(contentRaw).trim() !== '');
 
-    if((!projectStr || isJunkRow) && !amountRaw && !dateRaw){
+    if(!hasAnyData){
       emptyStreak++;
       if(emptyStreak > 40) break; // hết dữ liệu thật sự
       continue;
     }
-    if(!projectStr || isJunkRow){ continue; }
     emptyStreak = 0;
 
-    const iso = excelValueToISODate(dateRaw);
-    const amount = toNumber(amountRaw);
-    const content = String(getCell(r, colMap.content) || '').trim();
-    if(!iso && !amount && !content) continue; // dòng trống thật sự
-
+    // up hết mọi dòng có dữ liệu, phần nào thiếu thì để trống — không lọc bỏ
     results.push({
       rowIndex: r + 1,
       projectRaw: projectStr,
-      date: iso,
+      date: excelValueToISODate(dateRaw),
       code: String(getCell(r, colMap.code) || '').trim(),
-      content: content,
+      content: String(contentRaw || '').trim(),
       description: String(getCell(r, colMap.description) || '').trim(),
       unit: String(getCell(r, colMap.unit) || '').trim(),
       qty: toNumber(getCell(r, colMap.qty)),
       unitPrice: toNumber(getCell(r, colMap.unitPrice)),
-      amount,
+      amount: toNumber(amountRaw),
       transferInfo: getCell(r, colMap.transferInfo),
       invoiceInfo: getCell(r, colMap.invoiceInfo),
       note: getCell(r, colMap.note),
@@ -183,54 +181,48 @@ async function runImport(file, type){
     return;
   }
   if(rows.length === 0){
-    alert('Không đọc được dòng dữ liệu nào hợp lệ trong file.');
+    alert('Không đọc được dòng dữ liệu nào trong file.');
     return;
   }
 
-  // Khớp dự án + lọc dòng thiếu dữ liệu bắt buộc
-  const existingFingerprints = new Set(
-    TRANSACTIONS.map(t => `${t.projectId}|${t.date}|${(t.content||'').trim()}|${Number(t.amount||0)}`)
-  );
-  const seenInThisImport = new Set();
+  // Up hết toàn bộ dòng đọc được — không lọc bỏ, phần nào thiếu (ngày/tiền/dự án) để trống.
+  // Khớp dự án nếu có thể, không khớp được thì vẫn nhập, chỉ để trống dự án (nhóm "Không thuộc dự án").
+  const parsedList = rows.map(row => ({ row, proj: matchProjectByExcelName(row.projectRaw) }));
+  const unmatchedProjects = new Set(parsedList.filter(x=>!x.proj && x.row.projectRaw).map(x=>x.row.projectRaw));
 
-  const valid = [];
-  const unmatchedProjects = new Set();
-  let skippedNoDate = 0, skippedNoAmount = 0, skippedDup = 0;
-
-  rows.forEach(row=>{
-    const proj = matchProjectByExcelName(row.projectRaw);
-    if(!proj){ unmatchedProjects.add(row.projectRaw); return; }
-    if(!row.date){ skippedNoDate++; return; }
-    if(!row.amount){ skippedNoAmount++; return; }
-    const fp = `${proj.id}|${row.date}|${row.content}|${row.amount}`;
-    if(existingFingerprints.has(fp) || seenInThisImport.has(fp)){ skippedDup++; return; }
-    seenInThisImport.add(fp);
-    valid.push({row, proj});
-  });
+  // Dữ liệu Excel đã upload trước đó (cùng loại Thu/Chi) sẽ bị XÓA và thay bằng dữ liệu mới lần này.
+  const oldImported = TRANSACTIONS.filter(t => t.type===type && t.importedFromExcel===true);
 
   const typeLabel = type === 'IN' ? 'THU' : 'CHI';
-  let summary = `Đọc được ${rows.length} dòng trong file.\n\n`
-    + `✅ Sẽ nhập: ${valid.length} giao dịch (loại ${typeLabel})\n`;
-  if(unmatchedProjects.size) summary += `⚠️ Bỏ qua ${rows.length - valid.length - skippedNoDate - skippedNoAmount - skippedDup} dòng do KHÔNG khớp được tên dự án:\n   - ${[...unmatchedProjects].slice(0,15).join('\n   - ')}${unmatchedProjects.size>15?'\n   ... và nhiều hơn nữa':''}\n`;
-  if(skippedNoDate) summary += `⚠️ Bỏ qua ${skippedNoDate} dòng thiếu ngày hợp lệ\n`;
-  if(skippedNoAmount) summary += `⚠️ Bỏ qua ${skippedNoAmount} dòng không có Thành tiền\n`;
-  if(skippedDup) summary += `⚠️ Bỏ qua ${skippedDup} dòng trùng với giao dịch đã có (cùng dự án/ngày/nội dung/số tiền)\n`;
-  summary += `\nBạn có muốn tiếp tục nhập ${valid.length} giao dịch này không?`;
+  let summary = `Đọc được ${rows.length} dòng trong file "${file.name}".\n\n`
+    + `⚠️ Toàn bộ ${oldImported.length} giao dịch loại ${typeLabel} đã nhập từ Excel TRƯỚC ĐÓ sẽ bị XÓA.\n`
+    + `✅ Sau đó sẽ nhập mới toàn bộ ${rows.length} dòng từ file này (kể cả dòng thiếu ngày/số tiền/dự án — phần thiếu để trống).\n`;
+  if(unmatchedProjects.size) summary += `⚠️ Có ${unmatchedProjects.size} tên dự án không khớp được với dự án đã có, các dòng đó vẫn được nhập nhưng để trống mục Dự án:\n   - ${[...unmatchedProjects].slice(0,10).join('\n   - ')}${unmatchedProjects.size>10?'\n   ... và nhiều hơn nữa':''}\n`;
+  summary += `\nGiao dịch bạn tự tay nhập thủ công (không qua Upload Excel) sẽ KHÔNG bị ảnh hưởng.\n\nBạn có chắc chắn muốn tiếp tục?`;
 
-  if(valid.length === 0){ alert(summary); return; }
   if(!confirm(summary)) return;
 
-  toast(`Đang nhập ${valid.length} giao dịch...`);
   try{
     const CHUNK = 400;
-    for(let i = 0; i < valid.length; i += CHUNK){
+    // Bước 1: xóa toàn bộ dữ liệu Excel cũ (cùng loại)
+    if(oldImported.length){
+      toast(`Đang xóa ${oldImported.length} giao dịch cũ...`);
+      for(let i = 0; i < oldImported.length; i += CHUNK){
+        const batch = db.batch();
+        oldImported.slice(i, i+CHUNK).forEach(t=> batch.delete(db.collection('transactions').doc(t.id)));
+        await batch.commit();
+      }
+    }
+    // Bước 2: nhập toàn bộ dữ liệu mới
+    toast(`Đang nhập ${rows.length} giao dịch mới...`);
+    for(let i = 0; i < parsedList.length; i += CHUNK){
       const batch = db.batch();
-      valid.slice(i, i+CHUNK).forEach(({row, proj})=>{
+      parsedList.slice(i, i+CHUNK).forEach(({row, proj})=>{
         const ref = db.collection('transactions').doc();
         batch.set(ref, {
           type,
-          projectId: proj.id,
-          projectName: proj.name,
+          projectId: proj ? proj.id : '',
+          projectName: proj ? proj.name : (row.projectRaw || ''),
           date: row.date,
           code: row.code,
           content: row.content || '(Không có nội dung)',
@@ -255,7 +247,7 @@ async function runImport(file, type){
       });
       await batch.commit();
     }
-    toast(`✅ Đã nhập thành công ${valid.length} giao dịch ${typeLabel}`);
+    toast(`✅ Đã thay mới ${rows.length} giao dịch ${typeLabel} từ file Excel`);
   }catch(err){
     alert('Lỗi khi ghi dữ liệu: ' + err.message);
   }
