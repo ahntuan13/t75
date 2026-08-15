@@ -66,9 +66,13 @@ function renderTransfers(){
   rows = rows.slice().sort((a,b)=> (b.transferDate||b.date||'').localeCompare(a.transferDate||a.date||''));
   table.innerHTML = `<thead><tr>
     <th>Trạng thái</th><th>Ngày CK</th><th>Ngân hàng</th><th>Số TK</th><th>Chủ TK</th><th>Dự án</th><th>Loại</th><th>Số tiền</th><th>Ảnh</th>
-  </tr></thead><tbody>${rows.map(t=>`
+  </tr></thead><tbody>${rows.map(t=>{
+    const done = (t.transferStatus||'pending')==='done';
+    const doneLabel = t.type==='IN' ? '✅ Đã nhận' : '✅ Đã CK';
+    const pendingLabel = t.type==='IN' ? '⏳ Chưa nhận' : '⏳ Chưa CK';
+    return `
     <tr>
-      <td>${(t.transferStatus||'pending')==='done' ? '<span class="tag tag-gold">✅ Đã CK</span>' : '<span class="tag tag-gray">⏳ Chưa CK</span>'}</td>
+      <td>${done ? '<span class="tag tag-gold">'+doneLabel+'</span>' : '<span class="tag tag-gray">'+pendingLabel+'</span>'}</td>
       <td>${fmtDate(t.transferDate || t.date)}</td>
       <td><span class="tag tag-blue">${escapeHtml(t.bankName||'—')}</span></td>
       <td class="mono">${escapeHtml(t.bankAccount||'—')}</td>
@@ -77,7 +81,8 @@ function renderTransfers(){
       <td>${t.type==='IN' ? '<span class="tag tag-in">Thu</span>' : '<span class="tag tag-out">Chi</span>'}</td>
       <td class="num"><strong>${fmtVND(t.amount)}</strong></td>
       <td>${t.transferImage ? `<img src="${t.transferImage}" class="thumb-img" data-view-img="${escapeHtml(t.transferImage)}" title="Bấm để xem ảnh gốc">` : '—'}</td>
-    </tr>`).join('')}</tbody>`;
+    </tr>`;
+  }).join('')}</tbody>`;
 }
 
 ['inv-filter-project','inv-filter-status','inv-search'].forEach(id=>{
