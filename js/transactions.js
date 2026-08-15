@@ -174,7 +174,7 @@ function openTxModal(id){
 function renderApprovalCurrentStatus(t){
   const el = document.getElementById('tx-approval-current-status');
   if(!el) return;
-  const roleLabel = t.approverRole==='GD' ? 'Giám đốc' : 'Phó giám đốc';
+  const roleLabel = 'Giám đốc';
   if(!t.approvalStatus || t.approvalStatus==='none'){ el.textContent = 'Chưa gửi duyệt.'; return; }
   if(t.approvalStatus==='pending') el.innerHTML = `🟡 Đang chờ ${roleLabel} (${escapeHtml(t.approverEmail||'')}) duyệt.`;
   else if(t.approvalStatus==='approved') el.innerHTML = `✅ Đã được ${roleLabel} duyệt (${escapeHtml(t.approvedBy||'')}).`;
@@ -238,11 +238,11 @@ document.getElementById('save-tx-btn').addEventListener('click', async ()=>{
 
   // Gửi duyệt GĐ/PGĐ (chỉ áp dụng cho khoản Chi, và chỉ khi người dùng chủ động chọn ở dropdown)
   if(currentTxType === 'OUT'){
-    const approvalTarget = document.getElementById('tx-approval-target').value; // '', 'GD', 'PGD'
+    const approvalTarget = document.getElementById('tx-approval-target').value; // '' hoặc 'GD'
     if(approvalTarget){
-      const approverEmail = approvalTarget === 'GD' ? (APPROVERS.gdEmail||'') : (APPROVERS.pgdEmail||'');
+      const approverEmail = APPROVERS.gdEmail || '';
       if(!approverEmail){
-        toast(`Chưa cài đặt email ${approvalTarget==='GD'?'Giám đốc':'Phó giám đốc'} — vào mục Người dùng để nhập trước.`);
+        toast('Chưa cài đặt email Giám đốc — vào mục Người dùng để nhập trước.');
         return;
       }
       data.approvalStatus = 'pending';
@@ -295,7 +295,7 @@ function txRowHtml(t){
     const myEmail = (auth.currentUser && auth.currentUser.email || '').toLowerCase();
     const status = t.approvalStatus || 'none';
     if(status === 'pending'){
-      approvalCell = `<span class="tag tag-gray">🟡 Chờ ${t.approverRole==='GD'?'GĐ':'PGĐ'}</span>`;
+      approvalCell = `<span class="tag tag-gray">🟡 Chờ GĐ</span>`;
       if(myEmail && t.approverEmail && myEmail === t.approverEmail.toLowerCase()){
         approvalCell += ` <button class="icon-btn" data-approve-tx="${t.id}" title="Duyệt">✅</button><button class="icon-btn" data-reject-tx="${t.id}" title="Từ chối">❌</button>`;
       }
@@ -344,9 +344,9 @@ async function decideApproval(id, decision){
 }
 
 async function submitForApproval(id, role){
-  const approverEmail = role === 'GD' ? (APPROVERS.gdEmail||'') : (APPROVERS.pgdEmail||'');
+  const approverEmail = APPROVERS.gdEmail || '';
   if(!approverEmail){
-    toast(`Chưa cài đặt email ${role==='GD'?'Giám đốc':'Phó giám đốc'} — vào mục Người dùng để nhập trước.`);
+    toast('Chưa cài đặt email Giám đốc — vào mục Người dùng để nhập trước.');
     return;
   }
   try{
@@ -474,7 +474,7 @@ function openTxViewModal(id){
 function renderApprovalSectionHtml(t){
   const myEmail = (auth.currentUser && auth.currentUser.email || '').toLowerCase();
   const status = t.approvalStatus || 'none';
-  const roleLabel = t.approverRole==='GD' ? 'Giám đốc' : 'Phó giám đốc';
+  const roleLabel = 'Giám đốc';
   let statusHtml;
   if(status==='pending') statusHtml = `<span class="tag tag-gray">🟡 Đang chờ ${roleLabel} (${escapeHtml(t.approverEmail||'')}) duyệt</span>`;
   else if(status==='approved') statusHtml = `<span class="tag tag-gold">✅ Đã duyệt bởi ${escapeHtml(t.approvedBy||'')}</span>`;
@@ -490,7 +490,6 @@ function renderApprovalSectionHtml(t){
   } else if(status !== 'pending'){
     actions = `<div style="margin-top:10px;display:flex;gap:8px;flex-wrap:wrap;">
       <button class="btn btn-ghost btn-sm" data-submit-approval="${t.id}" data-role="GD">Gửi Giám đốc duyệt</button>
-      <button class="btn btn-ghost btn-sm" data-submit-approval="${t.id}" data-role="PGD">Gửi Phó giám đốc duyệt</button>
     </div>`;
   }
   return `<div class="tx-view-section"><h5>✅ Phê duyệt GĐ / PGĐ</h5>${statusHtml}${actions}</div>`;
