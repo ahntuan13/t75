@@ -15,9 +15,10 @@ service cloud.firestore {
     // Hồ sơ vai trò của từng người dùng (admin / user)
     match /users/{uid} {
       allow read: if isSignedIn();
-      // Cho phép tự tạo hồ sơ CỦA CHÍNH MÌNH lần đầu đăng nhập (mặc định role=user
-      // được set cứng phía client). Chỉ Admin mới được sửa/nâng quyền cho người khác.
-      allow create: if isSignedIn() && request.auth.uid == uid;
+      // Cho phép 2 trường hợp tạo mới:
+      // 1) Người dùng tự tạo hồ sơ CỦA CHÍNH MÌNH lần đầu đăng nhập (mặc định role=user).
+      // 2) Admin tạo/gán hồ sơ (kèm vai trò) cho một người khác (kể cả người đó chưa từng đăng nhập).
+      allow create: if isSignedIn() && (request.auth.uid == uid || isAdmin());
       allow update, delete: if isAdmin();
     }
 
@@ -29,8 +30,9 @@ service cloud.firestore {
 
     match /transactions/{id} {
       allow read: if isSignedIn();
-      allow create, update: if isSignedIn();
-      allow delete: if isAdmin();
+      // User thường chỉ được NHẬP MỚI giao dịch, không được sửa/xóa giao dịch đã có.
+      allow create: if isSignedIn();
+      allow update, delete: if isAdmin();
     }
 
     match /paymentOrders/{id} {
