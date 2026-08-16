@@ -18,19 +18,19 @@ function listenOrders(){
 
 const ORDER_TYPE_LABELS = {
   payment: 'Thanh toán chi phí',
-  advance_purchase: 'Tạm ứng mua hàng',
+  advance_purchase: 'Tạm ứng thanh toán',
   advance_salary: 'Tạm ứng lương',
 };
 
-function openOrderModal(id){
-  document.getElementById('order-modal-title').textContent = id ? 'Sửa lệnh chi' : 'Tạo lệnh chi';
+function openOrderModal(id, presetType){
+  document.getElementById('order-modal-title').textContent = id ? 'Sửa lệnh chi' : (presetType ? (ORDER_TYPE_LABELS[presetType] || 'Tạo lệnh chi') : 'Tạo lệnh chi');
   document.getElementById('order-id').value = id || '';
   const o = id ? ORDERS.find(x=>x.id===id) : {};
   document.getElementById('order-date').value = o.date || todayISO();
   document.getElementById('order-project').value = o.projectId || '';
   document.getElementById('order-code').value = o.code || '';
-  document.getElementById('order-type').value = o.orderType || 'payment';
-  document.getElementById('order-payer').value = o.payer || '';
+  document.getElementById('order-type').value = o.orderType || presetType || 'payment';
+  document.getElementById('order-payer').value = o.payer || (id ? '' : 'Công ty TNHH DVKT Cách Nhiệt Tuấn 75');
   document.getElementById('order-payee').value = o.payee || '';
   document.getElementById('order-payee-bank').value = o.payeeBank || '';
   document.getElementById('order-payee-tax').value = o.payeeTaxCode || '';
@@ -124,8 +124,8 @@ async function decideOrderApproval(id, decision){
 
     // Duyệt xong -> tự động ghi/khớp 1 khoản Chi tương ứng (chỉ khi DUYỆT)
     // - Có chọn Dự án -> ghi vào Thu chi (transactions), gắn đúng dự án.
-    // - KHÔNG chọn Dự án (để trống) -> ghi vào Chi phí cố định (fixedCosts).
-    //   Riêng loại "Tạm ứng mua hàng"/"Tạm ứng lương" không có dự án thì mặc định gắn mã INDIRECT.
+    // - KHÔNG chọn Dự án (để trống) -> ghi vào Chi phí gián tiếp (fixedCosts).
+    //   Riêng loại "Tạm ứng thanh toán"/"Tạm ứng lương" không có dự án thì mặc định gắn mã INDIRECT.
     if(decision === 'approved'){
       const hasProject = !!o.projectId;
       const isAdvance = o.orderType === 'advance_purchase' || o.orderType === 'advance_salary';
