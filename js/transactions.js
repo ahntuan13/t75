@@ -75,6 +75,7 @@ function listenTransactions(){
     if(window.renderReports) renderReports();
     if(window.renderPnl) renderPnl();
     renderApprovalBanner();
+    if(window.renderNotifications) renderNotifications();
   }, (err)=> console.error('tx listen error', err));
 }
 
