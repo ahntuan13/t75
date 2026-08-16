@@ -53,13 +53,12 @@ function applyRolePermissions(){
   if(!isAdmin() && activeView && adminOnlyViews.includes(activeView.dataset.view)){
     document.querySelector('[data-view="dashboard"]')?.click();
   }
-  const btnAddEmp = document.getElementById('btn-add-employee');
-  if(btnAddEmp) btnAddEmp.style.display = isAdmin() ? '' : 'none';
   const btnUploadThu = document.getElementById('btn-upload-thu');
   if(btnUploadThu) btnUploadThu.style.display = isAdmin() ? '' : 'none';
   const btnUploadChi = document.getElementById('btn-upload-chi');
   if(btnUploadChi) btnUploadChi.style.display = isAdmin() ? '' : 'none';
   if(window.renderDashboard) renderDashboard();
+  if(window.renderNotifications) renderNotifications();
 }
 
 // ---------------- Người duyệt chi (Giám đốc) ----------------
@@ -72,6 +71,7 @@ function listenApprovers(){
     if(gdEl) gdEl.value = APPROVERS.gdEmail || '';
     if(window.renderTxTable) renderTxTable();
     if(window.renderApprovalBanner) renderApprovalBanner();
+    if(window.renderNotifications) renderNotifications();
   }, (err)=> console.error('approvers listen error', err));
 }
 
