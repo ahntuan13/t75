@@ -73,13 +73,7 @@ function renderNotifications(){
 
   const { pendingForMe, decidedForMe, invoiceOverdue } = computeNotifications();
   const total = pendingForMe.length + decidedForMe.length + invoiceOverdue.length;
-
-  if(total > 0){
-    badge.style.display = 'flex';
-    badge.textContent = total > 99 ? '99+' : String(total);
-  } else {
-    badge.style.display = 'none';
-  }
+  badge.textContent = total > 99 ? '99+' : String(total);
 
   const section = (title, items, renderItem) => items.length ? `
     <div class="notif-section">
