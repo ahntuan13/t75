@@ -41,6 +41,17 @@ function renderDashboard(){
   const kpiBox = document.getElementById('dash-kpis');
   if(!kpiBox) return;
 
+  const adminSections = document.getElementById('dash-admin-sections');
+  const userSections = document.getElementById('dash-user-sections');
+  if(adminSections) adminSections.style.display = isAdmin() ? '' : 'none';
+  if(userSections) userSections.style.display = isAdmin() ? 'none' : '';
+
+  renderRecentTxTable();
+  if(!isAdmin()){
+    renderDashUserWidgets();
+    return;
+  }
+
   const totalIn = TRANSACTIONS.filter(t=>t.type==='IN').reduce((s,t)=>s+Number(t.amount||0),0);
   const totalOut = TRANSACTIONS.filter(t=>t.type==='OUT').reduce((s,t)=>s+Number(t.amount||0),0);
   const net = totalIn - totalOut;
@@ -139,19 +150,68 @@ function renderDashboard(){
   });
 
   // recent transactions
+  renderRecentTxTable();
+}
+
+function renderRecentTxTable(){
   const recent = TRANSACTIONS.slice(0,8);
   const rt = document.getElementById('dash-recent-table');
+  if(!rt) return;
   if(recent.length===0){
     rt.innerHTML = `<tr><td><div class="empty-state"><div class="big">⇄</div>Chưa có giao dịch nào.</div></td></tr>`;
-  } else {
-    rt.innerHTML = `<thead><tr><th>Ngày</th><th>Loại</th><th>Dự án</th><th>Nội dung</th><th>Số tiền</th></tr></thead><tbody>
-      ${recent.map(t=>`<tr>
-        <td>${fmtDate(t.date)}</td>
-        <td>${t.type==='IN'?'<span class="tag tag-in">Thu</span>':'<span class="tag tag-out">Chi</span>'}</td>
-        <td>${escapeHtml(t.projectName||'—')}</td>
-        <td>${escapeHtml(t.content)}</td>
-        <td class="num" style="color:${t.type==='IN'?'var(--teal)':'var(--red)'}"><strong>${fmtVND(t.amount)}</strong></td>
-      </tr>`).join('')}</tbody>`;
+    return;
+  }
+  rt.innerHTML = `<thead><tr><th>Ngày</th><th>Loại</th><th>Dự án</th><th>Nội dung</th><th>Số tiền</th></tr></thead><tbody>
+    ${recent.map(t=>`<tr>
+      <td>${fmtDate(t.date)}</td>
+      <td>${t.type==='IN'?'<span class="tag tag-in">Thu</span>':'<span class="tag tag-out">Chi</span>'}</td>
+      <td>${escapeHtml(t.projectName||'—')}</td>
+      <td>${escapeHtml(t.content)}</td>
+      <td class="num" style="color:${t.type==='IN'?'var(--teal)':'var(--red)'}"><strong>${fmtVND(t.amount)}</strong></td>
+    </tr>`).join('')}</tbody>`;
+}
+
+// ---------- Widget riêng cho User: Lệnh chi chờ duyệt / Dự án đang chạy / Hóa đơn chưa xuất ----------
+function renderDashUserWidgets(){
+  const ordTable = document.getElementById('dash-pending-orders-table');
+  if(ordTable){
+    const pending = (typeof ORDERS!=='undefined' ? ORDERS : []).filter(o=>o.status==='pending').slice(0,6);
+    ordTable.innerHTML = pending.length===0
+      ? `<tr><td><div class="empty-state"><div class="big">📝</div>Không có lệnh chi nào đang chờ duyệt.</div></td></tr>`
+      : `<thead><tr><th>Ngày</th><th>Dự án</th><th>Nội dung</th><th>Số tiền</th></tr></thead><tbody>
+        ${pending.map(o=>`<tr>
+          <td>${fmtDate(o.date)}</td>
+          <td>${escapeHtml(o.projectName||'—')}</td>
+          <td>${escapeHtml(o.content||'')}</td>
+          <td class="num">${fmtVND(o.amount)}</td>
+        </tr>`).join('')}</tbody>`;
+  }
+
+  const projTable = document.getElementById('dash-active-projects-table');
+  if(projTable){
+    const active = PROJECTS.filter(p=>p.status==='active').slice(0,6);
+    projTable.innerHTML = active.length===0
+      ? `<tr><td><div class="empty-state"><div class="big">▣</div>Không có dự án nào đang chạy.</div></td></tr>`
+      : `<thead><tr><th>Dự án</th><th>Khách hàng</th><th>Giá trị HĐ</th></tr></thead><tbody>
+        ${active.map(p=>`<tr>
+          <td><strong>${escapeHtml(p.name)}</strong></td>
+          <td>${escapeHtml(p.customer||'—')}</td>
+          <td class="num">${fmtVND(p.contractValue)}</td>
+        </tr>`).join('')}</tbody>`;
+  }
+
+  const invTable = document.getElementById('dash-pending-invoices-table');
+  if(invTable){
+    const pendingInv = TRANSACTIONS.filter(t=> (t.invoiceStatus||'pending')==='pending').slice(0,6);
+    invTable.innerHTML = pendingInv.length===0
+      ? `<tr><td><div class="empty-state"><div class="big">🧾</div>Không có giao dịch nào chưa xuất hóa đơn.</div></td></tr>`
+      : `<thead><tr><th>Ngày</th><th>Dự án</th><th>Nội dung</th><th>Số tiền</th></tr></thead><tbody>
+        ${pendingInv.map(t=>`<tr>
+          <td>${fmtDate(t.date)}</td>
+          <td>${escapeHtml(t.projectName||'—')}</td>
+          <td>${escapeHtml(t.content)}</td>
+          <td class="num">${fmtVND(t.amount)}</td>
+        </tr>`).join('')}</tbody>`;
   }
 }
 
