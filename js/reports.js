@@ -26,7 +26,7 @@ function renderWelcomeCard(){
 
   const today = todayISO();
   const txToday = TRANSACTIONS.filter(t=>t.date===today).length;
-  const pendingOrders = (typeof ORDERS!=='undefined' ? ORDERS : []).filter(o=>o.status==='pending').length;
+  const pendingOrders = (typeof ORDERS!=='undefined' ? ORDERS : []).filter(o=>o.approvalStatus==='pending').length;
   const activeProjects = PROJECTS.filter(p=>p.status==='active').length;
   document.getElementById('welcome-pills').innerHTML = `
     <div class="welcome-pill">📌 Giao dịch hôm nay <b>${fmtNum(txToday)}</b></div>
@@ -175,7 +175,7 @@ function renderRecentTxTable(){
 function renderDashUserWidgets(){
   const ordTable = document.getElementById('dash-pending-orders-table');
   if(ordTable){
-    const pending = (typeof ORDERS!=='undefined' ? ORDERS : []).filter(o=>o.status==='pending').slice(0,6);
+    const pending = (typeof ORDERS!=='undefined' ? ORDERS : []).filter(o=>o.approvalStatus==='pending').slice(0,6);
     ordTable.innerHTML = pending.length===0
       ? `<tr><td><div class="empty-state"><div class="big">📝</div>Không có lệnh chi nào đang chờ duyệt.</div></td></tr>`
       : `<thead><tr><th>Ngày</th><th>Dự án</th><th>Nội dung</th><th>Số tiền</th></tr></thead><tbody>
