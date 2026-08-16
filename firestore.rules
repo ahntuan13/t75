@@ -69,6 +69,14 @@ service cloud.firestore {
       allow delete: if isAdmin();
     }
 
+    // Chi phí cố định (không gắn dự án cụ thể) — quyền y hệt transactions
+    match /fixedCosts/{id} {
+      allow read: if isSignedIn();
+      allow create: if isSignedIn();
+      allow update: if isAdmin() || isSimpleStatusUpdate() || isApprovalSubmit() || isApprovalDecision();
+      allow delete: if isAdmin();
+    }
+
     // Cài đặt chung (VD: email GĐ duyệt chi) — ai cũng đọc được, chỉ Admin sửa
     match /settings/{id} {
       allow read: if isSignedIn();
