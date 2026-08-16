@@ -38,14 +38,15 @@ function fillEmployeeSelects(){
 }
 
 // ---- Employees CRUD ----
-document.getElementById('btn-add-employee').addEventListener('click', ()=>{
+function openEmployeeModal(){
   document.getElementById('emp-id').value = '';
   document.getElementById('emp-name').value = '';
   document.getElementById('emp-position').value = '';
   document.getElementById('emp-salary').value = '';
   document.getElementById('emp-note').value = '';
   openModal('modal-employee');
-});
+}
+document.getElementById('btn-add-employee')?.addEventListener('click', openEmployeeModal);
 
 document.getElementById('save-emp-btn').addEventListener('click', async ()=>{
   const id = document.getElementById('emp-id').value;
@@ -109,7 +110,7 @@ document.getElementById('employees-table').addEventListener('click', (e)=>{
 });
 
 // ---- Timesheet CRUD ----
-document.getElementById('btn-add-timesheet').addEventListener('click', ()=>{
+function openTimesheetModal(){
   if(EMPLOYEES.length===0){ toast('Vui lòng thêm nhân viên trước'); return; }
   document.getElementById('ts-id').value = '';
   document.getElementById('ts-employee').value = '';
@@ -119,7 +120,8 @@ document.getElementById('btn-add-timesheet').addEventListener('click', ()=>{
   document.getElementById('ts-checkout').value = '';
   document.getElementById('ts-note').value = '';
   openModal('modal-timesheet');
-});
+}
+document.getElementById('btn-add-timesheet')?.addEventListener('click', openTimesheetModal);
 
 document.getElementById('save-ts-btn').addEventListener('click', async ()=>{
   const id = document.getElementById('ts-id').value;
