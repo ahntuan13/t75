@@ -53,7 +53,8 @@
       <div class="nav-label">Hồ sơ</div>
       <div class="nav-group">
         <div class="nav-item" data-view="projects" style="display:none"><span class="ic">▣</span> Dự án</div>
-        <div class="nav-item" data-view="transactions"><span class="ic">⇄</span> Tổng quan thu chi</div>
+        <div class="nav-item" data-view="fixedcosts"><span class="ic">🏢</span> Chi phí cố định</div>
+        <div class="nav-item" data-view="transactions"><span class="ic">⇄</span> Thu Chi</div>
         <div class="nav-item" data-view="invoices"><span class="ic">🧾</span> Hóa đơn</div>
         <div class="nav-item" data-view="transfers"><span class="ic">🏦</span> Chuyển khoản</div>
       </div>
@@ -164,6 +165,40 @@
           <div><h2>Dự án</h2><div class="sub">Danh sách dự án & giá trị hợp đồng dự toán</div></div>
         </div>
         <div class="card"><div class="table-wrap"><table class="data" id="projects-table"></table></div></div>
+      </div>
+
+      <!-- FIXED COSTS (Chi phí cố định) — chi phí không gắn dự án cụ thể (VD: INDIRECT, tạm ứng...) -->
+      <div class="view" id="view-fixedcosts">
+        <div class="topbar">
+          <div><h2>Chi phí cố định</h2><div class="sub">Thu/Chi không gắn dự án cụ thể (chi phí gián tiếp, tạm ứng...)</div></div>
+          <div class="topbar-actions">
+            <button class="btn btn-ghost" id="btn-export-fc">⬇ Xuất Excel (theo bộ lọc)</button>
+            <button class="btn btn-ghost" id="btn-upload-fc-thu" style="display:none;">⬆ Upload Thu (Excel)</button>
+            <button class="btn btn-ghost" id="btn-upload-fc-chi" style="display:none;">⬆ Upload Chi (Excel)</button>
+            <button class="btn btn-primary" id="btn-add-fc">+ Nhập chi phí cố định</button>
+          </div>
+          <input type="file" id="upload-fc-thu-input" accept=".xlsx,.xls" style="display:none">
+          <input type="file" id="upload-fc-chi-input" accept=".xlsx,.xls" style="display:none">
+        </div>
+        <div class="filters-bar">
+          <select id="fc-filter-type">
+            <option value="">Tất cả loại</option>
+            <option value="IN">Thu (IN)</option>
+            <option value="OUT">Chi (OUT)</option>
+          </select>
+          <select id="fc-filter-code">
+            <option value="">Tất cả mã</option>
+            <option value="INDIRECT">INDIRECT</option>
+            <option value="QL">QL - Quản lý</option>
+            <option value="VTC">VTC - Vật tư chính</option>
+            <option value="VTP">VTP - Vật tư phụ</option>
+            <option value="NC">NC - Nhân công</option>
+          </select>
+          <input type="month" id="fc-filter-month">
+          <div class="spacer"></div>
+          <input type="text" id="fc-search" placeholder="Tìm nội dung...">
+        </div>
+        <div id="fc-table"></div>
       </div>
 
       <!-- TRANSACTIONS -->
@@ -353,6 +388,13 @@
           <button class="btn btn-primary btn-sm" id="save-approvers-btn">Lưu email duyệt chi</button>
         </div>
         <div class="card">
+          <div class="card-head"><h3>🏢 Chuyển dữ liệu INDIRECT → Chi phí cố định</h3></div>
+          <p class="helper-text" style="margin-bottom:14px;">
+            Chạy 1 lần duy nhất: chuyển toàn bộ giao dịch thuộc dự án "INDIRECT" đang nằm trong mục Thu Chi sang mục Chi phí cố định mới, sau đó xóa khỏi Thu Chi để tránh trùng lặp. <strong>Không hoàn tác được</strong> — chỉ bấm khi chắc chắn.
+          </p>
+          <button class="btn btn-danger btn-sm" id="btn-migrate-indirect">Chuyển dữ liệu INDIRECT ngay</button>
+        </div>
+        <div class="card">
           <div class="card-head"><h3>🔍 Đọc hóa đơn tự động (OCR miễn phí — Tesseract.js)</h3></div>
           <p class="helper-text" style="margin-bottom:14px;">
             Dùng cho tính năng "Upload hóa đơn" ở nút ⚡ Tạo mới — đọc chữ trực tiếp trong trình duyệt (miễn phí hoàn toàn, không gọi API trả phí nào).
@@ -425,6 +467,10 @@
           <span class="qc-icon" style="background:var(--gold-dim);color:var(--gold);">🗓</span>
           <span class="qc-text"><strong>Chấm công</strong><span class="helper-text">Ghi công theo ngày</span></span>
         </button>
+        <button class="qc-item" id="qc-add-fc">
+          <span class="qc-icon" style="background:var(--pink-dim);color:var(--pink);">🏢</span>
+          <span class="qc-text"><strong>Chi phí cố định</strong><span class="helper-text">Chi phí không gắn dự án</span></span>
+        </button>
         <button class="qc-item" id="qc-upload-invoice-image">
           <span class="qc-icon" style="background:var(--teal-dim);color:var(--teal);">📷</span>
           <span class="qc-text"><strong>Upload hóa đơn (ảnh)</strong><span class="helper-text">AI tự đọc thông tin từ ảnh</span></span>
@@ -495,7 +541,7 @@
         <div class="helper-text" id="tx-type-hint">Chọn Thu hoặc Chi để tiếp tục nhập thông tin.</div>
       </div>
       <div class="form-grid" id="tx-form-fields" style="display:none;">
-        <div class="field full"><label>Dự án *</label><select id="tx-project" required></select></div>
+        <div class="field full" id="tx-project-field"><label id="tx-project-label">Dự án *</label><select id="tx-project"></select></div>
         <div class="field"><label>Ngày *</label><input type="date" id="tx-date" required></div>
         <div class="field"><label>Mã (code)</label>
           <select id="tx-code">
@@ -704,6 +750,7 @@
 <script src="js/auth.js"></script>
 <script src="js/projects.js"></script>
 <script src="js/transactions.js"></script>
+<script src="js/fixedcosts.js"></script>
 <script src="js/notifications.js"></script>
 <script src="js/invoice-ocr.js"></script>
 <script src="js/import.js"></script>
