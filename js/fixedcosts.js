@@ -14,6 +14,7 @@ function listenFixedCosts(){
     renderFixedCostsTable();
     if(window.renderApprovalBanner) renderApprovalBanner();
     if(window.renderNotifications) renderNotifications();
+    if(window.renderDashboard) renderDashboard();
   }, (err)=> console.error('fixedCosts listen error', err));
 }
 
@@ -50,7 +51,7 @@ function renderFixedCostsTable(){
   wrap.innerHTML = `
     <div class="card tx-project-block">
       <div class="tx-project-head">
-        <h4>Chi phí cố định (${sorted.length})</h4>
+        <h4>Chi phí gián tiếp (${sorted.length})</h4>
         <div class="tx-project-summary">
           <span style="color:var(--teal)">Thu: <strong>${fmtVND(sumIn)}</strong></span>
           <span style="color:var(--red)">Chi: <strong>${fmtVND(sumOut)}</strong></span>
@@ -79,7 +80,7 @@ document.getElementById('fc-table')?.addEventListener('click', (e)=>{
       const t = FIXEDCOSTS.find(x=>x.id===delId);
       db.collection('fixedCosts').doc(delId).delete().then(()=>{
         toast('Đã xóa');
-        if(t) logActivity('delete', {projectName:'Chi phí cố định', content: t.content, amount: t.amount, type: t.type});
+        if(t) logActivity('delete', {projectName:'Chi phí gián tiếp', content: t.content, amount: t.amount, type: t.type});
       });
     }
   }
@@ -92,7 +93,7 @@ document.getElementById('fc-table')?.addEventListener('click', (e)=>{
   document.getElementById(id)?.addEventListener('change', renderFixedCostsTable);
 });
 
-// ---------------- Xuất Excel (Chi phí cố định) ----------------
+// ---------------- Xuất Excel (Chi phí gián tiếp) ----------------
 document.getElementById('btn-export-fc')?.addEventListener('click', ()=>{
   const rows = getFilteredFixedCosts();
   if(rows.length === 0){ toast('Không có khoản nào phù hợp bộ lọc để xuất'); return; }
@@ -115,7 +116,7 @@ document.getElementById('btn-export-fc')?.addEventListener('click', ()=>{
   toast(`Đã xuất ${rows.length} dòng ra file Excel`);
 });
 
-// ---------------- Upload Thu/Chi (Excel) cho Chi phí cố định ----------------
+// ---------------- Upload Thu/Chi (Excel) cho Chi phí gián tiếp ----------------
 // Dùng chung logic parse với import.js (parseImportWorkbook), chỉ khác nơi ghi dữ liệu:
 // không cần khớp dự án — mọi dòng trong file đều được xem là chi phí cố định.
 async function runImportFixedCosts(file, type){
@@ -139,8 +140,8 @@ async function runImportFixedCosts(file, type){
   const oldImported = FIXEDCOSTS.filter(t => t.type===type && t.importedFromExcel===true);
   const typeLabel = type === 'IN' ? 'THU' : 'CHI';
   const summary = `Đọc được ${rows.length} dòng trong file "${file.name}".\n\n`
-    + `⚠️ Toàn bộ ${oldImported.length} dòng Chi phí cố định loại ${typeLabel} đã nhập từ Excel TRƯỚC ĐÓ sẽ bị XÓA.\n`
-    + `✅ Sau đó sẽ nhập mới toàn bộ ${rows.length} dòng từ file này vào mục Chi phí cố định.\n\n`
+    + `⚠️ Toàn bộ ${oldImported.length} dòng Chi phí gián tiếp loại ${typeLabel} đã nhập từ Excel TRƯỚC ĐÓ sẽ bị XÓA.\n`
+    + `✅ Sau đó sẽ nhập mới toàn bộ ${rows.length} dòng từ file này vào mục Chi phí gián tiếp.\n\n`
     + `Bạn có chắc chắn muốn tiếp tục?`;
   if(!confirm(summary)) return;
 
@@ -175,7 +176,7 @@ async function runImportFixedCosts(file, type){
       });
       await batch.commit();
     }
-    toast(`✅ Đã thay mới ${rows.length} dòng Chi phí cố định ${typeLabel}`);
+    toast(`✅ Đã thay mới ${rows.length} dòng Chi phí gián tiếp ${typeLabel}`);
   }catch(err){
     alert('Lỗi khi ghi dữ liệu: ' + err.message);
   }
@@ -192,12 +193,12 @@ document.getElementById('upload-fc-chi-input')?.addEventListener('change', (e)=>
   runImportFixedCosts(file, 'OUT');
 });
 
-// ---------------- Chuyển dữ liệu cũ: các giao dịch project = INDIRECT trong Thu Chi -> Chi phí cố định ----------------
+// ---------------- Chuyển dữ liệu cũ: các giao dịch project = INDIRECT trong Thu Chi -> Chi phí gián tiếp ----------------
 // Chạy 1 LẦN DUY NHẤT (thủ công, Admin bấm) để dọn dữ liệu cũ đã lỡ nằm trong Thu Chi trước khi có mục này.
 async function migrateIndirectToFixedCosts(){
   const indirectTx = TRANSACTIONS.filter(t => (t.projectName||'').trim().toUpperCase() === 'INDIRECT');
   if(indirectTx.length === 0){ alert('Không tìm thấy giao dịch nào thuộc dự án INDIRECT trong Thu Chi.'); return; }
-  if(!confirm(`Tìm thấy ${indirectTx.length} giao dịch thuộc "INDIRECT" trong Thu Chi.\n\nBấm OK để CHUYỂN toàn bộ sang mục Chi phí cố định, sau đó XÓA khỏi Thu Chi (tránh trùng lặp).\n\nThao tác này không hoàn tác được, hãy chắc chắn trước khi tiếp tục.`)) return;
+  if(!confirm(`Tìm thấy ${indirectTx.length} giao dịch thuộc "INDIRECT" trong Thu Chi.\n\nBấm OK để CHUYỂN toàn bộ sang mục Chi phí gián tiếp, sau đó XÓA khỏi Thu Chi (tránh trùng lặp).\n\nThao tác này không hoàn tác được, hãy chắc chắn trước khi tiếp tục.`)) return;
 
   try{
     const CHUNK = 400;
@@ -211,7 +212,7 @@ async function migrateIndirectToFixedCosts(){
       });
       await batch.commit();
     }
-    toast(`✅ Đã chuyển ${indirectTx.length} giao dịch INDIRECT sang Chi phí cố định`);
+    toast(`✅ Đã chuyển ${indirectTx.length} giao dịch INDIRECT sang Chi phí gián tiếp`);
   }catch(err){
     alert('Lỗi khi chuyển dữ liệu: ' + err.message);
   }
