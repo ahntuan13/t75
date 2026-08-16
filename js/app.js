@@ -26,17 +26,21 @@ document.getElementById('menu-toggle').addEventListener('click', ()=>{
 
 // ---------------- Modal "Tạo nhanh" (nút + nổi, dùng chung cho MỌI trang) ----------------
 document.getElementById('fab-quick-create')?.addEventListener('click', ()=> openModal('modal-quickcreate'));
+document.getElementById('btn-dash-quick-create')?.addEventListener('click', ()=> openModal('modal-quickcreate'));
 
 document.getElementById('qc-add-project')?.addEventListener('click', ()=>{ closeModal('modal-quickcreate'); openProjectModal(null); });
 document.getElementById('qc-add-tx')?.addEventListener('click', ()=>{ closeModal('modal-quickcreate'); openTxModal(null); });
 document.getElementById('qc-add-order')?.addEventListener('click', ()=>{ closeModal('modal-quickcreate'); openOrderModal(null); });
+document.getElementById('qc-add-advance-payment')?.addEventListener('click', ()=>{ closeModal('modal-quickcreate'); openOrderModal(null, 'advance_purchase'); });
+document.getElementById('qc-add-advance-salary')?.addEventListener('click', ()=>{ closeModal('modal-quickcreate'); openOrderModal(null, 'advance_salary'); });
 document.getElementById('qc-add-employee')?.addEventListener('click', ()=>{ closeModal('modal-quickcreate'); openEmployeeModal(); });
 document.getElementById('qc-add-timesheet')?.addEventListener('click', ()=>{ closeModal('modal-quickcreate'); openTimesheetModal(); });
 document.getElementById('qc-add-fc')?.addEventListener('click', ()=>{ closeModal('modal-quickcreate'); openTxModal(null, null, 'fixedCosts'); });
 
 // ---------------- Định dạng các ô nhập tiền có dấu phẩy ----------------
 ['project-contract-value','project-cost-budget','project-revenue-budget',
- 'order-amount','emp-salary'].forEach(bindMoneyInput);
+ 'order-amount','emp-contract-salary','emp-effective-rate',
+ 'pa-bhxh','pa-tamung','pa-ungtuan','pa-thuong','pa-khactamung','pa-khaunghi'].forEach(bindMoneyInput);
 // tx-unitprice và tx-amount đã có listener riêng (auto-calc thành tiền) trong transactions.js
 
 let __appInitialized = false;
