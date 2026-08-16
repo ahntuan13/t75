@@ -58,8 +58,8 @@ function renderProjectsTable(){
       : p.status==='warranty' ? '<span class="tag tag-gold">Còn 5% bảo hành</span>'
       : '<span class="tag tag-in">Đang thực hiện</span>';
     return `<tr>
-      <td><strong>${escapeHtml(p.name)}</strong><div class="helper-text">${escapeHtml(p.customer||'')}${p.contractNumber? ' • HĐ: '+escapeHtml(p.contractNumber):''}</div></td>
-      <td>${escapeHtml(p.code||'—')}${(p.contractFileUrl||p.contractFile||p.contractLink) ? ` <a href="${p.contractFileUrl||p.contractFile||p.contractLink}" target="_blank" class="tag tag-blue" title="Xem file hợp đồng">📎 HĐ</a>` : ''}</td>
+      <td><strong>${escapeHtml(p.name)}</strong><div class="helper-text">${escapeHtml(p.customer||'')}${p.taxCode? ' • MST: '+escapeHtml(p.taxCode):''}${p.contractNumber? ' • HĐ: '+escapeHtml(p.contractNumber):''}</div></td>
+      <td>${escapeHtml(p.code||'—')}${(Array.isArray(p.contractFiles)&&p.contractFiles.length) ? ` <a href="${p.contractFiles[0].url}" target="_blank" class="tag tag-blue" title="Xem file hợp đồng (${p.contractFiles.length} file)">📎 HĐ${p.contractFiles.length>1?' ×'+p.contractFiles.length:''}</a>` : ((p.contractFileUrl||p.contractFile||p.contractLink) ? ` <a href="${p.contractFileUrl||p.contractFile||p.contractLink}" target="_blank" class="tag tag-blue" title="Xem file hợp đồng">📎 HĐ</a>` : '')}</td>
       <td>${statusTag}</td>
       <td class="num">${fmtVND(p.contractValue)}</td>
       <td class="num" style="color:var(--teal)">${fmtVND(revenue)}</td>
@@ -78,42 +78,45 @@ function renderProjectsTable(){
   </tr></thead><tbody>${rows}</tbody>`;
 }
 
-let currentContractFileUrl = '';
-let currentContractFileName = '';
+let currentContractFiles = []; // [{url, name, uploadedAt}]
 
 function renderContractFileStatus(){
   const el = document.getElementById('project-contract-file-status');
   if(!el) return;
-  if(currentContractFileUrl){
-    el.innerHTML = `<a href="${currentContractFileUrl}" target="_blank" class="tag tag-blue">📎 ${escapeHtml(currentContractFileName || 'Xem file trên OneDrive')}</a> <button type="button" class="btn btn-ghost btn-sm" id="project-contract-file-remove">Xóa liên kết</button>`;
-    document.getElementById('project-contract-file-remove').addEventListener('click', ()=>{
-      currentContractFileUrl = ''; currentContractFileName = '';
-      document.getElementById('project-contract-file').value = '';
+  if(currentContractFiles.length === 0){
+    el.innerHTML = `<span class="helper-text">Chưa có file hợp đồng nào.</span>`;
+    return;
+  }
+  el.innerHTML = currentContractFiles.map((f, idx)=>
+    `<div style="display:flex;align-items:center;gap:8px;margin-bottom:6px;">
+      <a href="${f.url}" target="_blank" class="tag tag-blue">📎 ${escapeHtml(f.name || 'Xem file trên OneDrive')}</a>
+      <button type="button" class="btn btn-ghost btn-sm" data-remove-contract-file="${idx}">Xóa</button>
+    </div>`
+  ).join('');
+  el.querySelectorAll('[data-remove-contract-file]').forEach(btn=>{
+    btn.addEventListener('click', ()=>{
+      currentContractFiles.splice(Number(btn.dataset.removeContractFile), 1);
       renderContractFileStatus();
     });
-  } else {
-    el.innerHTML = `<span class="helper-text">Chưa có file đính kèm.</span>`;
-  }
+  });
 }
 
 document.getElementById('project-contract-file').addEventListener('change', async (e)=>{
   const file = e.target.files[0];
   if(!file) return;
   const el = document.getElementById('project-contract-file-status');
-  el.innerHTML = `<span class="helper-text">⏳ Đang tải lên OneDrive công ty... (có thể hiện popup đăng nhập Microsoft 365 lần đầu)</span>`;
+  el.innerHTML = `<span class="helper-text">⏳ Đang tải "${escapeHtml(file.name)}" lên OneDrive công ty... (có thể hiện popup đăng nhập Microsoft 365 lần đầu)</span>`;
   try{
     const projName = document.getElementById('project-name').value.trim() || 'KhongTenDuAn';
     const folder = 'Projects/' + projName.replace(/[^\w\-]+/g, '_');
     const result = await msUploadFile(file, folder);
-    currentContractFileUrl = result.webUrl;
-    currentContractFileName = result.name;
-    toast('Đã tải file lên OneDrive');
+    currentContractFiles.push({ url: result.webUrl, name: result.name, uploadedAt: new Date().toISOString() });
+    toast('Đã thêm file hợp đồng');
   }catch(err){
     toast('Lỗi tải lên OneDrive: ' + err.message);
     el.innerHTML = `<span class="helper-text" style="color:var(--red)">Tải lên thất bại: ${escapeHtml(err.message)}</span>`;
-    e.target.value = '';
-    return;
   }
+  e.target.value = '';
   renderContractFileStatus();
 });
 
@@ -124,6 +127,7 @@ function openProjectModal(id){
   document.getElementById('project-name').value = p.name || '';
   document.getElementById('project-code').value = p.code || '';
   document.getElementById('project-customer').value = p.customer || '';
+  document.getElementById('project-tax-code').value = p.taxCode || '';
   document.getElementById('project-contract-number').value = p.contractNumber || '';
   document.getElementById('project-contract-link').value = p.contractLink || '';
   setMoneyInputValue(document.getElementById('project-contract-value'), p.contractValue);
@@ -131,9 +135,14 @@ function openProjectModal(id){
   setMoneyInputValue(document.getElementById('project-revenue-budget'), p.revenueBudget);
   document.getElementById('project-status').value = p.status || 'active';
   document.getElementById('project-note').value = p.note || '';
-  // ưu tiên file mới (contractFileUrl trên OneDrive), fallback file cũ lưu base64 nếu có từ trước
-  currentContractFileUrl = p.contractFileUrl || p.contractFile || '';
-  currentContractFileName = p.contractFileName || '';
+  // ưu tiên mảng nhiều file mới (contractFiles); nếu dự án cũ chỉ có 1 file (contractFileUrl/contractFile) thì tự chuyển thành mảng 1 phần tử
+  if(Array.isArray(p.contractFiles) && p.contractFiles.length){
+    currentContractFiles = p.contractFiles.slice();
+  } else if(p.contractFileUrl || p.contractFile){
+    currentContractFiles = [{ url: p.contractFileUrl || p.contractFile, name: p.contractFileName || 'Hợp đồng' }];
+  } else {
+    currentContractFiles = [];
+  }
   document.getElementById('project-contract-file').value = '';
   renderContractFileStatus();
   openModal('modal-project');
@@ -149,6 +158,7 @@ document.getElementById('save-project-btn').addEventListener('click', async ()=>
     name,
     code: document.getElementById('project-code').value.trim(),
     customer: document.getElementById('project-customer').value.trim(),
+    taxCode: document.getElementById('project-tax-code').value.trim(),
     contractNumber: document.getElementById('project-contract-number').value.trim(),
     contractLink: document.getElementById('project-contract-link').value.trim(),
     contractValue: parseMoneyInput(document.getElementById('project-contract-value')),
@@ -156,14 +166,19 @@ document.getElementById('save-project-btn').addEventListener('click', async ()=>
     revenueBudget: parseMoneyInput(document.getElementById('project-revenue-budget')),
     status: document.getElementById('project-status').value,
     note: document.getElementById('project-note').value.trim(),
-    contractFileUrl: currentContractFileUrl,
-    contractFileName: currentContractFileName,
+    contractFiles: currentContractFiles,
+    // xóa field cũ (single-file) để tránh dữ liệu thừa/nhầm lẫn khi đọc lại
+    contractFileUrl: firebase.firestore.FieldValue.delete(),
+    contractFile: firebase.firestore.FieldValue.delete(),
+    contractFileName: firebase.firestore.FieldValue.delete(),
+    contractFileType: firebase.firestore.FieldValue.delete(),
   };
   try{
     if(id){
       await db.collection('projects').doc(id).update(data);
       toast('Đã cập nhật dự án');
     } else {
+      delete data.contractFileUrl; delete data.contractFile; delete data.contractFileName; delete data.contractFileType;
       data.createdAt = firebase.firestore.FieldValue.serverTimestamp();
       data.createdBy = auth.currentUser.email;
       await db.collection('projects').add(data);
