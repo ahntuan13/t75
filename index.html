@@ -53,8 +53,9 @@
       <div class="nav-label">Hồ sơ</div>
       <div class="nav-group">
         <div class="nav-item" data-view="projects" style="display:none"><span class="ic">▣</span> Dự án</div>
-        <div class="nav-item" data-view="fixedcosts"><span class="ic">🏢</span> Chi phí cố định</div>
+        <div class="nav-item" data-view="fixedcosts"><span class="ic">🏢</span> Chi phí gián tiếp</div>
         <div class="nav-item" data-view="transactions"><span class="ic">⇄</span> Thu Chi</div>
+        <div class="nav-item" data-view="orders"><span class="ic">📝</span> Lệnh chi</div>
         <div class="nav-item" data-view="invoices"><span class="ic">🧾</span> Hóa đơn</div>
         <div class="nav-item" data-view="transfers"><span class="ic">🏦</span> Chuyển khoản</div>
       </div>
@@ -67,7 +68,6 @@
 
       <div class="nav-label">Chi & lương</div>
       <div class="nav-group">
-        <div class="nav-item" data-view="orders"><span class="ic">📝</span> Lệnh chi</div>
         <div class="nav-item" data-view="payroll"><span class="ic">💵</span> Bảng lương</div>
         <div class="nav-item" data-view="timesheet"><span class="ic">🗓</span> Chấm công</div>
       </div>
@@ -110,6 +110,7 @@
             <h2>Tổng quan</h2>
             <div class="sub">Bức tranh dòng tiền toàn công ty</div>
           </div>
+          <div class="topbar-actions"><button class="btn btn-primary" id="btn-dash-quick-create">⚡ Tạo mới</button></div>
         </div>
         <div class="welcome-card" id="welcome-card">
           <div class="welcome-left">
@@ -165,10 +166,10 @@
         <div class="card"><div class="table-wrap"><table class="data" id="projects-table"></table></div></div>
       </div>
 
-      <!-- FIXED COSTS (Chi phí cố định) — chi phí không gắn dự án cụ thể (VD: INDIRECT, tạm ứng...) -->
+      <!-- FIXED COSTS (Chi phí gián tiếp) — chi phí không gắn dự án cụ thể (VD: INDIRECT, tạm ứng...) -->
       <div class="view" id="view-fixedcosts">
         <div class="topbar">
-          <div><h2>Chi phí cố định</h2><div class="sub">Thu/Chi không gắn dự án cụ thể (chi phí gián tiếp, tạm ứng...)</div></div>
+          <div><h2>Chi phí gián tiếp</h2><div class="sub">Thu/Chi không gắn dự án cụ thể (chi phí gián tiếp, tạm ứng...)</div></div>
           <div class="topbar-actions">
             <button class="btn btn-ghost" id="btn-export-fc" style="display:none;">⬇ Xuất Excel (theo bộ lọc)</button>
             <button class="btn btn-ghost" id="btn-upload-fc-thu" style="display:none;">⬆ Upload Thu (Excel)</button>
@@ -337,10 +338,22 @@
         </div>
         <div class="card">
           <div class="card-head"><h3>Tổng hợp lương theo tháng</h3></div>
+          <div class="helper-text" style="margin-bottom:10px;">Bấm vào tên nhân viên để chỉnh các khoản tạm ứng/thưởng/khấu trừ riêng tháng này, hoặc bấm 🖨 để xuất phiếu lương PDF.</div>
           <div class="table-wrap"><table class="data" id="payroll-summary-table"></table></div>
         </div>
         <div class="card">
-          <div class="card-head"><h3>Danh sách nhân viên</h3></div>
+          <div class="card-head"><h3>🏗 Chi phí lương phân bổ theo dự án</h3></div>
+          <p class="helper-text" style="margin-bottom:10px;">Tổng tiền lương quy đổi theo tỉ lệ giờ công mỗi nhân viên làm cho từng dự án trong tháng.</p>
+          <div class="table-wrap"><table class="data" id="payroll-project-cost-table"></table></div>
+        </div>
+        <div class="card">
+          <div class="card-head">
+            <h3>Danh sách nhân viên</h3>
+            <div class="actions">
+              <button class="btn btn-ghost btn-sm" id="btn-upload-employees">⬆ Upload danh sách NV (Excel)</button>
+            </div>
+          </div>
+          <input type="file" id="upload-employees-input" accept=".xlsx,.xls" style="display:none">
           <div class="table-wrap"><table class="data" id="employees-table"></table></div>
         </div>
       </div>
@@ -348,17 +361,24 @@
       <!-- TIMESHEET (Chấm công) -->
       <div class="view" id="view-timesheet">
         <div class="topbar">
-          <div><h2>Chấm công</h2><div class="sub">Ghi nhận công theo ngày</div></div>
+          <div><h2>Chấm công</h2><div class="sub">3 ca Sáng / Chiều / Tối mỗi ngày — ca Tối (từ 17:01) tự tính là giờ tăng ca</div></div>
         </div>
         <div class="filters-bar">
           <input type="month" id="ts-filter-month">
           <select id="ts-filter-employee"><option value="">Tất cả nhân viên</option></select>
         </div>
         <div class="card">
-          <div class="card-head"><h3>Bảng chấm công theo ngày</h3></div>
+          <div class="card-head"><h3>Tổng hợp công theo tháng</h3></div>
+          <div class="table-wrap"><table class="data" id="ts-summary-table"></table></div>
+        </div>
+        <div class="card">
+          <div class="card-head"><h3>Bảng chấm công theo ngày (chi tiết từng ca)</h3></div>
           <div class="table-wrap"><table class="data" id="timesheet-table"></table></div>
         </div>
       </div>
+
+      <!-- PAYSLIP PRINT AREA (ẩn, chỉ dùng khi xuất PDF) -->
+      <div id="payslip-print-area" style="display:none;"></div>
 
       <!-- USERS & PERMISSIONS (admin only) -->
       <div class="view" id="view-users">
@@ -385,9 +405,9 @@
           <button class="btn btn-primary btn-sm" id="save-approvers-btn">Lưu email duyệt chi</button>
         </div>
         <div class="card">
-          <div class="card-head"><h3>🏢 Chuyển dữ liệu INDIRECT → Chi phí cố định</h3></div>
+          <div class="card-head"><h3>🏢 Chuyển dữ liệu INDIRECT → Chi phí gián tiếp</h3></div>
           <p class="helper-text" style="margin-bottom:14px;">
-            Chạy 1 lần duy nhất: chuyển toàn bộ giao dịch thuộc dự án "INDIRECT" đang nằm trong mục Thu Chi sang mục Chi phí cố định mới, sau đó xóa khỏi Thu Chi để tránh trùng lặp. <strong>Không hoàn tác được</strong> — chỉ bấm khi chắc chắn.
+            Chạy 1 lần duy nhất: chuyển toàn bộ giao dịch thuộc dự án "INDIRECT" đang nằm trong mục Thu Chi sang mục Chi phí gián tiếp mới, sau đó xóa khỏi Thu Chi để tránh trùng lặp. <strong>Không hoàn tác được</strong> — chỉ bấm khi chắc chắn.
           </p>
           <button class="btn btn-danger btn-sm" id="btn-migrate-indirect">Chuyển dữ liệu INDIRECT ngay</button>
         </div>
@@ -456,17 +476,25 @@
           <span class="qc-icon" style="background:var(--red-dim);color:var(--red);">📝</span>
           <span class="qc-text"><strong>Tạo lệnh chi</strong><span class="helper-text">Lập lệnh chi mới</span></span>
         </button>
-        <button class="qc-item" id="qc-add-employee">
-          <span class="qc-icon" style="background:var(--purple-dim);color:var(--purple);">👤</span>
-          <span class="qc-text"><strong>Thêm nhân viên</strong><span class="helper-text">Thêm hồ sơ nhân viên</span></span>
+        <button class="qc-item" id="qc-add-advance-payment">
+          <span class="qc-icon" style="background:var(--gold-dim);color:var(--gold);">💳</span>
+          <span class="qc-text"><strong>Tạm ứng thanh toán</strong><span class="helper-text">Đề nghị tạm ứng chi phí</span></span>
+        </button>
+        <button class="qc-item" id="qc-add-advance-salary">
+          <span class="qc-icon" style="background:var(--gold-dim);color:var(--gold);">💰</span>
+          <span class="qc-text"><strong>Tạm ứng lương</strong><span class="helper-text">Đề nghị tạm ứng lương NV</span></span>
         </button>
         <button class="qc-item" id="qc-add-timesheet">
           <span class="qc-icon" style="background:var(--gold-dim);color:var(--gold);">🗓</span>
           <span class="qc-text"><strong>Chấm công</strong><span class="helper-text">Ghi công theo ngày</span></span>
         </button>
+        <button class="qc-item" id="qc-add-employee">
+          <span class="qc-icon" style="background:var(--purple-dim);color:var(--purple);">👤</span>
+          <span class="qc-text"><strong>Thêm nhân viên</strong><span class="helper-text">Thêm hồ sơ nhân viên</span></span>
+        </button>
         <button class="qc-item" id="qc-add-fc">
           <span class="qc-icon" style="background:var(--pink-dim);color:var(--pink);">🏢</span>
-          <span class="qc-text"><strong>Chi phí cố định</strong><span class="helper-text">Chi phí không gắn dự án</span></span>
+          <span class="qc-text"><strong>Chi phí gián tiếp</strong><span class="helper-text">Chi phí không gắn dự án</span></span>
         </button>
         <button class="qc-item" id="qc-upload-invoice-image">
           <span class="qc-icon" style="background:var(--teal-dim);color:var(--teal);">📷</span>
@@ -639,7 +667,7 @@
         <div class="field"><label>Loại lệnh chi</label>
           <select id="order-type">
             <option value="payment">Thanh toán chi phí</option>
-            <option value="advance_purchase">Tạm ứng mua hàng</option>
+            <option value="advance_purchase">Tạm ứng thanh toán</option>
             <option value="advance_salary">Tạm ứng lương</option>
           </select>
         </div>
@@ -668,13 +696,20 @@
 
 <div class="modal-backdrop" id="modal-employee">
   <div class="modal">
-    <div class="modal-head"><h3>Thêm nhân viên</h3><button class="modal-close" data-close>✕</button></div>
+    <div class="modal-head"><h3 id="emp-modal-title">Thêm nhân viên</h3><button class="modal-close" data-close>✕</button></div>
     <div class="modal-body">
       <input type="hidden" id="emp-id">
       <div class="form-grid">
         <div class="field full"><label>Họ tên *</label><input id="emp-name" required></div>
-        <div class="field"><label>Chức vụ</label><input id="emp-position"></div>
-        <div class="field"><label>Lương cơ bản / tháng</label><input type="text" id="emp-salary" placeholder="0"></div>
+        <div class="field"><label>Chức vụ</label><input id="emp-position" placeholder="VD: Giám sát, Công nhân..."></div>
+        <div class="field"><label>Nhóm lương *</label>
+          <select id="emp-paytype">
+            <option value="monthly">Quản lý (lương tháng cố định)</option>
+            <option value="daily">Công nhân (lương theo ngày công)</option>
+          </select>
+        </div>
+        <div class="field"><label>Lương theo HĐLĐ/BHXH (VNĐ/tháng)</label><input type="text" id="emp-contract-salary" placeholder="0"></div>
+        <div class="field" id="emp-effective-field"><label id="emp-effective-label">Lương hiệu quả (VNĐ/tháng)</label><input type="text" id="emp-effective-rate" placeholder="0"></div>
         <div class="field full"><label>Ghi chú</label><textarea id="emp-note" rows="2"></textarea></div>
       </div>
     </div>
@@ -689,22 +724,55 @@
       <input type="hidden" id="ts-id">
       <div class="form-grid">
         <div class="field full"><label>Nhân viên *</label><select id="ts-employee" required></select></div>
-        <div class="field"><label>Ngày *</label><input type="date" id="ts-date" required></div>
-        <div class="field"><label>Loại công</label>
-          <select id="ts-worktype">
-            <option value="full">Đủ công (1.0)</option>
-            <option value="half">Nửa công (0.5)</option>
-            <option value="ot">Tăng ca</option>
-            <option value="leave">Nghỉ có phép (0)</option>
-            <option value="absent">Nghỉ không phép (0)</option>
-          </select>
-        </div>
-        <div class="field"><label>Giờ vào</label><input type="time" id="ts-checkin"></div>
-        <div class="field"><label>Giờ ra</label><input type="time" id="ts-checkout"></div>
+        <div class="field full"><label>Ngày *</label><input type="date" id="ts-date" required></div>
+      </div>
+      <div class="field full" style="border-top:1px solid var(--line);padding-top:14px;margin-top:6px;">
+        <label style="font-size:13px;font-weight:700;color:var(--ink);">☀️ Ca Sáng</label>
+      </div>
+      <div class="form-grid">
+        <div class="field"><label>Dự án</label><select id="ts-sang-project"><option value="">— Không có —</option></select></div>
+        <div class="field"><label>Số giờ</label><input type="number" step="0.5" id="ts-sang-hours" placeholder="0"></div>
+      </div>
+      <div class="field full" style="border-top:1px solid var(--line);padding-top:14px;margin-top:6px;">
+        <label style="font-size:13px;font-weight:700;color:var(--ink);">🌤 Ca Chiều</label>
+      </div>
+      <div class="form-grid">
+        <div class="field"><label>Dự án</label><select id="ts-chieu-project"><option value="">— Không có —</option></select></div>
+        <div class="field"><label>Số giờ</label><input type="number" step="0.5" id="ts-chieu-hours" placeholder="0"></div>
+      </div>
+      <div class="field full" style="border-top:1px solid var(--line);padding-top:14px;margin-top:6px;">
+        <label style="font-size:13px;font-weight:700;color:var(--ink);">🌙 Ca Tối (từ 17:01 — tự tính Tăng ca)</label>
+      </div>
+      <div class="form-grid">
+        <div class="field"><label>Dự án</label><select id="ts-toi-project"><option value="">— Không có —</option></select></div>
+        <div class="field"><label>Số giờ (tăng ca)</label><input type="number" step="0.5" id="ts-toi-hours" placeholder="0"></div>
+      </div>
+      <div class="form-grid">
         <div class="field full"><label>Ghi chú</label><input id="ts-note"></div>
       </div>
     </div>
     <div class="modal-foot"><button class="btn btn-ghost" data-close>Hủy</button><button class="btn btn-primary" id="save-ts-btn">Lưu chấm công</button></div>
+  </div>
+</div>
+
+<div class="modal-backdrop" id="modal-payroll-adjust">
+  <div class="modal">
+    <div class="modal-head"><h3 id="pa-modal-title">Điều chỉnh lương tháng</h3><button class="modal-close" data-close>✕</button></div>
+    <div class="modal-body">
+      <input type="hidden" id="pa-employee-id">
+      <input type="hidden" id="pa-month">
+      <div id="pa-summary" class="tx-view-note" style="margin-bottom:14px;"></div>
+      <div class="form-grid">
+        <div class="field"><label>Khấu trừ BHXH</label><input type="text" id="pa-bhxh" placeholder="Tự tính 10.5% lương HĐLĐ"></div>
+        <div class="field"><label>Tiền tạm ứng cuối tháng</label><input type="text" id="pa-tamung" placeholder="0"></div>
+        <div class="field"><label>Tiền ứng Mr.Tuấn</label><input type="text" id="pa-ungtuan" placeholder="0"></div>
+        <div class="field"><label>Thưởng chuyên cần / Điều chỉnh khác</label><input type="text" id="pa-thuong" placeholder="0"></div>
+        <div class="field"><label>Khấu trừ tạm ứng khác</label><input type="text" id="pa-khactamung" placeholder="0"></div>
+        <div class="field"><label>Khấu trừ ngày nghỉ</label><input type="text" id="pa-khaunghi" placeholder="0"></div>
+        <div class="field full"><label>Ghi chú</label><textarea id="pa-note" rows="2"></textarea></div>
+      </div>
+    </div>
+    <div class="modal-foot"><button class="btn btn-ghost" data-close>Hủy</button><button class="btn btn-primary" id="save-pa-btn">Lưu điều chỉnh</button></div>
   </div>
 </div>
 
