@@ -17,7 +17,12 @@ function openOrderModal(id){
   const o = id ? ORDERS.find(x=>x.id===id) : {};
   document.getElementById('order-date').value = o.date || todayISO();
   document.getElementById('order-project').value = o.projectId || '';
+  document.getElementById('order-code').value = o.code || '';
+  document.getElementById('order-type').value = o.orderType || 'payment';
+  document.getElementById('order-payer').value = o.payer || '';
   document.getElementById('order-payee').value = o.payee || '';
+  document.getElementById('order-payee-bank').value = o.payeeBank || '';
+  document.getElementById('order-payee-tax').value = o.payeeTaxCode || '';
   document.getElementById('order-reason').value = o.reason || '';
   setMoneyInputValue(document.getElementById('order-amount'), o.amount);
   document.getElementById('order-status').value = o.status || 'pending';
@@ -31,7 +36,7 @@ function openOrderModal(id){
   openModal('modal-order');
 }
 
-document.getElementById('btn-add-order').addEventListener('click', ()=> openOrderModal(null));
+document.getElementById('btn-add-order')?.addEventListener('click', ()=> openOrderModal(null));
 
 document.getElementById('save-order-btn').addEventListener('click', async ()=>{
   const id = document.getElementById('order-id').value;
@@ -46,7 +51,12 @@ document.getElementById('save-order-btn').addEventListener('click', async ()=>{
   const status = document.getElementById('order-status').value;
   const data = {
     date, projectId: projectId || null, projectName: proj ? proj.name : '',
+    code: document.getElementById('order-code').value,
+    orderType: document.getElementById('order-type').value,
+    payer: document.getElementById('order-payer').value.trim(),
     payee, reason, amount, status,
+    payeeBank: document.getElementById('order-payee-bank').value.trim(),
+    payeeTaxCode: document.getElementById('order-payee-tax').value.trim(),
     requester: document.getElementById('order-requester').value.trim(),
     approver: document.getElementById('order-approver').value.trim(),
     note: document.getElementById('order-note').value.trim(),
@@ -72,13 +82,13 @@ document.getElementById('save-order-btn').addEventListener('click', async ()=>{
       const txData = {
         type:'OUT',
         projectId: data.projectId, projectName: data.projectName,
-        date: data.date, code:'LENHCHI',
-        content: `Lệnh chi: ${data.reason}`,
-        description: `Chi cho ${data.payee}` + (data.note ? ' — '+data.note : ''),
+        date: data.date, code: data.code || '',
+        content: data.reason,
+        description: `Chi cho ${data.payee}` + (data.payer ? ` (từ ${data.payer})` : '') + (data.note ? ' — '+data.note : ''),
         unit:'', qty:0, unitPrice:0, amount: data.amount,
         invoiceNumber:'', invoiceDate:'',
-        bankName:'', bankAccount:'', bankHolder:'', transferDate:'',
-        note:`Tự động tạo từ Lệnh chi (${data.payee})`,
+        bankName:'', bankAccount: data.payeeBank||'', bankHolder: data.payee||'', transferDate:'',
+        note:`Tự động tạo từ Lệnh chi (${data.payee})${data.payeeTaxCode ? ' — MST: '+data.payeeTaxCode : ''}`,
       };
       if(existingTxId){
         await db.collection('transactions').doc(existingTxId).update(txData);
