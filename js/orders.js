@@ -12,6 +12,7 @@ function listenOrders(){
     ORDERS = snap.docs.map(d=> ({id:d.id, ...d.data()}));
     renderOrdersTable();
     if(window.renderApprovalBanner) renderApprovalBanner();
+    if(window.renderNotifications) renderNotifications();
   }, (err)=> console.error('orders listen error', err));
 }
 
