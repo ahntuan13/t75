@@ -25,12 +25,12 @@ function listenPayroll(){
 }
 
 function fillEmployeeSelects(){
-  const selectors = ['#pr-filter-employee','#ts-employee'];
+  const selectors = ['#ts-filter-employee','#ts-employee'];
   selectors.forEach(sel=>{
     const node = document.querySelector(sel);
     if(!node) return;
     const cur = node.value;
-    const withAll = sel==='#pr-filter-employee';
+    const withAll = sel==='#ts-filter-employee';
     node.innerHTML = (withAll ? '<option value="">Tất cả nhân viên</option>' : '<option value="">— Chọn nhân viên —</option>')
       + EMPLOYEES.map(e=>`<option value="${e.id}">${escapeHtml(e.name)}</option>`).join('');
     if(cur) node.value = cur;
@@ -150,8 +150,8 @@ document.getElementById('save-ts-btn').addEventListener('click', async ()=>{
 });
 
 function getFilteredTimesheets(){
-  const month = document.getElementById('pr-filter-month').value;
-  const employee = document.getElementById('pr-filter-employee').value;
+  const month = document.getElementById('ts-filter-month').value;
+  const employee = document.getElementById('ts-filter-employee').value;
   return TIMESHEETS.filter(t=>{
     if(month && monthKey(t.date)!==month) return false;
     if(employee && t.employeeId!==employee) return false;
@@ -212,15 +212,15 @@ document.getElementById('timesheet-table').addEventListener('click', (e)=>{
   }
 });
 
-['pr-filter-month','pr-filter-employee'].forEach(id=>{
-  document.getElementById(id).addEventListener('change', ()=>{ renderTimesheetTable(); renderPayrollSummary(); });
+['ts-filter-month','ts-filter-employee'].forEach(id=>{
+  document.getElementById(id).addEventListener('change', renderTimesheetTable);
 });
 
 // ---- Monthly payroll summary ----
 function renderPayrollSummary(){
   const table = document.getElementById('payroll-summary-table');
   if(!table) return;
-  const month = document.getElementById('pr-filter-month').value || todayISO().slice(0,7);
+  const month = document.getElementById('payroll-filter-month').value || todayISO().slice(0,7);
   const rowsForMonth = TIMESHEETS.filter(t=> monthKey(t.date)===month);
 
   const byEmp = {};
@@ -257,4 +257,6 @@ function renderPayrollSummary(){
   </tbody>`;
 }
 
-document.getElementById('pr-filter-month').value = todayISO().slice(0,7);
+document.getElementById('payroll-filter-month')?.addEventListener('change', renderPayrollSummary);
+document.getElementById('payroll-filter-month').value = todayISO().slice(0,7);
+document.getElementById('ts-filter-month').value = todayISO().slice(0,7);
