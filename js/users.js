@@ -42,14 +42,24 @@ async function ensureUserRole(){
 function applyRolePermissions(){
   const label = document.getElementById('user-role-label');
   if(label) label.textContent = isAdmin() ? 'Quản trị viên (Admin)' : 'Thành viên';
-  const navUsers = document.querySelector('[data-view="users"]');
-  if(navUsers) navUsers.style.display = isAdmin() ? '' : 'none';
+  // Chỉ Admin được xem: Dự án, Báo cáo (dòng tiền theo kỳ, lãi lỗ), quản trị người dùng, lịch sử chỉnh sửa.
+  // "Tổng quan thu chi", "Hóa đơn", "Chuyển khoản": User VẪN xem được (chỉ không sửa/xóa — đã chặn ở nút + Firestore rules).
+  const adminOnlyViews = ['users','activitylog','projects','reports','pnl'];
+  adminOnlyViews.forEach(view=>{
+    const nav = document.querySelector(`[data-view="${view}"]`);
+    if(nav) nav.style.display = isAdmin() ? '' : 'none';
+  });
+  const activeView = document.querySelector('.nav-item.active');
+  if(!isAdmin() && activeView && adminOnlyViews.includes(activeView.dataset.view)){
+    document.querySelector('[data-view="dashboard"]')?.click();
+  }
   const btnAddEmp = document.getElementById('btn-add-employee');
   if(btnAddEmp) btnAddEmp.style.display = isAdmin() ? '' : 'none';
   const btnUploadThu = document.getElementById('btn-upload-thu');
   if(btnUploadThu) btnUploadThu.style.display = isAdmin() ? '' : 'none';
   const btnUploadChi = document.getElementById('btn-upload-chi');
   if(btnUploadChi) btnUploadChi.style.display = isAdmin() ? '' : 'none';
+  if(window.renderDashboard) renderDashboard();
 }
 
 // ---------------- Người duyệt chi (Giám đốc) ----------------
