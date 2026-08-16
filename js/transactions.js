@@ -142,13 +142,21 @@ function setTxType(type){
 document.getElementById('seg-in').addEventListener('click', ()=> setTxType('IN'));
 document.getElementById('seg-out').addEventListener('click', ()=> setTxType('OUT'));
 
-function openTxModal(id, prefill){
-  document.getElementById('tx-modal-title').textContent = id ? 'Sửa giao dịch' : 'Nhập giao dịch thu chi';
+let currentTxTarget = 'transactions'; // 'transactions' | 'fixedCosts'
+
+function openTxModal(id, prefill, target){
+  currentTxTarget = target || 'transactions';
+  const isFc = currentTxTarget === 'fixedCosts';
+  const sourceArr = isFc ? (typeof FIXEDCOSTS!=='undefined'?FIXEDCOSTS:[]) : TRANSACTIONS;
+  document.getElementById('tx-modal-title').textContent = isFc
+    ? (id ? 'Sửa chi phí cố định' : 'Nhập chi phí cố định')
+    : (id ? 'Sửa giao dịch' : 'Nhập giao dịch thu chi');
   document.getElementById('tx-id').value = id || '';
-  const t = id ? TRANSACTIONS.find(x=>x.id===id) : (prefill || {});
+  const t = id ? sourceArr.find(x=>x.id===id) : (prefill || {});
   // giao dịch mới không có prefill: chưa chọn Thu/Chi, bắt buộc chọn trước.
   // Có prefill (VD: từ AI đọc hóa đơn) thì tự chọn sẵn đúng loại AI đã xác định được.
   setTxType(id ? (t.type || 'IN') : (prefill ? (prefill.type || 'OUT') : ''));
+  document.getElementById('tx-project-field').style.display = isFc ? 'none' : '';
   document.getElementById('tx-project').value = t.projectId || '';
   document.getElementById('tx-date').value = t.date || todayISO();
   document.getElementById('tx-code').value = t.code || '';
@@ -206,13 +214,14 @@ document.getElementById('tx-qty').addEventListener('input', ()=>{
 document.getElementById('tx-amount').addEventListener('input', ()=> formatMoneyInput(document.getElementById('tx-amount')));
 
 document.getElementById('save-tx-btn').addEventListener('click', async ()=>{
+  const isFc = currentTxTarget === 'fixedCosts';
   const id = document.getElementById('tx-id').value;
   const projectId = document.getElementById('tx-project').value;
   const content = document.getElementById('tx-content').value.trim();
   const date = document.getElementById('tx-date').value;
   const amount = parseMoneyInput(document.getElementById('tx-amount'));
   if(!currentTxType){ toast('Vui lòng chọn Thu hoặc Chi'); return; }
-  if(!projectId){ toast('Vui lòng chọn dự án'); return; }
+  if(!isFc && !projectId){ toast('Vui lòng chọn dự án'); return; }
   if(!content){ toast('Vui lòng nhập nội dung'); return; }
   if(!date){ toast('Vui lòng chọn ngày'); return; }
   if(!amount){ toast('Vui lòng nhập thành tiền'); return; }
@@ -221,10 +230,10 @@ document.getElementById('save-tx-btn').addEventListener('click', async ()=>{
     return;
   }
 
-  const proj = projectById(projectId);
+  const proj = (!isFc && projectId) ? projectById(projectId) : null;
   const data = {
     type: currentTxType,
-    projectId, projectName: proj ? proj.name : '',
+    projectId: isFc ? '' : projectId, projectName: isFc ? '' : (proj ? proj.name : ''),
     date, code: document.getElementById('tx-code').value.trim(),
     content, description: document.getElementById('tx-desc').value.trim(),
     unit: document.getElementById('tx-unit').value.trim(),
@@ -262,16 +271,17 @@ document.getElementById('save-tx-btn').addEventListener('click', async ()=>{
     }
   }
 
+  const targetCollection = isFc ? 'fixedCosts' : 'transactions';
   try{
     if(id){
-      await db.collection('transactions').doc(id).update(data);
-      toast('Đã cập nhật giao dịch');
+      await db.collection(targetCollection).doc(id).update(data);
+      toast(isFc ? 'Đã cập nhật chi phí cố định' : 'Đã cập nhật giao dịch');
       logActivity('update', {projectName: data.projectName, content: data.content, amount: data.amount, type: data.type});
     } else {
       data.createdAt = firebase.firestore.FieldValue.serverTimestamp();
       data.createdBy = auth.currentUser.email;
-      await db.collection('transactions').add(data);
-      toast('Đã lưu giao dịch');
+      await db.collection(targetCollection).add(data);
+      toast(isFc ? 'Đã lưu chi phí cố định' : 'Đã lưu giao dịch');
       logActivity('create', {projectName: data.projectName, content: data.content, amount: data.amount, type: data.type});
     }
     closeModal('modal-tx');
@@ -338,13 +348,15 @@ function txRowHtml(t){
 }
 
 // ---------------- Duyệt chi (GĐ/PGĐ) — dùng chung cho bảng + modal xem chi tiết ----------------
-async function decideApproval(id, decision){
-  const t = TRANSACTIONS.find(x=>x.id===id);
+async function decideApproval(id, decision, source){
+  const coll = source==='fc' ? 'fixedCosts' : 'transactions';
+  const arr = source==='fc' ? (typeof FIXEDCOSTS!=='undefined'?FIXEDCOSTS:[]) : TRANSACTIONS;
+  const t = arr.find(x=>x.id===id);
   if(!t) return;
   const label = decision==='approved' ? 'DUYỆT' : 'TỪ CHỐI';
   if(!confirm(`Xác nhận ${label} khoản chi "${t.content}" — ${fmtVND(t.amount)}?`)) return;
   try{
-    await db.collection('transactions').doc(id).update({
+    await db.collection(coll).doc(id).update({
       approvalStatus: decision,
       approvedBy: auth.currentUser.email,
       approvedAt: firebase.firestore.FieldValue.serverTimestamp(),
@@ -354,15 +366,17 @@ async function decideApproval(id, decision){
   }catch(err){ toast('Lỗi: '+err.message); }
 }
 
-async function submitForApproval(id, role){
+async function submitForApproval(id, role, source){
   const approverEmail = APPROVERS.gdEmail || '';
   if(!approverEmail){
     toast('Chưa cài đặt email Giám đốc — vào mục Người dùng để nhập trước.');
     return;
   }
-  const t = TRANSACTIONS.find(x=>x.id===id);
+  const coll = source==='fc' ? 'fixedCosts' : 'transactions';
+  const arr = source==='fc' ? (typeof FIXEDCOSTS!=='undefined'?FIXEDCOSTS:[]) : TRANSACTIONS;
+  const t = arr.find(x=>x.id===id);
   try{
-    await db.collection('transactions').doc(id).update({
+    await db.collection(coll).doc(id).update({
       approvalStatus: 'pending', approverRole: role, approverEmail,
       approvalSubmittedAt: firebase.firestore.FieldValue.serverTimestamp(),
       approvedBy: '', approvedAt: '',
@@ -456,13 +470,16 @@ function renderTxTable(){
   }).join('');
 }
 
-function openTxViewModal(id){
-  const t = TRANSACTIONS.find(x=>x.id===id);
+let currentViewSource = 'tx'; // 'tx' | 'fc'
+
+function openTxViewModal(id, source){
+  currentViewSource = source || 'tx';
+  const t = (currentViewSource==='fc' ? (typeof FIXEDCOSTS!=='undefined'?FIXEDCOSTS:[]) : TRANSACTIONS).find(x=>x.id===id);
   if(!t) return;
   const row = (label, value) => value ? `<dt>${label}</dt><dd>${value}</dd>` : '';
   let html = `<dl class="tx-view-grid">
     ${row('Loại giao dịch', t.type==='IN' ? '<span class="tag tag-in">Thu</span>' : '<span class="tag tag-out">Chi</span>')}
-    ${row('Dự án', escapeHtml(t.projectName||'—'))}
+    ${currentViewSource==='fc' ? '' : row('Dự án', escapeHtml(t.projectName||'—'))}
     ${row('Ngày', fmtDate(t.date))}
     ${row('Mã (code)', t.code ? escapeHtml(t.code) : '')}
     ${row('Nội dung', '<strong>'+escapeHtml(t.content||'')+'</strong>')}
@@ -543,7 +560,7 @@ function renderApprovalSectionHtml(t){
 document.getElementById('tx-view-edit-btn').addEventListener('click', (e)=>{
   const id = e.target.dataset.editTx;
   closeModal('modal-tx-view');
-  openTxModal(id);
+  openTxModal(id, null, currentViewSource==='fc' ? 'fixedCosts' : 'transactions');
 });
 
 document.getElementById('tx-view-body').addEventListener('click', async (e)=>{
@@ -555,29 +572,31 @@ document.getElementById('tx-view-body').addEventListener('click', async (e)=>{
     const field = toggleBtn.dataset.statusToggle;
     const value = toggleBtn.dataset.statusValue;
     const id = toggleBtn.dataset.txId;
-    const t = TRANSACTIONS.find(x=>x.id===id);
+    const coll = currentViewSource==='fc' ? 'fixedCosts' : 'transactions';
+    const arr = currentViewSource==='fc' ? (typeof FIXEDCOSTS!=='undefined'?FIXEDCOSTS:[]) : TRANSACTIONS;
+    const t = arr.find(x=>x.id===id);
     try{
-      await db.collection('transactions').doc(id).update({ [field]: value });
+      await db.collection(coll).doc(id).update({ [field]: value });
       toast('Đã cập nhật trạng thái');
       if(t) logActivity(field==='invoiceStatus' ? 'status_invoice' : 'status_transfer',
         {projectName: t.projectName, content: t.content, amount: t.amount, type: t.type, note: value});
-      openTxViewModal(id);
+      openTxViewModal(id, currentViewSource);
     }catch(err){ toast('Lỗi: '+err.message); }
     return;
   }
 
   const approveBtn = e.target.closest('[data-approve-tx]');
-  if(approveBtn){ await decideApproval(approveBtn.dataset.approveTx, 'approved'); openTxViewModal(approveBtn.dataset.approveTx); return; }
+  if(approveBtn){ await decideApproval(approveBtn.dataset.approveTx, 'approved', currentViewSource); openTxViewModal(approveBtn.dataset.approveTx, currentViewSource); return; }
 
   const rejectBtn = e.target.closest('[data-reject-tx]');
-  if(rejectBtn){ await decideApproval(rejectBtn.dataset.rejectTx, 'rejected'); openTxViewModal(rejectBtn.dataset.rejectTx); return; }
+  if(rejectBtn){ await decideApproval(rejectBtn.dataset.rejectTx, 'rejected', currentViewSource); openTxViewModal(rejectBtn.dataset.rejectTx, currentViewSource); return; }
 
   const submitBtn = e.target.closest('[data-submit-approval]');
   if(submitBtn){
     const id = submitBtn.dataset.submitApproval;
     const role = submitBtn.dataset.role;
-    await submitForApproval(id, role);
-    openTxViewModal(id);
+    await submitForApproval(id, role, currentViewSource);
+    openTxViewModal(id, currentViewSource);
   }
 });
 
@@ -587,8 +606,8 @@ document.getElementById('tx-table').addEventListener('click', (e)=>{
   const delId = e.target.closest('[data-del-tx]')?.dataset.delTx;
   const approveId = e.target.closest('[data-approve-tx]')?.dataset.approveTx;
   const rejectId = e.target.closest('[data-reject-tx]')?.dataset.rejectTx;
-  if(viewId) openTxViewModal(viewId);
-  if(editId) openTxModal(editId);
+  if(viewId) openTxViewModal(viewId, 'tx');
+  if(editId) openTxModal(editId, null, 'transactions');
   if(delId){
     if(confirmDelete('Xóa giao dịch này?')){
       const t = TRANSACTIONS.find(x=>x.id===delId);
@@ -598,8 +617,8 @@ document.getElementById('tx-table').addEventListener('click', (e)=>{
       });
     }
   }
-  if(approveId) decideApproval(approveId, 'approved');
-  if(rejectId) decideApproval(rejectId, 'rejected');
+  if(approveId) decideApproval(approveId, 'approved', 'tx');
+  if(rejectId) decideApproval(rejectId, 'rejected', 'tx');
 });
 
 ['tx-filter-project','tx-filter-type','tx-filter-code','tx-filter-month'].forEach(id=>{
