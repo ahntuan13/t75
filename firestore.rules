@@ -31,6 +31,18 @@ service cloud.firestore {
         && (request.resource.data.approvalStatus == 'approved' || request.resource.data.approvalStatus == 'rejected')
         && resource.data.approverEmail == request.auth.token.email;
     }
+    // Y hệt trên nhưng dùng riêng cho Lệnh chi (paymentOrders)
+    function isOrderApprovalSubmit() {
+      return isSignedIn()
+        && changedKeys().hasOnly(['approvalStatus','approverRole','approverEmail','approvalSubmittedAt','approvedBy','approvedAt'])
+        && request.resource.data.approvalStatus == 'pending';
+    }
+    function isOrderApprovalDecision() {
+      return isSignedIn()
+        && changedKeys().hasOnly(['approvalStatus','approvedBy','approvedAt'])
+        && (request.resource.data.approvalStatus == 'approved' || request.resource.data.approvalStatus == 'rejected')
+        && resource.data.approverEmail == request.auth.token.email;
+    }
 
     // Hồ sơ vai trò của từng người dùng (admin / user)
     match /users/{uid} {
@@ -63,13 +75,23 @@ service cloud.firestore {
       allow write: if isAdmin();
     }
 
+    // Lịch sử chỉnh sửa (audit log) — ai đăng nhập cũng được GHI (để tự ghi lại thao tác của chính mình),
+    // nhưng chỉ Admin mới ĐỌC được (không cho User xem lịch sử của người khác), và không ai sửa/xóa được (đảm bảo tính toàn vẹn).
+    match /activityLog/{id} {
+      allow create: if isSignedIn();
+      allow read: if isAdmin();
+      allow update, delete: if false;
+    }
+
     match /paymentOrders/{id} {
       allow read: if isSignedIn();
       allow create: if isSignedIn();
-      // User thường chỉ được sửa lệnh chi khi trạng thái vẫn đang "pending"
-      // và không được đổi sang trạng thái khác; Admin thì sửa/duyệt tự do.
-      allow update: if isAdmin() ||
-        (isSignedIn() && resource.data.status == 'pending' && request.resource.data.status == 'pending');
+      // User thường được sửa lệnh chi khi CHƯA gửi duyệt (approvalStatus rỗng/'none'),
+      // được GỬI DUYỆT (chuyển sang 'pending'), Admin thì sửa/xóa tự do.
+      // Chỉ đúng email GĐ đã được gán (resource.data.approverEmail) mới được DUYỆT/TỪ CHỐI.
+      allow update: if isAdmin() || isOrderApprovalSubmit() || isOrderApprovalDecision() ||
+        (isSignedIn() && (!('approvalStatus' in resource.data) || resource.data.approvalStatus == 'none' || resource.data.approvalStatus == '')
+          && changedKeys().hasOnly(['date','projectId','projectName','code','orderType','payer','payee','payeeBank','payeeTaxCode','reason','amount','requester','note']));
       allow delete: if isAdmin();
     }
 
