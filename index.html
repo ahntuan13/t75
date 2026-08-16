@@ -52,27 +52,32 @@
 
       <div class="nav-label">Hồ sơ</div>
       <div class="nav-group">
-        <div class="nav-item" data-view="projects"><span class="ic">▣</span> Dự án</div>
-        <div class="nav-item" data-view="transactions"><span class="ic">⇄</span> Thu chi</div>
+        <div class="nav-item" data-view="projects" style="display:none"><span class="ic">▣</span> Dự án</div>
+        <div class="nav-item" data-view="transactions" style="display:none"><span class="ic">⇄</span> Tổng quan thu chi</div>
+        <div class="nav-item" data-view="invoices" style="display:none"><span class="ic">🧾</span> Hóa đơn</div>
+        <div class="nav-item" data-view="transfers" style="display:none"><span class="ic">🏦</span> Chuyển khoản</div>
+      </div>
         <div class="nav-item" data-view="invoices"><span class="ic">🧾</span> Hóa đơn</div>
         <div class="nav-item" data-view="transfers"><span class="ic">🏦</span> Chuyển khoản</div>
       </div>
 
       <div class="nav-label">Báo cáo</div>
       <div class="nav-group">
-        <div class="nav-item" data-view="reports"><span class="ic">📊</span> Dòng tiền theo kỳ</div>
-        <div class="nav-item" data-view="pnl"><span class="ic">📈</span> Lãi lỗ quý/năm</div>
+        <div class="nav-item" data-view="reports" style="display:none"><span class="ic">📊</span> Dòng tiền theo kỳ</div>
+        <div class="nav-item" data-view="pnl" style="display:none"><span class="ic">📈</span> Lãi lỗ quý/năm</div>
       </div>
 
       <div class="nav-label">Chi & lương</div>
       <div class="nav-group">
         <div class="nav-item" data-view="orders"><span class="ic">📝</span> Lệnh chi</div>
-        <div class="nav-item" data-view="payroll"><span class="ic">👥</span> Bảng lương / Chấm công</div>
+        <div class="nav-item" data-view="payroll"><span class="ic">💵</span> Bảng lương</div>
+        <div class="nav-item" data-view="timesheet"><span class="ic">🗓</span> Chấm công</div>
       </div>
 
       <div class="nav-label">Quản trị</div>
       <div class="nav-group">
         <div class="nav-item" data-view="users" style="display:none"><span class="ic">🔐</span> Người dùng & phân quyền</div>
+        <div class="nav-item" data-view="activitylog" style="display:none"><span class="ic">🕘</span> Lịch sử chỉnh sửa</div>
       </div>
 
       <div class="sidebar-foot">
@@ -102,6 +107,7 @@
             <h2>Tổng quan</h2>
             <div class="sub">Bức tranh dòng tiền toàn công ty</div>
           </div>
+          <div class="topbar-actions"><button class="btn btn-primary" id="btn-quick-create">⚡ Tạo mới</button></div>
         </div>
         <div class="welcome-card" id="welcome-card">
           <div class="welcome-left">
@@ -114,22 +120,38 @@
           </div>
           <div class="welcome-pills" id="welcome-pills"></div>
         </div>
-        <div class="kpi-grid" id="dash-kpis"></div>
-        <div class="card">
-          <div class="card-head"><h3>Dòng tiền 12 tháng gần nhất</h3></div>
-          <div class="chart-wrap"><canvas id="chart-cashflow-trend"></canvas></div>
-        </div>
-        <div class="card">
-          <div class="card-head"><h3>Doanh thu / Chi phí / Lợi nhuận thực tế theo dự án</h3></div>
-          <div class="chart-wrap" style="height:460px;"><canvas id="chart-project-actual"></canvas></div>
-        </div>
-        <div class="card">
-          <div class="card-head"><h3>Giá trị hợp đồng đã ký</h3></div>
-          <div class="chart-wrap"><canvas id="chart-project-budget"></canvas></div>
+        <div id="dash-admin-sections">
+          <div class="kpi-grid" id="dash-kpis"></div>
+          <div class="card">
+            <div class="card-head"><h3>Dòng tiền 12 tháng gần nhất</h3></div>
+            <div class="chart-wrap"><canvas id="chart-cashflow-trend"></canvas></div>
+          </div>
+          <div class="card">
+            <div class="card-head"><h3>Doanh thu / Chi phí / Lợi nhuận thực tế theo dự án</h3></div>
+            <div class="chart-wrap" style="height:460px;"><canvas id="chart-project-actual"></canvas></div>
+          </div>
+          <div class="card">
+            <div class="card-head"><h3>Giá trị hợp đồng đã ký</h3></div>
+            <div class="chart-wrap"><canvas id="chart-project-budget"></canvas></div>
+          </div>
         </div>
         <div class="card">
           <div class="card-head"><h3>Giao dịch gần đây</h3></div>
           <div class="table-wrap"><table class="data" id="dash-recent-table"></table></div>
+        </div>
+        <div id="dash-user-sections" style="display:none;">
+          <div class="card">
+            <div class="card-head"><h3>📝 Lệnh chi chờ duyệt</h3></div>
+            <div class="table-wrap"><table class="data" id="dash-pending-orders-table"></table></div>
+          </div>
+          <div class="card">
+            <div class="card-head"><h3>▣ Dự án đang chạy</h3></div>
+            <div class="table-wrap"><table class="data" id="dash-active-projects-table"></table></div>
+          </div>
+          <div class="card">
+            <div class="card-head"><h3>🧾 Hóa đơn chưa xuất</h3></div>
+            <div class="table-wrap"><table class="data" id="dash-pending-invoices-table"></table></div>
+          </div>
         </div>
       </div>
 
@@ -147,6 +169,7 @@
         <div class="topbar">
           <div><h2>Thu chi</h2><div class="sub">Ghi nhận dòng tiền vào/ra theo dự án</div></div>
           <div class="topbar-actions">
+            <button class="btn btn-ghost" id="btn-export-tx">⬇ Xuất Excel (theo bộ lọc)</button>
             <button class="btn btn-ghost" id="btn-upload-thu" style="display:none;">⬆ Upload Thu (Excel)</button>
             <button class="btn btn-ghost" id="btn-upload-chi" style="display:none;">⬆ Upload Chi (Excel)</button>
             <button class="btn btn-primary" id="btn-add-tx">+ Nhập giao dịch</button>
@@ -273,19 +296,13 @@
       <!-- PAYROLL -->
       <div class="view" id="view-payroll">
         <div class="topbar">
-          <div><h2>Bảng lương / Chấm công</h2><div class="sub">Ghi nhận công theo ngày & tổng hợp lương theo tháng</div></div>
+          <div><h2>Bảng lương</h2><div class="sub">Tổng hợp lương theo tháng & danh sách nhân viên</div></div>
           <div class="topbar-actions">
-            <button class="btn btn-ghost" id="btn-add-employee">+ Thêm nhân viên</button>
-            <button class="btn btn-primary" id="btn-add-timesheet">+ Chấm công</button>
+            <button class="btn btn-primary" id="btn-add-employee">+ Thêm nhân viên</button>
           </div>
         </div>
         <div class="filters-bar">
-          <input type="month" id="pr-filter-month">
-          <select id="pr-filter-employee"><option value="">Tất cả nhân viên</option></select>
-        </div>
-        <div class="card">
-          <div class="card-head"><h3>Bảng chấm công theo ngày</h3></div>
-          <div class="table-wrap"><table class="data" id="timesheet-table"></table></div>
+          <input type="month" id="payroll-filter-month">
         </div>
         <div class="card">
           <div class="card-head"><h3>Tổng hợp lương theo tháng</h3></div>
@@ -294,6 +311,24 @@
         <div class="card">
           <div class="card-head"><h3>Danh sách nhân viên</h3></div>
           <div class="table-wrap"><table class="data" id="employees-table"></table></div>
+        </div>
+      </div>
+
+      <!-- TIMESHEET (Chấm công) -->
+      <div class="view" id="view-timesheet">
+        <div class="topbar">
+          <div><h2>Chấm công</h2><div class="sub">Ghi nhận công theo ngày</div></div>
+          <div class="topbar-actions">
+            <button class="btn btn-primary" id="btn-add-timesheet">+ Chấm công</button>
+          </div>
+        </div>
+        <div class="filters-bar">
+          <input type="month" id="ts-filter-month">
+          <select id="ts-filter-employee"><option value="">Tất cả nhân viên</option></select>
+        </div>
+        <div class="card">
+          <div class="card-head"><h3>Bảng chấm công theo ngày</h3></div>
+          <div class="table-wrap"><table class="data" id="timesheet-table"></table></div>
         </div>
       </div>
 
@@ -324,11 +359,70 @@
         <div class="card"><div class="table-wrap"><table class="data" id="users-table"></table></div></div>
       </div>
 
+      <!-- ACTIVITY LOG + BACKUP (admin only) -->
+      <div class="view" id="view-activitylog">
+        <div class="topbar">
+          <div><h2>Lịch sử chỉnh sửa & Sao lưu</h2><div class="sub">Chỉ Admin thấy được trang này</div></div>
+        </div>
+        <div class="card">
+          <div class="card-head"><h3>💾 Sao lưu dữ liệu Thu Chi lên OneDrive</h3></div>
+          <p class="helper-text" style="margin-bottom:14px;">
+            Xuất toàn bộ dữ liệu Thu Chi hiện tại thành file Excel và lưu vào thư mục <code>Backups/</code> trên OneDrive công ty.
+            Lưu ý: app tĩnh (GitHub Pages) không tự chạy được theo lịch tự động (VD: mỗi tuần 1 lần) — bạn cần chủ động bấm nút này định kỳ
+            (gợi ý: đầu mỗi tuần). Nếu muốn tự động hoàn toàn, cần nâng cấp thêm Cloud Functions (gói trả phí Blaze), báo mình nếu bạn muốn làm thêm.
+          </p>
+          <button class="btn btn-primary btn-sm" id="btn-backup-onedrive">💾 Sao lưu ngay lên OneDrive</button>
+          <div class="helper-text" id="backup-status" style="margin-top:10px;"></div>
+        </div>
+        <div class="card">
+          <div class="card-head"><h3>🕘 Lịch sử chỉnh sửa Thu Chi</h3></div>
+          <p class="helper-text" style="margin-bottom:14px;">Ghi lại các thao tác tạo/sửa/xóa giao dịch, đổi trạng thái hóa đơn/CK, gửi & duyệt chi — kèm người thực hiện và thời gian.</p>
+          <div class="filters-bar">
+            <select id="log-filter-days">
+              <option value="7">7 ngày gần nhất</option>
+              <option value="30" selected>30 ngày gần nhất</option>
+              <option value="9999">Toàn bộ</option>
+            </select>
+          </div>
+        </div>
+        <div class="card"><div class="table-wrap"><table class="data" id="activity-log-table"></table></div></div>
+      </div>
+
     </div>
   </div>
 </div>
 
 <!-- ================= MODALS ================= -->
+<div class="modal-backdrop" id="modal-quickcreate">
+  <div class="modal" style="max-width:560px;">
+    <div class="modal-head"><h3>⚡ Tạo nhanh</h3><button class="modal-close" data-close>✕</button></div>
+    <div class="modal-body">
+      <div class="qc-grid">
+        <button class="qc-item" id="qc-add-project">
+          <span class="qc-icon" style="background:var(--primary-dim);color:var(--primary);">▣</span>
+          <span class="qc-text"><strong>Thêm dự án</strong><span class="helper-text">Tạo hồ sơ dự án mới</span></span>
+        </button>
+        <button class="qc-item" id="qc-add-tx">
+          <span class="qc-icon" style="background:var(--teal-dim);color:var(--teal);">⇄</span>
+          <span class="qc-text"><strong>Nhập giao dịch</strong><span class="helper-text">Ghi nhận Thu / Chi</span></span>
+        </button>
+        <button class="qc-item" id="qc-add-order">
+          <span class="qc-icon" style="background:var(--red-dim);color:var(--red);">📝</span>
+          <span class="qc-text"><strong>Tạo lệnh chi</strong><span class="helper-text">Lập lệnh chi mới</span></span>
+        </button>
+        <button class="qc-item" id="qc-add-employee">
+          <span class="qc-icon" style="background:var(--purple-dim);color:var(--purple);">👤</span>
+          <span class="qc-text"><strong>Thêm nhân viên</strong><span class="helper-text">Thêm hồ sơ nhân viên</span></span>
+        </button>
+        <button class="qc-item" id="qc-add-timesheet">
+          <span class="qc-icon" style="background:var(--gold-dim);color:var(--gold);">🗓</span>
+          <span class="qc-text"><strong>Chấm công</strong><span class="helper-text">Ghi công theo ngày</span></span>
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+
 <div class="modal-backdrop" id="modal-project">
   <div class="modal">
     <div class="modal-head"><h3 id="project-modal-title">Thêm dự án</h3><button class="modal-close" data-close>✕</button></div>
@@ -338,14 +432,15 @@
         <div class="field full"><label>Tên dự án *</label><input id="project-name" required></div>
         <div class="field"><label>Mã dự án</label><input id="project-code" placeholder="VD: NTGLOBAL"></div>
         <div class="field"><label>Khách hàng</label><input id="project-customer"></div>
+        <div class="field"><label>MST (Mã số thuế)</label><input id="project-tax-code" placeholder="VD: 0312345678"></div>
         <div class="field"><label>Số hợp đồng</label><input id="project-contract-number" placeholder="VD: 12/2026/HĐKT-XYZ"></div>
         <div class="field"><label>Giá trị hợp đồng (đã VAT)</label><input type="text" id="project-contract-value" placeholder="0"></div>
         <div class="field"><label>Chi phí dự toán</label><input type="text" id="project-cost-budget" placeholder="0"></div>
         <div class="field"><label>Doanh thu dự toán</label><input type="text" id="project-revenue-budget" placeholder="0"></div>
         <div class="field full">
-          <label>File hợp đồng (upload thẳng lên OneDrive công ty)</label>
+          <label>File hợp đồng (upload thẳng lên OneDrive công ty — 1 dự án có thể có nhiều hợp đồng)</label>
           <input type="file" id="project-contract-file" accept="image/*,.pdf,application/pdf">
-          <div class="helper-text">File tối đa 4MB. Lần đầu upload sẽ hiện popup đăng nhập Microsoft 365 công ty — nếu trình duyệt chặn popup, bấm cho phép popup của trang này.</div>
+          <div class="helper-text">File tối đa 4MB. Chọn file xong tự thêm vào danh sách bên dưới, không thay thế file cũ. Lần đầu upload sẽ hiện popup đăng nhập Microsoft 365 công ty — nếu trình duyệt chặn popup, bấm cho phép popup của trang này.</div>
           <div id="project-contract-file-status" style="margin-top:8px;"></div>
         </div>
         <div class="field full"><label>Link hợp đồng khác (Google Drive, dùng khi file lớn)</label><input id="project-contract-link" placeholder="https://drive.google.com/..."></div>
@@ -564,6 +659,7 @@
 <script src="js/firebase-config.js"></script>
 <script src="js/utils.js"></script>
 <script src="js/onedrive.js"></script>
+<script src="js/activitylog.js"></script>
 <script src="js/auth.js"></script>
 <script src="js/projects.js"></script>
 <script src="js/transactions.js"></script>
