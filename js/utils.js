@@ -12,7 +12,19 @@ function fmtNum(n){
 }
 function fmtDate(d){
   if(!d) return '—';
-  const dt = (d instanceof Date) ? d : new Date(d);
+  let dt;
+  if(d instanceof Date){
+    dt = d;
+  } else if(typeof d === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(d)){
+    // Chuỗi ngày dạng "YYYY-MM-DD" (không có giờ) — dựng Date theo giờ ĐỊA PHƯƠNG (không qua mốc UTC).
+    // QUAN TRỌNG: new Date("YYYY-MM-DD") bị JS hiểu ngầm là UTC midnight, nên khi hiển thị lại theo
+    // giờ địa phương có thể bị lùi mất 1 ngày (y hệt lỗi đã gặp lúc đọc Excel) — dựng thủ công theo
+    // từng phần năm/tháng/ngày để tránh hoàn toàn việc này, luôn ra đúng ngày bất kể múi giờ máy nào.
+    const [y, m, day] = d.split('-').map(Number);
+    dt = new Date(y, m - 1, day);
+  } else {
+    dt = new Date(d);
+  }
   if(isNaN(dt)) return '—';
   return dt.toLocaleDateString('vi-VN');
 }
