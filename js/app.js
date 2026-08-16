@@ -24,6 +24,22 @@ document.getElementById('menu-toggle').addEventListener('click', ()=>{
   document.getElementById('sidebar').classList.toggle('open');
 });
 
+// ---------------- Modal "Tạo nhanh" (⚡ Tạo mới) — dùng chung cho cả Admin & User ----------------
+document.getElementById('btn-quick-create')?.addEventListener('click', ()=> openModal('modal-quickcreate'));
+const QC_MAP = {
+  'qc-add-project': 'btn-add-project',
+  'qc-add-tx': 'btn-add-tx',
+  'qc-add-order': 'btn-add-order',
+  'qc-add-employee': 'btn-add-employee',
+  'qc-add-timesheet': 'btn-add-timesheet',
+};
+Object.entries(QC_MAP).forEach(([qcId, targetBtnId])=>{
+  document.getElementById(qcId)?.addEventListener('click', ()=>{
+    closeModal('modal-quickcreate');
+    document.getElementById(targetBtnId)?.click();
+  });
+});
+
 // ---------------- Định dạng các ô nhập tiền có dấu phẩy ----------------
 ['project-contract-value','project-cost-budget','project-revenue-budget',
  'order-amount','emp-salary'].forEach(bindMoneyInput);
@@ -38,6 +54,7 @@ window.__initApp = function(){
   listenOrders();
   listenPayroll();
   listenApprovers();
+  listenActivityLog();
 };
 
 // ---------------- Theme (sáng / tối) ----------------
