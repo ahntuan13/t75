@@ -122,12 +122,18 @@ async function decideOrderApproval(id, decision){
     });
     toast(decision==='approved' ? 'Đã duyệt lệnh chi' : 'Đã từ chối lệnh chi');
 
-    // Duyệt xong -> tự động ghi/khớp 1 khoản Chi tương ứng trong Thu chi (chỉ khi DUYỆT)
+    // Duyệt xong -> tự động ghi/khớp 1 khoản Chi tương ứng (chỉ khi DUYỆT)
+    // - Có chọn Dự án -> ghi vào Thu chi (transactions), gắn đúng dự án.
+    // - KHÔNG chọn Dự án (để trống) -> ghi vào Chi phí cố định (fixedCosts).
+    //   Riêng loại "Tạm ứng mua hàng"/"Tạm ứng lương" không có dự án thì mặc định gắn mã INDIRECT.
     if(decision === 'approved'){
+      const hasProject = !!o.projectId;
+      const isAdvance = o.orderType === 'advance_purchase' || o.orderType === 'advance_salary';
+      const targetCollection = hasProject ? 'transactions' : 'fixedCosts';
       const txData = {
         type:'OUT',
-        projectId: o.projectId || null, projectName: o.projectName || '',
-        date: o.date, code: o.code || '',
+        projectId: hasProject ? o.projectId : '', projectName: hasProject ? (o.projectName || '') : '',
+        date: o.date, code: hasProject ? (o.code || '') : (o.code || (isAdvance ? 'INDIRECT' : '')),
         content: o.reason,
         description: `Chi cho ${o.payee}` + (o.payer ? ` (từ ${o.payer})` : '') + (o.note ? ' — '+o.note : ''),
         unit:'', qty:0, unitPrice:0, amount: o.amount,
@@ -136,12 +142,12 @@ async function decideOrderApproval(id, decision){
         note:`Tự động tạo từ Lệnh chi (${o.payee})${o.payeeTaxCode ? ' — MST: '+o.payeeTaxCode : ''}`,
       };
       if(o.transactionId){
-        await db.collection('transactions').doc(o.transactionId).update(txData);
+        await db.collection(targetCollection).doc(o.transactionId).update(txData);
       } else {
         txData.createdAt = firebase.firestore.FieldValue.serverTimestamp();
         txData.createdBy = auth.currentUser.email;
-        const txRef = await db.collection('transactions').add(txData);
-        await db.collection('paymentOrders').doc(id).update({transactionId: txRef.id});
+        const txRef = await db.collection(targetCollection).add(txData);
+        await db.collection('paymentOrders').doc(id).update({transactionId: txRef.id, transactionCollection: targetCollection});
       }
     }
   }catch(err){ toast('Lỗi: '+err.message); }
@@ -255,7 +261,7 @@ document.getElementById('orders-table').addEventListener('click', (e)=>{
       const ord = ORDERS.find(x=>x.id===delId);
       db.collection('paymentOrders').doc(delId).delete().then(async ()=>{
         if(ord && ord.transactionId){
-          try{ await db.collection('transactions').doc(ord.transactionId).delete(); }catch(e){}
+          try{ await db.collection(ord.transactionCollection || 'transactions').doc(ord.transactionId).delete(); }catch(e){}
         }
         toast('Đã xóa lệnh chi');
       });
