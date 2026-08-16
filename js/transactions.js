@@ -258,11 +258,13 @@ document.getElementById('save-tx-btn').addEventListener('click', async ()=>{
     if(id){
       await db.collection('transactions').doc(id).update(data);
       toast('Đã cập nhật giao dịch');
+      logActivity('update', {projectName: data.projectName, content: data.content, amount: data.amount, type: data.type});
     } else {
       data.createdAt = firebase.firestore.FieldValue.serverTimestamp();
       data.createdBy = auth.currentUser.email;
       await db.collection('transactions').add(data);
       toast('Đã lưu giao dịch');
+      logActivity('create', {projectName: data.projectName, content: data.content, amount: data.amount, type: data.type});
     }
     closeModal('modal-tx');
   }catch(err){ toast('Lỗi: '+err.message); }
@@ -340,6 +342,7 @@ async function decideApproval(id, decision){
       approvedAt: firebase.firestore.FieldValue.serverTimestamp(),
     });
     toast(decision==='approved' ? 'Đã duyệt khoản chi' : 'Đã từ chối khoản chi');
+    logActivity('approval_decide', {projectName: t.projectName, content: t.content, amount: t.amount, type: t.type, note: decision==='approved'?'Đã duyệt':'Đã từ chối'});
   }catch(err){ toast('Lỗi: '+err.message); }
 }
 
@@ -349,6 +352,7 @@ async function submitForApproval(id, role){
     toast('Chưa cài đặt email Giám đốc — vào mục Người dùng để nhập trước.');
     return;
   }
+  const t = TRANSACTIONS.find(x=>x.id===id);
   try{
     await db.collection('transactions').doc(id).update({
       approvalStatus: 'pending', approverRole: role, approverEmail,
@@ -356,6 +360,7 @@ async function submitForApproval(id, role){
       approvedBy: '', approvedAt: '',
     });
     toast('Đã gửi duyệt');
+    if(t) logActivity('approval_submit', {projectName: t.projectName, content: t.content, amount: t.amount, type: t.type});
   }catch(err){ toast('Lỗi: '+err.message); }
 }
 
@@ -368,7 +373,44 @@ function renderTxTable(){
     return;
   }
 
-  // Nhóm theo dự án: mỗi dự án 1 khung riêng, Thu nằm trên, Chi nằm dưới
+  const theadHtml = `<thead><tr>
+    <th>Ngày</th><th>Loại</th><th>Nội dung</th><th>Diễn giải</th><th>Thành tiền</th><th>Hóa đơn</th><th>CK / Nhận tiền</th><th>Duyệt chi</th><th></th>
+  </tr></thead>`;
+
+  // Đang tìm nội dung hoặc đang lọc (dự án/loại/mã/tháng) → hiện bảng PHẲNG, không tách theo dự án,
+  // để dễ rà soát kết quả tìm kiếm/lọc across toàn bộ dữ liệu.
+  const search = document.getElementById('tx-search').value.trim();
+  const hasActiveFilter = search
+    || document.getElementById('tx-filter-project').value
+    || document.getElementById('tx-filter-type').value
+    || document.getElementById('tx-filter-code').value
+    || document.getElementById('tx-filter-month').value;
+
+  if(hasActiveFilter){
+    const flatRows = rows.slice().sort((a,b)=> (b.date||'').localeCompare(a.date||''));
+    const sumIn = flatRows.filter(t=>t.type==='IN').reduce((s,t)=>s+Number(t.amount||0),0);
+    const sumOut = flatRows.filter(t=>t.type==='OUT').reduce((s,t)=>s+Number(t.amount||0),0);
+    wrap.innerHTML = `
+    <div class="card tx-project-block">
+      <div class="tx-project-head">
+        <h4>Kết quả tìm kiếm / lọc (${flatRows.length} giao dịch)</h4>
+        <div class="tx-project-summary">
+          <span style="color:var(--teal)">Thu: <strong>${fmtVND(sumIn)}</strong></span>
+          <span style="color:var(--red)">Chi: <strong>${fmtVND(sumOut)}</strong></span>
+          <span>Chênh lệch: <strong>${fmtVND(sumIn-sumOut)}</strong></span>
+        </div>
+      </div>
+      <div class="table-wrap">
+        <table class="data">
+          ${theadHtml}
+          <tbody>${flatRows.map(txRowHtml).join('')}</tbody>
+        </table>
+      </div>
+    </div>`;
+    return;
+  }
+
+  // Không có tìm kiếm/lọc nào đang áp dụng → giữ chế độ xem mặc định: nhóm theo dự án cho dễ tổng quan
   const groups = {};
   const order = [];
   rows.forEach(t=>{
@@ -379,12 +421,7 @@ function renderTxTable(){
     }
     groups[key].items.push(t);
   });
-  // sắp xếp các khung dự án theo tên A-Z cho dễ tra cứu
   order.sort((a,b)=> groups[a].name.localeCompare(groups[b].name, 'vi'));
-
-  const theadHtml = `<thead><tr>
-    <th>Ngày</th><th>Loại</th><th>Nội dung</th><th>Diễn giải</th><th>Thành tiền</th><th>Hóa đơn</th><th>CK / Nhận tiền</th><th>Duyệt chi</th><th></th>
-  </tr></thead>`;
 
   wrap.innerHTML = order.map(key=>{
     const g = groups[key];
@@ -510,9 +547,12 @@ document.getElementById('tx-view-body').addEventListener('click', async (e)=>{
     const field = toggleBtn.dataset.statusToggle;
     const value = toggleBtn.dataset.statusValue;
     const id = toggleBtn.dataset.txId;
+    const t = TRANSACTIONS.find(x=>x.id===id);
     try{
       await db.collection('transactions').doc(id).update({ [field]: value });
       toast('Đã cập nhật trạng thái');
+      if(t) logActivity(field==='invoiceStatus' ? 'status_invoice' : 'status_transfer',
+        {projectName: t.projectName, content: t.content, amount: t.amount, type: t.type, note: value});
       openTxViewModal(id);
     }catch(err){ toast('Lỗi: '+err.message); }
     return;
@@ -543,7 +583,11 @@ document.getElementById('tx-table').addEventListener('click', (e)=>{
   if(editId) openTxModal(editId);
   if(delId){
     if(confirmDelete('Xóa giao dịch này?')){
-      db.collection('transactions').doc(delId).delete().then(()=>toast('Đã xóa giao dịch'));
+      const t = TRANSACTIONS.find(x=>x.id===delId);
+      db.collection('transactions').doc(delId).delete().then(()=>{
+        toast('Đã xóa giao dịch');
+        if(t) logActivity('delete', {projectName: t.projectName, content: t.content, amount: t.amount, type: t.type});
+      });
     }
   }
   if(approveId) decideApproval(approveId, 'approved');
