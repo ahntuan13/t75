@@ -136,11 +136,13 @@ function setTxType(type){
 document.getElementById('seg-in').addEventListener('click', ()=> setTxType('IN'));
 document.getElementById('seg-out').addEventListener('click', ()=> setTxType('OUT'));
 
-function openTxModal(id){
+function openTxModal(id, prefill){
   document.getElementById('tx-modal-title').textContent = id ? 'Sửa giao dịch' : 'Nhập giao dịch thu chi';
   document.getElementById('tx-id').value = id || '';
-  const t = id ? TRANSACTIONS.find(x=>x.id===id) : {};
-  setTxType(id ? (t.type || 'IN') : ''); // giao dịch mới: chưa chọn Thu/Chi, bắt buộc chọn trước
+  const t = id ? TRANSACTIONS.find(x=>x.id===id) : (prefill || {});
+  // giao dịch mới không có prefill: chưa chọn Thu/Chi, bắt buộc chọn trước.
+  // Có prefill (VD: từ AI đọc hóa đơn) thì tự chọn sẵn đúng loại AI đã xác định được.
+  setTxType(id ? (t.type || 'IN') : (prefill ? (prefill.type || 'OUT') : ''));
   document.getElementById('tx-project').value = t.projectId || '';
   document.getElementById('tx-date').value = t.date || todayISO();
   document.getElementById('tx-code').value = t.code || '';
@@ -181,7 +183,7 @@ function renderApprovalCurrentStatus(t){
   else if(t.approvalStatus==='rejected') el.innerHTML = `❌ Đã bị ${roleLabel} từ chối (${escapeHtml(t.approvedBy||'')}).`;
 }
 
-document.getElementById('btn-add-tx').addEventListener('click', ()=> openTxModal(null));
+document.getElementById('btn-add-tx')?.addEventListener('click', ()=> openTxModal(null));
 
 // auto-calc thành tiền = SL * đơn giá (nếu có đơn giá; SL bỏ trống mặc định tính là 1)
 document.getElementById('tx-unitprice').addEventListener('input', ()=>{
