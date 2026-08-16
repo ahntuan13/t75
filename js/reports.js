@@ -52,13 +52,16 @@ function renderDashboard(){
     return;
   }
 
-  const totalIn = TRANSACTIONS.filter(t=>t.type==='IN').reduce((s,t)=>s+Number(t.amount||0),0);
-  const totalOut = TRANSACTIONS.filter(t=>t.type==='OUT').reduce((s,t)=>s+Number(t.amount||0),0);
+  // Gộp cả Thu Chi (theo dự án) và Chi phí gián tiếp (không gắn dự án) vào toàn bộ dòng tiền công ty
+  const ALL_CASHFLOW = TRANSACTIONS.concat(typeof FIXEDCOSTS!=='undefined' ? FIXEDCOSTS : []);
+
+  const totalIn = ALL_CASHFLOW.filter(t=>t.type==='IN').reduce((s,t)=>s+Number(t.amount||0),0);
+  const totalOut = ALL_CASHFLOW.filter(t=>t.type==='OUT').reduce((s,t)=>s+Number(t.amount||0),0);
   const net = totalIn - totalOut;
 
   const thisMonth = todayISO().slice(0,7);
-  const monthIn = TRANSACTIONS.filter(t=>t.type==='IN' && monthKey(t.date)===thisMonth).reduce((s,t)=>s+Number(t.amount||0),0);
-  const monthOut = TRANSACTIONS.filter(t=>t.type==='OUT' && monthKey(t.date)===thisMonth).reduce((s,t)=>s+Number(t.amount||0),0);
+  const monthIn = ALL_CASHFLOW.filter(t=>t.type==='IN' && monthKey(t.date)===thisMonth).reduce((s,t)=>s+Number(t.amount||0),0);
+  const monthOut = ALL_CASHFLOW.filter(t=>t.type==='OUT' && monthKey(t.date)===thisMonth).reduce((s,t)=>s+Number(t.amount||0),0);
 
   kpiBox.innerHTML =
     kpiCard('💰','teal','Tổng thu (lũy kế)', `<span class="pos">${fmtVND(totalIn)}</span>`) +
@@ -75,8 +78,8 @@ function renderDashboard(){
     const dt = new Date(d.getFullYear(), d.getMonth()-i, 1);
     months.push(dt.toISOString().slice(0,7));
   }
-  const inSeries = months.map(m=> TRANSACTIONS.filter(t=>t.type==='IN' && monthKey(t.date)===m).reduce((s,t)=>s+Number(t.amount||0),0));
-  const outSeries = months.map(m=> TRANSACTIONS.filter(t=>t.type==='OUT' && monthKey(t.date)===m).reduce((s,t)=>s+Number(t.amount||0),0));
+  const inSeries = months.map(m=> ALL_CASHFLOW.filter(t=>t.type==='IN' && monthKey(t.date)===m).reduce((s,t)=>s+Number(t.amount||0),0));
+  const outSeries = months.map(m=> ALL_CASHFLOW.filter(t=>t.type==='OUT' && monthKey(t.date)===m).reduce((s,t)=>s+Number(t.amount||0),0));
 
   const ctx1 = document.getElementById('chart-cashflow-trend');
   if(chartCashflowTrend) chartCashflowTrend.destroy();
