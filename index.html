@@ -279,8 +279,10 @@
         <div class="filters-bar">
           <select id="ord-filter-status">
             <option value="">Tất cả trạng thái</option>
-            <option value="pending">Chờ duyệt</option>
-            <option value="approved">Đã duyệt</option>
+            <option value="none">Chưa gửi duyệt</option>
+            <option value="pending">🟡 Chờ duyệt</option>
+            <option value="approved">✅ Đã duyệt</option>
+            <option value="rejected">❌ Từ chối</option>
           </select>
           <select id="ord-filter-project"><option value="">Tất cả dự án</option></select>
         </div>
@@ -598,13 +600,16 @@
         <div class="field"><label>MST</label><input id="order-payee-tax"></div>
         <div class="field full"><label>Lý do chi *</label><input id="order-reason" required placeholder="VD: Thanh toán vật tư đợt 2"></div>
         <div class="field"><label>Số tiền *</label><input type="text" id="order-amount" required placeholder="0"></div>
-        <div class="field"><label>Trạng thái</label>
-          <select id="order-status"><option value="pending">Chờ duyệt</option><option value="approved">Đã duyệt</option></select>
-          <div class="helper-text">Khi chuyển sang "Đã duyệt", hệ thống tự động ghi khoản chi này vào mục Thu chi.</div>
-          <div class="helper-text" id="order-status-hint" style="display:none;">Chỉ Admin mới được duyệt/đổi trạng thái lệnh chi.</div>
-        </div>
         <div class="field"><label>Người đề nghị</label><input id="order-requester"></div>
-        <div class="field"><label>Người duyệt</label><input id="order-approver"></div>
+        <div class="field full" style="border-top:1px solid var(--line);padding-top:14px;margin-top:2px;">
+          <label style="font-size:13px;font-weight:700;color:var(--ink);">✅ Phê duyệt Giám đốc</label>
+          <div class="helper-text" style="margin-bottom:8px;">Gửi lệnh chi này cho Giám đốc duyệt (đăng nhập đúng email đã cài đặt mới thấy nút duyệt). Khi được Duyệt, hệ thống tự động ghi khoản chi này vào mục Thu chi.</div>
+          <select id="order-approval-target">
+            <option value="">-- Chưa gửi duyệt --</option>
+            <option value="GD">Gửi Giám đốc duyệt</option>
+          </select>
+          <div class="helper-text" id="order-approval-current-status" style="margin-top:8px;"></div>
+        </div>
         <div class="field full"><label>Ghi chú</label><textarea id="order-note" rows="2"></textarea></div>
       </div>
     </div>
