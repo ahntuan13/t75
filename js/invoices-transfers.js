@@ -18,13 +18,17 @@ function renderInvoices(){
 
   const issuedCount = rows.filter(t=>(t.invoiceStatus||'pending')==='issued').length;
   const pendingCount = rows.length - issuedCount;
-  const totalIn = rows.filter(t=>t.type==='IN').reduce((s,t)=>s+Number(t.amount||0),0);
-  const totalOut = rows.filter(t=>t.type==='OUT').reduce((s,t)=>s+Number(t.amount||0),0);
+  const inIssued = rows.filter(t=>t.type==='IN' && (t.invoiceStatus||'pending')==='issued').reduce((s,t)=>s+Number(t.amount||0),0);
+  const outIssued = rows.filter(t=>t.type==='OUT' && (t.invoiceStatus||'pending')==='issued').reduce((s,t)=>s+Number(t.amount||0),0);
+  const inPending = rows.filter(t=>t.type==='IN' && (t.invoiceStatus||'pending')==='pending').reduce((s,t)=>s+Number(t.amount||0),0);
+  const outPending = rows.filter(t=>t.type==='OUT' && (t.invoiceStatus||'pending')==='pending').reduce((s,t)=>s+Number(t.amount||0),0);
   kpiBox.innerHTML =
     kpiCard('✅','gold','Đã xuất hóa đơn', fmtNum(issuedCount)) +
     kpiCard('⏳','gray','Chưa xuất hóa đơn', fmtNum(pendingCount)) +
-    kpiCard('💰','teal','Giá trị Thu', `<span class="pos">${fmtVND(totalIn)}</span>`) +
-    kpiCard('💸','red','Giá trị Chi', `<span class="neg">${fmtVND(totalOut)}</span>`);
+    kpiCard('💰','teal','Tổng thu đã xuất', `<span class="pos">${fmtVND(inIssued)}</span>`) +
+    kpiCard('💸','red','Tổng chi đã xuất', `<span class="neg">${fmtVND(outIssued)}</span>`) +
+    kpiCard('📥','teal','Tổng thu chưa xuất', `<span class="pos">${fmtVND(inPending)}</span>`) +
+    kpiCard('📤','red','Tổng chi chưa xuất', `<span class="neg">${fmtVND(outPending)}</span>`);
 
   if(rows.length===0){
     table.innerHTML = `<tr><td><div class="empty-state"><div class="big">🧾</div>Chưa có giao dịch nào phù hợp.</div></td></tr>`;
