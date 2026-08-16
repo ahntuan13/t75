@@ -1,379 +1,705 @@
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=IBM+Plex+Mono:wght@500;600&display=swap');
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Quản lý tài chính - T75</title>
+<link rel="stylesheet" href="css/style.css">
+</head>
+<body>
 
-:root{
-  --bg:#F4F6FB;
-  --bg-soft:#EEF1FA;
-  --card:#FFFFFF;
-  --ink:#1E2433;
-  --ink-dim:#6B7280;
-  --ink-faint:#9AA1B1;
-  --line:#E9ECF5;
+<!-- ================= LOGIN ================= -->
+<div id="login-screen">
+  <div class="login-card">
+    <div class="login-brand">
+      <div class="mark logo-mark"><img src="assets/logo-t75.jpg" alt="TUAN75 Insulation"></div>
+      <div>
+        <div class="name">Quản lý tài chính</div>
+        <div class="sub">TUAN75 INSULATION</div>
+      </div>
+    </div>
+    <h1>Đăng nhập</h1>
+    <p class="hint">Dùng tài khoản được cấp để truy cập hệ thống.</p>
+    <form id="login-form">
+      <div class="field">
+        <label>Email</label>
+        <input type="email" id="login-email" required placeholder="ten@congty.com">
+      </div>
+      <div class="field">
+        <label>Mật khẩu</label>
+        <input type="password" id="login-password" required placeholder="••••••••">
+      </div>
+      <button type="submit" class="btn btn-primary btn-block">Đăng nhập</button>
+      <div class="err-msg" id="login-err"></div>
+    </form>
+  </div>
+</div>
 
-  --primary:#4F6EF7;
-  --primary-dim:#EAF0FE;
-  --primary-dark:#3B57D9;
+<!-- ================= APP ================= -->
+<div id="app-screen">
+  <div class="shell">
 
-  --teal:#12B8A6;
-  --teal-dim:#E3FBF6;
-  --gold:#F5A524;
-  --gold-dim:#FEF3E0;
-  --red:#F5455C;
-  --red-dim:#FEE9EC;
-  --purple:#8B5CF6;
-  --purple-dim:#F2ECFE;
-  --blue:#3B9DF6;
-  --blue-dim:#E9F4FE;
-  --pink:#F754A2;
-  --pink-dim:#FEEBF5;
+    <!-- SIDEBAR -->
+    <div class="sidebar" id="sidebar">
+      <div class="brand">
+        <div class="mark logo-mark"><img src="assets/logo-t75.jpg" alt="TUAN75 Insulation"></div>
+        <div class="name">Quản lý tài chính</div>
+      </div>
 
-  --sidebar-bg:#FFFFFF;
-  --radius:14px;
-  --shadow: 0 1px 2px rgba(31,41,64,.04), 0 8px 24px rgba(31,41,64,.06);
-}
+      <div class="nav-group">
+        <div class="nav-item active" data-view="dashboard"><span class="ic">◈</span> Tổng quan</div>
+      </div>
 
-/* ---------- Dark mode ---------- */
-html.dark{
-  --bg:#0E1320;
-  --bg-soft:#171E2E;
-  --card:#161C2B;
-  --ink:#EAEDF5;
-  --ink-dim:#A7AEC0;
-  --ink-faint:#6E7791;
-  --line:#262E42;
-  --sidebar-bg:#12172A;
-  --primary-dim:#1D2954;
-  --teal-dim:#0E2C28;
-  --gold-dim:#2E2510;
-  --red-dim:#301621;
-  --purple-dim:#241E3D;
-  --blue-dim:#16233D;
-  --pink-dim:#2E1830;
-  --shadow: 0 1px 2px rgba(0,0,0,.2), 0 8px 24px rgba(0,0,0,.28);
-}
-html.dark #login-screen{
-  background:
-    radial-gradient(circle at 15% 15%, rgba(139,92,246,.28), transparent 45%),
-    radial-gradient(circle at 85% 85%, rgba(79,110,247,.32), transparent 45%),
-    linear-gradient(160deg,#0E1320,#141A2C 60%, #101526);
-}
+      <div class="nav-label">Hồ sơ</div>
+      <div class="nav-group">
+        <div class="nav-item" data-view="projects" style="display:none"><span class="ic">▣</span> Dự án</div>
+        <div class="nav-item" data-view="transactions"><span class="ic">⇄</span> Tổng quan thu chi</div>
+        <div class="nav-item" data-view="invoices"><span class="ic">🧾</span> Hóa đơn</div>
+        <div class="nav-item" data-view="transfers"><span class="ic">🏦</span> Chuyển khoản</div>
+      </div>
 
-*{box-sizing:border-box;}
-html,body{height:100%;}
-body{
-  margin:0;
-  font-family:'Inter',system-ui,sans-serif;
-  background:var(--bg);
-  color:var(--ink);
-  -webkit-font-smoothing:antialiased;
-}
-.mono{font-family:'IBM Plex Mono',monospace;font-variant-numeric:tabular-nums;}
-button{font-family:inherit;cursor:pointer;}
-input,select,textarea{font-family:inherit;}
-::selection{background:var(--primary-dim);}
+      <div class="nav-label">Báo cáo</div>
+      <div class="nav-group">
+        <div class="nav-item" data-view="reports" style="display:none"><span class="ic">📊</span> Dòng tiền theo kỳ</div>
+        <div class="nav-item" data-view="pnl" style="display:none"><span class="ic">📈</span> Lãi lỗ quý/năm</div>
+      </div>
 
-/* ---------- Login ---------- */
-#login-screen{
-  min-height:100vh;
-  display:flex;
-  align-items:center;
-  justify-content:center;
-  background:
-    radial-gradient(circle at 15% 15%, rgba(139,92,246,.25), transparent 45%),
-    radial-gradient(circle at 85% 85%, rgba(79,110,247,.30), transparent 45%),
-    linear-gradient(160deg,#EEF1FF,#E4E9FD 60%, #DCE3FC);
-  padding:24px;
-}
-.login-card{
-  width:100%;max-width:380px;
-  background:var(--card);
-  border-radius:20px;
-  padding:40px 32px 32px;
-  box-shadow:0 24px 60px rgba(79,110,247,.18);
-}
-.login-brand{
-  display:flex;align-items:center;gap:10px;margin-bottom:28px;
-}
-.login-brand .mark{
-  width:40px;height:40px;border-radius:12px;
-  background:linear-gradient(135deg,var(--primary),var(--purple));
-  display:flex;align-items:center;justify-content:center;
-  color:#fff;font-weight:800;font-size:13px;letter-spacing:-.5px;
-  box-shadow:0 8px 18px rgba(79,110,247,.35);
-}
-.login-brand .mark.logo-mark,.sidebar .brand .mark.logo-mark{
-  background:#fff;box-shadow:0 4px 12px rgba(0,0,0,.12);
-}
-.login-brand .mark.logo-mark{width:64px;height:42px;border-radius:10px;}
-.sidebar .brand .mark.logo-mark{width:58px;height:36px;border-radius:8px;}
-.mark.logo-mark img{width:100%;height:100%;object-fit:contain;padding:4px;}
-.login-brand .name{font-weight:800;font-size:17px;letter-spacing:-.3px;color:var(--ink);}
-.login-brand .sub{font-size:11px;color:var(--ink-faint);text-transform:uppercase;letter-spacing:.08em;}
-.login-card h1{font-size:20px;margin:0 0 4px;font-weight:700;}
-.login-card p.hint{margin:0 0 24px;color:var(--ink-dim);font-size:13.5px;}
-.field{margin-bottom:16px;}
-.field label{display:block;font-size:12.5px;font-weight:600;color:var(--ink-dim);margin-bottom:6px;}
-.field input,.field select,.field textarea{
-  width:100%;padding:10px 12px;border:1.5px solid var(--line);border-radius:10px;
-  font-size:14px;color:var(--ink);background:var(--bg-soft);transition:border-color .15s,background .15s;
-}
-.field input:focus,.field select:focus,.field textarea:focus{outline:none;border-color:var(--primary);background:var(--card);}
-.btn{
-  display:inline-flex;align-items:center;justify-content:center;gap:6px;
-  padding:10px 18px;border-radius:10px;border:none;font-weight:600;font-size:14px;
-  transition:transform .08s, box-shadow .15s, background .15s;
-}
-.btn:active{transform:scale(.98);}
-.btn-primary{background:var(--primary);color:#fff;box-shadow:0 6px 16px rgba(79,110,247,.28);}
-.btn-primary:hover{background:var(--primary-dark);}
-.btn-block{width:100%;}
-.btn-ghost{background:transparent;color:var(--ink-dim);border:1.5px solid var(--line);}
-.btn-ghost:hover{border-color:var(--ink-faint);color:var(--ink);}
-.btn-danger{background:var(--red-dim);color:var(--red);}
-.btn-danger:hover{background:#fbd3d9;}
-.btn-sm{padding:6px 12px;font-size:12.5px;border-radius:8px;}
-.err-msg{color:var(--red);font-size:13px;margin-top:10px;min-height:16px;}
+      <div class="nav-label">Chi & lương</div>
+      <div class="nav-group">
+        <div class="nav-item" data-view="orders"><span class="ic">📝</span> Lệnh chi</div>
+        <div class="nav-item" data-view="payroll"><span class="ic">💵</span> Bảng lương</div>
+        <div class="nav-item" data-view="timesheet"><span class="ic">🗓</span> Chấm công</div>
+      </div>
 
-/* ---------- App Shell ---------- */
-#app-screen{display:none;min-height:100vh;}
-.shell{display:grid;grid-template-columns:240px 1fr;min-height:100vh;}
-.sidebar{
-  background:var(--sidebar-bg);
-  color:var(--ink-dim);padding:20px 14px;display:flex;flex-direction:column;
-  position:sticky;top:0;height:100vh;
-  border-right:1px solid var(--line);
-}
-.sidebar .brand{display:flex;align-items:center;gap:10px;padding:6px 8px 22px;}
-.sidebar .brand .mark{
-  width:34px;height:34px;border-radius:10px;background:linear-gradient(135deg,var(--primary),var(--purple));
-  display:flex;align-items:center;justify-content:center;color:#fff;font-weight:800;font-size:12px;
-  box-shadow:0 6px 14px rgba(79,110,247,.3);
-}
-.sidebar .brand .name{font-weight:800;color:var(--ink);font-size:15px;letter-spacing:-.2px;}
-.nav-group{margin-bottom:6px;}
-.nav-label{font-size:10.5px;text-transform:uppercase;letter-spacing:.09em;color:var(--ink-faint);padding:14px 10px 6px;font-weight:700;}
-.nav-item{
-  display:flex;align-items:center;gap:10px;padding:9px 10px;border-radius:10px;
-  color:var(--ink-dim);font-size:13.5px;font-weight:600;cursor:pointer;margin-bottom:2px;
-  transition:background .12s,color .12s;
-}
-.nav-item .ic{width:19px;text-align:center;font-size:15px;opacity:.9;}
-.nav-item:hover{background:var(--bg-soft);color:var(--ink);}
-.nav-item.active{background:var(--primary);color:#fff;box-shadow:0 6px 14px rgba(79,110,247,.3);}
-.sidebar-foot{margin-top:auto;padding-top:14px;border-top:1px solid var(--line);}
-.user-chip{display:flex;align-items:center;gap:9px;padding:8px 8px;border-radius:10px;}
-.user-chip .av{width:30px;height:30px;border-radius:50%;background:linear-gradient(135deg,var(--gold),#F6C453);color:#5A3B00;font-weight:800;font-size:12px;display:flex;align-items:center;justify-content:center;}
-.user-chip .who{flex:1;min-width:0;}
-.user-chip .who .em{font-size:12px;color:var(--ink);font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
-.user-chip .who .role{font-size:10.5px;color:var(--ink-faint);}
-.logout-btn{background:none;border:none;color:var(--ink-faint);font-size:15px;padding:4px;}
-.logout-btn:hover{color:var(--red);}
+      <div class="nav-label">Quản trị</div>
+      <div class="nav-group">
+        <div class="nav-item" data-view="users" style="display:none"><span class="ic">🔐</span> Người dùng & phân quyền</div>
+        <div class="nav-item" data-view="activitylog" style="display:none"><span class="ic">🕘</span> Lịch sử chỉnh sửa</div>
+      </div>
 
-.main{padding:26px 32px 60px;max-width:1440px;}
-.topbar{display:flex;align-items:center;justify-content:space-between;margin-bottom:22px;flex-wrap:wrap;gap:12px;}
-.topbar h2{font-size:22px;font-weight:800;margin:0;letter-spacing:-.3px;color:var(--ink);}
-.topbar .sub{color:var(--ink-dim);font-size:13px;margin-top:3px;}
-.topbar-actions{display:flex;gap:10px;align-items:center;}
+      <div class="sidebar-foot">
+        <button class="theme-toggle" id="theme-toggle" title="Chuyển giao diện sáng/tối">
+          <span id="theme-icon">🌙</span> <span id="theme-label">Chế độ tối</span>
+        </button>
+        <div class="user-chip">
+          <div class="av" id="user-avatar">?</div>
+          <div class="who">
+            <div class="em" id="user-email">—</div>
+            <div class="role" id="user-role-label">Thành viên</div>
+          </div>
+          <button class="logout-btn" id="logout-btn" title="Đăng xuất">⏻</button>
+        </div>
+      </div>
+    </div>
 
-.view{display:none;}
-.view.active{display:block;}
+    <!-- MAIN -->
+    <div class="main">
+      <button id="menu-toggle">☰</button>
+      <div id="approval-banner" style="display:none;"></div>
+      <button id="fab-quick-create" class="fab-btn" title="Tạo nhanh">+</button>
 
-/* ---------- Cards / KPI ---------- */
-.kpi-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:14px;margin-bottom:22px;}
-.kpi-card{
-  background:var(--card);border-radius:var(--radius);padding:18px 18px;box-shadow:var(--shadow);
-  border:1px solid var(--line);display:flex;flex-direction:column;gap:10px;
-}
-.kpi-card .top-row{display:flex;align-items:flex-start;justify-content:space-between;}
-.icon-badge{
-  width:38px;height:38px;border-radius:11px;display:flex;align-items:center;justify-content:center;
-  font-size:17px;flex-shrink:0;
-}
-.icon-badge.c-blue{background:var(--primary-dim);color:var(--primary);}
-.icon-badge.c-teal{background:var(--teal-dim);color:var(--teal);}
-.icon-badge.c-gold{background:var(--gold-dim);color:var(--gold);}
-.icon-badge.c-red{background:var(--red-dim);color:var(--red);}
-.icon-badge.c-purple{background:var(--purple-dim);color:var(--purple);}
-.icon-badge.c-pink{background:var(--pink-dim);color:var(--pink);}
-.icon-badge.c-gray{background:var(--bg-soft);color:var(--ink-dim);}
-.qc-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px;}
-.qc-item{display:flex;align-items:center;gap:12px;text-align:left;padding:14px;border:1.5px solid var(--line);border-radius:12px;background:var(--card);cursor:pointer;transition:border-color .15s,transform .1s;}
-.qc-item:hover{border-color:var(--primary);transform:translateY(-1px);}
-.qc-icon{width:38px;height:38px;flex:none;border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:17px;}
-.qc-text{display:flex;flex-direction:column;gap:2px;}
-.qc-text strong{font-size:13.5px;color:var(--ink);}
-.qc-text .helper-text{margin:0;font-size:11.5px;}
-@media (max-width:560px){.qc-grid{grid-template-columns:1fr;}}
-.kpi-card .lbl{font-size:12px;color:var(--ink-dim);font-weight:600;}
-.kpi-card .val{font-size:22px;font-weight:800;letter-spacing:-.4px;color:var(--ink);}
-.kpi-card .val.pos{color:var(--teal);}
-.kpi-card .val.neg{color:var(--red);}
-.pos{color:var(--teal);}
-.neg{color:var(--red);}
-.kpi-card .delta{font-size:12px;color:var(--ink-faint);}
+      <!-- DASHBOARD -->
+      <div class="view active" id="view-dashboard">
+        <div class="topbar">
+          <div>
+            <h2>Tổng quan</h2>
+            <div class="sub">Bức tranh dòng tiền toàn công ty</div>
+          </div>
+        </div>
+        <div class="welcome-card" id="welcome-card">
+          <div class="welcome-left">
+            <div class="welcome-avatar" id="welcome-avatar">?</div>
+            <div>
+              <div class="welcome-greet" id="welcome-greet">Chào bạn,</div>
+              <div class="welcome-name" id="welcome-name">—</div>
+              <div class="welcome-sub" id="welcome-sub">—</div>
+            </div>
+          </div>
+          <div class="welcome-pills" id="welcome-pills"></div>
+        </div>
+        <div id="dash-admin-sections">
+          <div class="kpi-grid" id="dash-kpis"></div>
+          <div class="card">
+            <div class="card-head"><h3>Dòng tiền 12 tháng gần nhất</h3></div>
+            <div class="chart-wrap"><canvas id="chart-cashflow-trend"></canvas></div>
+          </div>
+          <div class="card">
+            <div class="card-head"><h3>Doanh thu / Chi phí / Lợi nhuận thực tế theo dự án</h3></div>
+            <div class="chart-wrap" style="height:460px;"><canvas id="chart-project-actual"></canvas></div>
+          </div>
+          <div class="card">
+            <div class="card-head"><h3>Giá trị hợp đồng đã ký</h3></div>
+            <div class="chart-wrap"><canvas id="chart-project-budget"></canvas></div>
+          </div>
+        </div>
+        <div class="card">
+          <div class="card-head"><h3>Giao dịch gần đây</h3></div>
+          <div class="table-wrap"><table class="data" id="dash-recent-table"></table></div>
+        </div>
+        <div id="dash-user-sections" style="display:none;">
+          <div class="card">
+            <div class="card-head"><h3>📝 Lệnh chi chờ duyệt</h3></div>
+            <div class="table-wrap"><table class="data" id="dash-pending-orders-table"></table></div>
+          </div>
+          <div class="card">
+            <div class="card-head"><h3>▣ Dự án đang chạy</h3></div>
+            <div class="table-wrap"><table class="data" id="dash-active-projects-table"></table></div>
+          </div>
+          <div class="card">
+            <div class="card-head"><h3>🧾 Hóa đơn chưa xuất</h3></div>
+            <div class="table-wrap"><table class="data" id="dash-pending-invoices-table"></table></div>
+          </div>
+        </div>
+      </div>
 
-.card{background:var(--card);border-radius:var(--radius);padding:20px;box-shadow:var(--shadow);border:1px solid var(--line);margin-bottom:18px;}
-.card-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;flex-wrap:wrap;gap:10px;}
-.card-head h3{font-size:15px;font-weight:800;margin:0;color:var(--ink);}
-.card-head .actions{display:flex;gap:8px;}
+      <!-- PROJECTS -->
+      <div class="view" id="view-projects">
+        <div class="topbar">
+          <div><h2>Dự án</h2><div class="sub">Danh sách dự án & giá trị hợp đồng dự toán</div></div>
+        </div>
+        <div class="card"><div class="table-wrap"><table class="data" id="projects-table"></table></div></div>
+      </div>
 
-/* ---------- Table ---------- */
-.table-wrap{overflow-x:auto;}
-table.data{width:100%;border-collapse:collapse;font-size:13px;}
-table.data th{
-  text-align:left;padding:10px 12px;background:var(--bg-soft);color:var(--ink-dim);
-  font-weight:700;font-size:11.5px;text-transform:uppercase;letter-spacing:.04em;
-  border-bottom:1px solid var(--line);white-space:nowrap;
-}
-table.data th:first-child{border-top-left-radius:10px;border-bottom-left-radius:10px;}
-table.data th:last-child{border-top-right-radius:10px;border-bottom-right-radius:10px;}
-table.data td{padding:10px 12px;border-bottom:1px solid var(--line);vertical-align:middle;}
-table.data tr:hover td{background:var(--bg-soft);}
-table.data td.num{text-align:right;font-family:'IBM Plex Mono',monospace;font-variant-numeric:tabular-nums;}
-.tag{display:inline-flex;align-items:center;padding:3px 10px;border-radius:999px;font-size:11px;font-weight:700;}
-.tag-in{background:var(--teal-dim);color:var(--teal);}
-.tag-out{background:var(--red-dim);color:var(--red);}
-.tag-blue{background:var(--blue-dim);color:var(--blue);}
-.tag-gold{background:var(--gold-dim);color:var(--gold);}
-.tag-gray{background:var(--bg-soft);color:var(--ink-dim);}
-.tx-project-block{padding:16px 20px;}
-.tx-project-head{display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;margin-bottom:10px;padding-bottom:10px;border-bottom:1.5px solid var(--line);}
-.tx-project-head h4{margin:0;font-size:15px;}
-.tx-project-summary{display:flex;gap:16px;font-size:12.5px;color:var(--ink-dim);flex-wrap:wrap;}
-tr.tx-subhead td{background:var(--bg-soft);font-weight:700;font-size:11.5px;letter-spacing:.3px;color:var(--ink-dim);padding:6px 12px;border-bottom:1px solid var(--line);}
-tr.tx-subhead-in td{color:var(--teal);}
-tr.tx-subhead-out td{color:var(--red);}
-tr td.tx-subhead-empty{color:var(--ink-faint);font-style:italic;font-size:12.5px;}
-.approval-banner{display:flex;align-items:center;gap:12px;justify-content:space-between;background:var(--gold-dim);color:var(--gold);border-radius:12px;padding:12px 16px;margin-bottom:16px;font-weight:600;font-size:13.5px;flex-wrap:wrap;}
-.approval-banner button{white-space:nowrap;}
-.fab-btn{
-  position:fixed; bottom:26px; right:26px; z-index:500;
-  width:56px; height:56px; border-radius:50%; border:none;
-  background:var(--primary); color:#fff; font-size:28px; font-weight:400; line-height:1;
-  box-shadow:0 8px 20px rgba(79,110,247,.4); cursor:pointer;
-  display:flex; align-items:center; justify-content:center;
-  transition:transform .15s;
-}
-.fab-btn:hover{transform:scale(1.06); background:var(--primary-dark);}
-@media print{.fab-btn{display:none;}}
-.row-actions{display:flex;gap:6px;}
-.icon-btn{background:var(--bg-soft);border:none;color:var(--ink-dim);font-size:13px;padding:6px 8px;border-radius:8px;}
-.icon-btn:hover{background:var(--primary-dim);color:var(--primary);}
-.empty-state{text-align:center;padding:44px 20px;color:var(--ink-faint);}
-.empty-state .big{font-size:30px;margin-bottom:8px;}
-.thumb-img{width:36px;height:36px;object-fit:cover;border-radius:6px;border:1px solid var(--line);cursor:pointer;}
-.thumb-img:hover{outline:2px solid var(--primary);}
+      <!-- TRANSACTIONS -->
+      <div class="view" id="view-transactions">
+        <div class="topbar">
+          <div><h2>Thu chi</h2><div class="sub">Ghi nhận dòng tiền vào/ra theo dự án</div></div>
+          <div class="topbar-actions">
+            <button class="btn btn-ghost" id="btn-export-tx">⬇ Xuất Excel (theo bộ lọc)</button>
+            <button class="btn btn-ghost" id="btn-upload-thu" style="display:none;">⬆ Upload Thu (Excel)</button>
+            <button class="btn btn-ghost" id="btn-upload-chi" style="display:none;">⬆ Upload Chi (Excel)</button>
+          </div>
+          <input type="file" id="upload-thu-input" accept=".xlsx,.xls" style="display:none">
+          <input type="file" id="upload-chi-input" accept=".xlsx,.xls" style="display:none">
+        </div>
+        <div class="filters-bar">
+          <select id="tx-filter-project"><option value="">Tất cả dự án</option></select>
+          <select id="tx-filter-type">
+            <option value="">Tất cả loại</option>
+            <option value="IN">Thu (IN)</option>
+            <option value="OUT">Chi (OUT)</option>
+          </select>
+          <select id="tx-filter-code">
+            <option value="">Tất cả mã</option>
+            <option value="QL">QL - Quản lý</option>
+            <option value="VTC">VTC - Vật tư chính</option>
+            <option value="VTP">VTP - Vật tư phụ</option>
+            <option value="NC">NC - Nhân công</option>
+          </select>
+          <input type="month" id="tx-filter-month">
+          <div class="spacer"></div>
+          <input type="text" id="tx-search" placeholder="Tìm nội dung...">
+        </div>
+        <div id="tx-table"></div>
+      </div>
 
-/* ---------- Filters bar ---------- */
-.filters-bar{display:flex;gap:10px;flex-wrap:wrap;margin-bottom:16px;align-items:center;}
-.filters-bar select, .filters-bar input{
-  padding:8px 12px;border:1.5px solid var(--line);border-radius:10px;font-size:13px;background:var(--card);color:var(--ink);
-}
-.filters-bar .spacer{flex:1;}
+      <!-- INVOICES -->
+      <div class="view" id="view-invoices">
+        <div class="topbar">
+          <div><h2>Hóa đơn</h2><div class="sub">Thống kê các giao dịch có hóa đơn</div></div>
+        </div>
+        <div class="filters-bar">
+          <select id="inv-filter-project"><option value="">Tất cả dự án</option></select>
+          <select id="inv-filter-status">
+            <option value="">Tất cả trạng thái</option>
+            <option value="issued">✅ Đã xuất hóa đơn</option>
+            <option value="pending">⏳ Chưa xuất hóa đơn</option>
+          </select>
+          <input type="text" id="inv-search" placeholder="Tìm số hóa đơn / nội dung...">
+        </div>
+        <div class="kpi-grid" id="inv-kpis"></div>
+        <div class="card"><div class="table-wrap"><table class="data" id="inv-table"></table></div></div>
+      </div>
 
-/* ---------- Modal ---------- */
-.modal-backdrop{
-  position:fixed;inset:0;background:rgba(30,36,51,.45);backdrop-filter:blur(2px);
-  display:none;align-items:flex-start;justify-content:center;z-index:100;padding:40px 16px;overflow-y:auto;
-}
-.modal-backdrop.open{display:flex;}
-.modal{
-  background:var(--card);border-radius:18px;width:100%;max-width:560px;box-shadow:0 30px 80px rgba(0,0,0,.35);
-  animation:modalIn .16s ease-out;
-}
-@keyframes modalIn{from{opacity:0;transform:translateY(8px) scale(.98);}to{opacity:1;transform:none;}}
-.modal-head{display:flex;align-items:center;justify-content:space-between;padding:18px 22px;border-bottom:1px solid var(--line);}
-.modal-head h3{margin:0;font-size:16px;font-weight:800;color:var(--ink);}
-.modal-close{background:var(--bg-soft);border:none;font-size:15px;color:var(--ink-dim);width:28px;height:28px;border-radius:8px;}
-.modal-body{padding:20px 22px;max-height:70vh;overflow-y:auto;}
-.modal-foot{padding:16px 22px;border-top:1px solid var(--line);display:flex;justify-content:flex-end;gap:10px;}
-.form-grid{display:grid;grid-template-columns:1fr 1fr;gap:14px;}
-.form-grid .full{grid-column:1/-1;}
-.form-grid .field{margin-bottom:0;}
-.seg{display:flex;border:1.5px solid var(--line);border-radius:10px;overflow:hidden;}
-.seg button{flex:1;padding:9px;border:none;background:var(--card);font-size:13px;font-weight:700;color:var(--ink-dim);}
-.seg button.active-in{background:var(--teal-dim);color:var(--teal);}
-.seg button.active-out{background:var(--red-dim);color:var(--red);}
-.seg button.active-gold{background:var(--gold-dim);color:var(--gold);}
-.seg button.active-gray{background:var(--bg-soft);color:var(--ink-dim);}
+      <!-- TRANSFERS -->
+      <div class="view" id="view-transfers">
+        <div class="topbar">
+          <div><h2>Chuyển khoản</h2><div class="sub">Thông tin các giao dịch chuyển khoản ngân hàng</div></div>
+        </div>
+        <div class="filters-bar">
+          <select id="tr-filter-project"><option value="">Tất cả dự án</option></select>
+          <select id="tr-filter-status">
+            <option value="">Tất cả trạng thái</option>
+            <option value="done">✅ Đã CK / Đã nhận</option>
+            <option value="pending">⏳ Chưa CK / Chưa nhận</option>
+          </select>
+          <input type="text" id="tr-search" placeholder="Tìm số TK / ngân hàng...">
+        </div>
+        <div class="card"><div class="table-wrap"><table class="data" id="tr-table"></table></div></div>
+      </div>
 
-/* ---------- Toast ---------- */
-#toast{
-  position:fixed;bottom:22px;right:22px;background:#1E2433;color:#fff;
-  padding:12px 18px;border-radius:12px;font-size:13.5px;box-shadow:0 10px 30px rgba(0,0,0,.35);
-  z-index:200;opacity:0;transform:translateY(10px);transition:all .2s;pointer-events:none;
-}
-#toast.show{opacity:1;transform:none;}
+      <!-- REPORTS -->
+      <div class="view" id="view-reports">
+        <div class="topbar">
+          <div><h2>Dòng tiền theo kỳ</h2><div class="sub">Thống kê thu / chi theo ngày, tháng, năm</div></div>
+        </div>
+        <div class="filters-bar">
+          <select id="rp-groupby">
+            <option value="day">Theo ngày</option>
+            <option value="month" selected>Theo tháng</option>
+            <option value="year">Theo năm</option>
+          </select>
+          <select id="rp-filter-project"><option value="">Tất cả dự án</option></select>
+          <input type="number" id="rp-filter-year" placeholder="Năm (vd 2026)" style="width:110px;">
+        </div>
+        <div class="kpi-grid" id="rp-kpis"></div>
+        <div class="card">
+          <div class="card-head"><h3>Biểu đồ dòng tiền</h3></div>
+          <div class="chart-wrap"><canvas id="chart-report"></canvas></div>
+        </div>
+        <div class="card"><div class="table-wrap"><table class="data" id="rp-table"></table></div></div>
+      </div>
 
-/* ---------- Welcome card (Dashboard) ---------- */
-.welcome-card{
-  background:linear-gradient(120deg, var(--card), var(--primary-dim));
-  border:1px solid var(--line);
-  border-radius:var(--radius);
-  padding:20px 22px;
-  display:flex;align-items:center;justify-content:space-between;
-  gap:16px;flex-wrap:wrap;
-  margin-bottom:18px;
-  box-shadow:var(--shadow);
-}
-.welcome-left{display:flex;align-items:center;gap:14px;}
-.welcome-avatar{
-  width:52px;height:52px;border-radius:50%;
-  background:linear-gradient(135deg,var(--primary),var(--purple));
-  color:#fff;font-weight:800;font-size:19px;
-  display:flex;align-items:center;justify-content:center;
-  box-shadow:0 8px 20px rgba(79,110,247,.3);
-  flex-shrink:0;
-}
-.welcome-greet{font-size:12.5px;color:var(--ink-dim);font-weight:600;}
-.welcome-name{font-size:18px;font-weight:800;color:var(--ink);margin-top:1px;}
-.welcome-sub{font-size:12.5px;color:var(--ink-faint);margin-top:2px;}
-.welcome-pills{display:flex;gap:10px;flex-wrap:wrap;}
-.welcome-pill{
-  background:var(--card);border:1px solid var(--line);border-radius:12px;
-  padding:8px 14px;font-size:12.5px;color:var(--ink-dim);font-weight:600;
-  display:flex;align-items:center;gap:6px;white-space:nowrap;
-}
-.welcome-pill b{color:var(--ink);font-weight:800;}
+      <!-- P&L -->
+      <div class="view" id="view-pnl">
+        <div class="topbar">
+          <div><h2>Báo cáo lãi lỗ</h2><div class="sub">Theo quý / năm, toàn công ty hoặc theo dự án</div></div>
+        </div>
+        <div class="filters-bar">
+          <select id="pnl-groupby">
+            <option value="quarter" selected>Theo quý</option>
+            <option value="year">Theo năm</option>
+          </select>
+          <select id="pnl-filter-project"><option value="">Tất cả dự án (tổng công ty)</option></select>
+          <input type="number" id="pnl-filter-year" placeholder="Năm (vd 2026)" style="width:110px;">
+        </div>
+        <div class="kpi-grid" id="pnl-kpis"></div>
+        <div class="card">
+          <div class="card-head"><h3>Biểu đồ Doanh thu — Chi phí — LNTT</h3></div>
+          <div class="chart-wrap"><canvas id="chart-pnl"></canvas></div>
+        </div>
+        <div class="card"><div class="table-wrap"><table class="data" id="pnl-table"></table></div></div>
+      </div>
 
-/* ---------- Theme toggle ---------- */
-.theme-toggle{
-  display:flex;align-items:center;justify-content:center;gap:8px;width:100%;
-  padding:9px 10px;border-radius:10px;border:1px solid var(--line);
-  background:var(--bg-soft);color:var(--ink-dim);font-size:12.5px;font-weight:600;
-  margin-bottom:10px;transition:background .12s,color .12s;
-}
-.theme-toggle:hover{background:var(--primary-dim);color:var(--primary);}
+      <!-- PAYMENT ORDERS -->
+      <div class="view" id="view-orders">
+        <div class="topbar">
+          <div><h2>Lệnh chi</h2><div class="sub">Đề nghị & duyệt chi tiền</div></div>
+        </div>
+        <div class="filters-bar">
+          <select id="ord-filter-status">
+            <option value="">Tất cả trạng thái</option>
+            <option value="pending">Chờ duyệt</option>
+            <option value="approved">Đã duyệt</option>
+          </select>
+          <select id="ord-filter-project"><option value="">Tất cả dự án</option></select>
+        </div>
+        <div class="card"><div class="table-wrap"><table class="data" id="orders-table"></table></div></div>
+      </div>
 
-/* ---------- Chart wrap ---------- */
-.chart-wrap{position:relative;height:340px;}
-.two-col{display:grid;grid-template-columns:1.3fr 1fr;gap:16px;}
-@media (max-width:980px){.two-col{grid-template-columns:1fr;}}
+      <!-- PAYROLL -->
+      <div class="view" id="view-payroll">
+        <div class="topbar">
+          <div><h2>Bảng lương</h2><div class="sub">Tổng hợp lương theo tháng & danh sách nhân viên</div></div>
+        </div>
+        <div class="filters-bar">
+          <input type="month" id="payroll-filter-month">
+        </div>
+        <div class="card">
+          <div class="card-head"><h3>Tổng hợp lương theo tháng</h3></div>
+          <div class="table-wrap"><table class="data" id="payroll-summary-table"></table></div>
+        </div>
+        <div class="card">
+          <div class="card-head"><h3>Danh sách nhân viên</h3></div>
+          <div class="table-wrap"><table class="data" id="employees-table"></table></div>
+        </div>
+      </div>
 
-/* ---------- Responsive ---------- */
-@media (max-width:840px){
-  .shell{grid-template-columns:1fr;}
-  .sidebar{position:fixed;left:-260px;width:240px;z-index:90;transition:left .2s;box-shadow:10px 0 30px rgba(31,41,64,.15);}
-  .sidebar.open{left:0;}
-  .main{padding:18px 16px 60px;}
-  .form-grid{grid-template-columns:1fr;}
-  #menu-toggle{display:inline-flex !important;}
-}
-#menu-toggle{display:none;background:var(--card);border:1px solid var(--line);border-radius:10px;width:36px;height:36px;align-items:center;justify-content:center;font-size:15px;color:var(--ink-dim);}
+      <!-- TIMESHEET (Chấm công) -->
+      <div class="view" id="view-timesheet">
+        <div class="topbar">
+          <div><h2>Chấm công</h2><div class="sub">Ghi nhận công theo ngày</div></div>
+        </div>
+        <div class="filters-bar">
+          <input type="month" id="ts-filter-month">
+          <select id="ts-filter-employee"><option value="">Tất cả nhân viên</option></select>
+        </div>
+        <div class="card">
+          <div class="card-head"><h3>Bảng chấm công theo ngày</h3></div>
+          <div class="table-wrap"><table class="data" id="timesheet-table"></table></div>
+        </div>
+      </div>
 
-.badge-count{background:var(--gold);color:#5A3B00;font-size:10px;font-weight:800;padding:1px 6px;border-radius:999px;margin-left:auto;}
-.helper-text{font-size:12px;color:var(--ink-faint);margin-top:4px;}
-.tx-view-grid{display:grid;grid-template-columns:150px 1fr;gap:10px 14px;font-size:13.5px;}
-.tx-view-grid dt{color:var(--ink-faint);font-weight:600;}
-.tx-view-grid dd{margin:0;color:var(--ink);}
-.tx-view-section{margin-top:16px;padding-top:14px;border-top:1px solid var(--line);}
-.tx-view-section h5{margin:0 0 10px;font-size:13px;color:var(--ink-dim);}
-.tx-view-note{background:var(--bg-soft);border-radius:10px;padding:12px 14px;font-size:13.5px;line-height:1.5;white-space:pre-wrap;}
-.tx-view-images{display:flex;gap:12px;flex-wrap:wrap;margin-top:10px;}
-.tx-view-images img{max-width:180px;max-height:180px;border-radius:10px;border:1px solid var(--line);cursor:zoom-in;}
-.print-only{display:none;}
-@media print{
-  .sidebar,.topbar-actions,.filters-bar,.no-print{display:none !important;}
-  .main{padding:0;max-width:none;}
-  .print-only{display:block;}
-  body{background:#fff;}
-}
+      <!-- USERS & PERMISSIONS (admin only) -->
+      <div class="view" id="view-users">
+        <div class="topbar">
+          <div><h2>Người dùng & phân quyền</h2><div class="sub">Chỉ Admin thấy được trang này</div></div>
+          <div class="topbar-actions"><button class="btn btn-primary" id="btn-add-user">+ Gán quyền người dùng</button></div>
+        </div>
+        <div class="card">
+          <p class="helper-text" style="margin-bottom:14px;font-size:13px;">
+            App không tự tạo được tài khoản đăng nhập — bạn vẫn tạo tài khoản (email/mật khẩu) như cũ trong
+            <strong>Firebase Console → Authentication → Users → Add user</strong>. Sau khi tạo xong, copy cột
+            <strong>User UID</strong> của tài khoản đó, quay lại đây bấm "+ Gán quyền người dùng" để chọn họ là
+            <strong>Admin</strong> hay <strong>Thành viên</strong>.
+          </p>
+        </div>
+        <div class="card">
+          <div class="card-head"><h3>Người duyệt chi (Giám đốc)</h3></div>
+          <p class="helper-text" style="margin-bottom:14px;">
+            Nhập đúng email đăng nhập app của Giám đốc. Khi một khoản Chi được gửi duyệt, đúng người này (đăng nhập bằng email dưới) mới thấy nút Duyệt/Từ chối.
+          </p>
+          <div class="form-grid">
+            <div class="field"><label>Email Giám đốc (GĐ)</label><input id="approver-gd-email" placeholder="gd@congty.com"></div>
+          </div>
+          <button class="btn btn-primary btn-sm" id="save-approvers-btn">Lưu email duyệt chi</button>
+        </div>
+        <div class="card">
+          <div class="card-head"><h3>🔍 Đọc hóa đơn tự động (OCR miễn phí — Tesseract.js)</h3></div>
+          <p class="helper-text" style="margin-bottom:14px;">
+            Dùng cho tính năng "Upload hóa đơn" ở nút ⚡ Tạo mới — đọc chữ trực tiếp trong trình duyệt (miễn phí hoàn toàn, không gọi API trả phí nào).
+            <strong>Lưu ý:</strong> độ chính xác thấp hơn AI trả phí, đặc biệt với ảnh mờ/nghiêng/có watermark — luôn kiểm tra kỹ lại thông tin trước khi lưu. Toàn bộ chữ đọc được sẽ tự động điền vào ô Ghi chú để bạn đối chiếu.
+          </p>
+          <div class="form-grid">
+            <div class="field full"><label>Tên công ty (để nhận diện Thu/Chi đúng)</label><input id="ocr-company-name" placeholder="VD: CÔNG TY TNHH DỊCH VỤ KỸ THUẬT CÁCH NHIỆT TUẤN 75"></div>
+          </div>
+          <button class="btn btn-primary btn-sm" id="save-ocr-settings-btn">Lưu cài đặt OCR</button>
+        </div>
+        <div class="card"><div class="table-wrap"><table class="data" id="users-table"></table></div></div>
+      </div>
+
+      <!-- ACTIVITY LOG + BACKUP (admin only) -->
+      <div class="view" id="view-activitylog">
+        <div class="topbar">
+          <div><h2>Lịch sử chỉnh sửa & Sao lưu</h2><div class="sub">Chỉ Admin thấy được trang này</div></div>
+        </div>
+        <div class="card">
+          <div class="card-head"><h3>💾 Sao lưu dữ liệu Thu Chi lên OneDrive</h3></div>
+          <p class="helper-text" style="margin-bottom:14px;">
+            Xuất toàn bộ dữ liệu Thu Chi hiện tại thành file Excel và lưu vào thư mục <code>Backups/</code> trên OneDrive công ty.
+            Lưu ý: app tĩnh (GitHub Pages) không tự chạy được theo lịch tự động (VD: mỗi tuần 1 lần) — bạn cần chủ động bấm nút này định kỳ
+            (gợi ý: đầu mỗi tuần). Nếu muốn tự động hoàn toàn, cần nâng cấp thêm Cloud Functions (gói trả phí Blaze), báo mình nếu bạn muốn làm thêm.
+          </p>
+          <button class="btn btn-primary btn-sm" id="btn-backup-onedrive">💾 Sao lưu ngay lên OneDrive</button>
+          <div class="helper-text" id="backup-status" style="margin-top:10px;"></div>
+        </div>
+        <div class="card">
+          <div class="card-head"><h3>🕘 Lịch sử chỉnh sửa Thu Chi</h3></div>
+          <p class="helper-text" style="margin-bottom:14px;">Ghi lại các thao tác tạo/sửa/xóa giao dịch, đổi trạng thái hóa đơn/CK, gửi & duyệt chi — kèm người thực hiện và thời gian.</p>
+          <div class="filters-bar">
+            <select id="log-filter-days">
+              <option value="7">7 ngày gần nhất</option>
+              <option value="30" selected>30 ngày gần nhất</option>
+              <option value="9999">Toàn bộ</option>
+            </select>
+          </div>
+        </div>
+        <div class="card"><div class="table-wrap"><table class="data" id="activity-log-table"></table></div></div>
+      </div>
+
+    </div>
+  </div>
+</div>
+
+<!-- ================= MODALS ================= -->
+<div class="modal-backdrop" id="modal-quickcreate">
+  <div class="modal" style="max-width:560px;">
+    <div class="modal-head"><h3>⚡ Tạo nhanh</h3><button class="modal-close" data-close>✕</button></div>
+    <div class="modal-body">
+      <div class="qc-grid">
+        <button class="qc-item" id="qc-add-project">
+          <span class="qc-icon" style="background:var(--primary-dim);color:var(--primary);">▣</span>
+          <span class="qc-text"><strong>Thêm dự án</strong><span class="helper-text">Tạo hồ sơ dự án mới</span></span>
+        </button>
+        <button class="qc-item" id="qc-add-tx">
+          <span class="qc-icon" style="background:var(--teal-dim);color:var(--teal);">⇄</span>
+          <span class="qc-text"><strong>Nhập giao dịch</strong><span class="helper-text">Ghi nhận Thu / Chi</span></span>
+        </button>
+        <button class="qc-item" id="qc-add-order">
+          <span class="qc-icon" style="background:var(--red-dim);color:var(--red);">📝</span>
+          <span class="qc-text"><strong>Tạo lệnh chi</strong><span class="helper-text">Lập lệnh chi mới</span></span>
+        </button>
+        <button class="qc-item" id="qc-add-employee">
+          <span class="qc-icon" style="background:var(--purple-dim);color:var(--purple);">👤</span>
+          <span class="qc-text"><strong>Thêm nhân viên</strong><span class="helper-text">Thêm hồ sơ nhân viên</span></span>
+        </button>
+        <button class="qc-item" id="qc-add-timesheet">
+          <span class="qc-icon" style="background:var(--gold-dim);color:var(--gold);">🗓</span>
+          <span class="qc-text"><strong>Chấm công</strong><span class="helper-text">Ghi công theo ngày</span></span>
+        </button>
+        <button class="qc-item" id="qc-upload-invoice-image">
+          <span class="qc-icon" style="background:var(--teal-dim);color:var(--teal);">📷</span>
+          <span class="qc-text"><strong>Upload hóa đơn (ảnh)</strong><span class="helper-text">AI tự đọc thông tin từ ảnh</span></span>
+        </button>
+        <button class="qc-item" id="qc-upload-invoice-pdf">
+          <span class="qc-icon" style="background:var(--blue-dim, var(--primary-dim));color:var(--primary);">📄</span>
+          <span class="qc-text"><strong>Upload hóa đơn (PDF)</strong><span class="helper-text">AI tự đọc thông tin từ file PDF</span></span>
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+<input type="file" id="ocr-invoice-image-input" accept="image/*" style="display:none">
+<input type="file" id="ocr-invoice-pdf-input" accept="application/pdf,.pdf" style="display:none">
+
+<div class="modal-backdrop" id="modal-project">
+  <div class="modal">
+    <div class="modal-head"><h3 id="project-modal-title">Thêm dự án</h3><button class="modal-close" data-close>✕</button></div>
+    <div class="modal-body">
+      <input type="hidden" id="project-id">
+      <div class="form-grid">
+        <div class="field full"><label>Tên dự án *</label><input id="project-name" required></div>
+        <div class="field"><label>Mã dự án</label><input id="project-code" placeholder="VD: NTGLOBAL"></div>
+        <div class="field"><label>Khách hàng</label><input id="project-customer"></div>
+        <div class="field"><label>MST (Mã số thuế)</label><input id="project-tax-code" placeholder="VD: 0312345678"></div>
+        <div class="field"><label>Số hợp đồng</label><input id="project-contract-number" placeholder="VD: 12/2026/HĐKT-XYZ"></div>
+        <div class="field"><label>Giá trị hợp đồng (đã VAT)</label><input type="text" id="project-contract-value" placeholder="0"></div>
+        <div class="field"><label>Chi phí dự toán</label><input type="text" id="project-cost-budget" placeholder="0"></div>
+        <div class="field"><label>Doanh thu dự toán</label><input type="text" id="project-revenue-budget" placeholder="0"></div>
+        <div class="field full">
+          <label>File hợp đồng (upload thẳng lên OneDrive công ty — 1 dự án có thể có nhiều hợp đồng)</label>
+          <input type="file" id="project-contract-file" accept="image/*,.pdf,application/pdf">
+          <div class="helper-text">File tối đa 4MB. Chọn file xong tự thêm vào danh sách bên dưới, không thay thế file cũ. Lần đầu upload sẽ hiện popup đăng nhập Microsoft 365 công ty — nếu trình duyệt chặn popup, bấm cho phép popup của trang này.</div>
+          <div id="project-contract-file-status" style="margin-top:8px;"></div>
+        </div>
+        <div class="field full"><label>Link hợp đồng khác (Google Drive, dùng khi file lớn)</label><input id="project-contract-link" placeholder="https://drive.google.com/..."></div>
+        <div class="field"><label>Trạng thái</label>
+          <select id="project-status"><option value="active">Đang thực hiện</option><option value="warranty">Còn giữ 5% bảo hành</option><option value="done">Hoàn thành</option><option value="paused">Tạm dừng</option></select>
+        </div>
+        <div class="field full"><label>Ghi chú</label><textarea id="project-note" rows="2"></textarea></div>
+      </div>
+    </div>
+    <div class="modal-foot"><button class="btn btn-ghost" data-close>Hủy</button><button class="btn btn-primary" id="save-project-btn">Lưu dự án</button></div>
+  </div>
+</div>
+
+<div class="modal-backdrop" id="modal-tx-view">
+  <div class="modal">
+    <div class="modal-head"><h3>Chi tiết giao dịch</h3><button class="modal-close" data-close>✕</button></div>
+    <div class="modal-body">
+      <div id="tx-view-body"></div>
+    </div>
+    <div class="modal-foot"><button class="btn btn-ghost" data-close>Đóng</button><button class="btn btn-primary" id="tx-view-edit-btn">Sửa giao dịch</button></div>
+  </div>
+</div>
+
+<div class="modal-backdrop" id="modal-tx">
+  <div class="modal">
+    <div class="modal-head"><h3 id="tx-modal-title">Nhập giao dịch thu chi</h3><button class="modal-close" data-close>✕</button></div>
+    <div class="modal-body">
+      <input type="hidden" id="tx-id">
+      <div class="field full" style="margin-bottom:14px;">
+        <label>Loại giao dịch *</label>
+        <div class="seg">
+          <button type="button" id="seg-in" data-type="IN">↓ Thu (IN)</button>
+          <button type="button" id="seg-out" data-type="OUT">↑ Chi (OUT)</button>
+        </div>
+        <div class="helper-text" id="tx-type-hint">Chọn Thu hoặc Chi để tiếp tục nhập thông tin.</div>
+      </div>
+      <div class="form-grid" id="tx-form-fields" style="display:none;">
+        <div class="field full"><label>Dự án *</label><select id="tx-project" required></select></div>
+        <div class="field"><label>Ngày *</label><input type="date" id="tx-date" required></div>
+        <div class="field"><label>Mã (code)</label>
+          <select id="tx-code">
+            <option value="">-- Chọn mã --</option>
+            <option value="QL">QL - Quản lý</option>
+            <option value="VTC">VTC - Vật tư chính</option>
+            <option value="VTP">VTP - Vật tư phụ</option>
+            <option value="NC">NC - Nhân công</option>
+          </select>
+        </div>
+        <div class="field full"><label>Nội dung *</label><input id="tx-content" required placeholder="VD: Thanh toán chi phí vật tư"></div>
+        <div class="field full"><label>Diễn giải</label><input id="tx-desc" placeholder="Chi tiết diễn giải"></div>
+        <div class="field"><label>ĐVT</label><input id="tx-unit" placeholder="lot, m2, cái..."></div>
+        <div class="field"><label>Số lượng</label><input type="number" id="tx-qty" placeholder="1"></div>
+        <div class="field"><label>Đơn giá</label><input type="text" id="tx-unitprice" placeholder="0"></div>
+        <div class="field"><label>Thành tiền *</label><input type="text" id="tx-amount" required placeholder="0"></div>
+
+        <div class="field full" style="border-top:1px solid var(--line);padding-top:14px;margin-top:2px;">
+          <label style="font-size:13px;font-weight:700;color:var(--ink);">🧾 Thông tin hóa đơn</label>
+        </div>
+        <div class="field full" style="margin-bottom:14px;">
+          <label>Trạng thái hóa đơn</label>
+          <div class="seg">
+            <button type="button" id="seg-invoice-yes" data-invoice="issued">✅ Đã xuất hóa đơn</button>
+            <button type="button" id="seg-invoice-no" data-invoice="pending">⏳ Chưa xuất hóa đơn</button>
+          </div>
+        </div>
+        <div class="field"><label>Số hóa đơn</label><input id="tx-invoice-number"></div>
+        <div class="field"><label>Ngày hóa đơn</label><input type="date" id="tx-invoice-date"></div>
+        <div class="field full">
+          <label>Ảnh hóa đơn (tùy chọn)</label>
+          <input type="file" id="tx-invoice-image" accept="image/*">
+          <div class="helper-text">Ảnh sẽ tự động được nén nhỏ lại trước khi lưu.</div>
+          <div style="margin-top:8px;">
+            <img id="tx-invoice-image-preview" style="display:none;max-width:150px;max-height:150px;border-radius:8px;border:1px solid var(--line);">
+            <button type="button" class="btn btn-ghost btn-sm" id="tx-invoice-image-remove" style="display:none;">Xóa ảnh</button>
+          </div>
+        </div>
+
+        <div class="field full" style="border-top:1px solid var(--line);padding-top:14px;margin-top:2px;">
+          <label style="font-size:13px;font-weight:700;color:var(--ink);" id="tx-transfer-section-label">🏦 Thông tin chuyển khoản</label>
+        </div>
+        <div class="field full" style="margin-bottom:14px;">
+          <label id="tx-transfer-status-label">Trạng thái chuyển khoản</label>
+          <div class="seg">
+            <button type="button" id="seg-transfer-yes" data-transfer="done">✅ Đã chuyển khoản</button>
+            <button type="button" id="seg-transfer-no" data-transfer="pending">⏳ Chưa chuyển khoản</button>
+          </div>
+        </div>
+        <div class="field"><label>Ngân hàng</label><input id="tx-bank-name"></div>
+        <div class="field"><label>Số tài khoản</label><input id="tx-bank-account"></div>
+        <div class="field"><label>Tên chủ TK</label><input id="tx-bank-holder"></div>
+        <div class="field"><label>Ngày chuyển khoản</label><input type="date" id="tx-transfer-date"></div>
+        <div class="field full">
+          <label>Ảnh chuyển khoản (tùy chọn)</label>
+          <input type="file" id="tx-transfer-image" accept="image/*">
+          <div class="helper-text">Ảnh sẽ tự động được nén nhỏ lại trước khi lưu.</div>
+          <div style="margin-top:8px;">
+            <img id="tx-transfer-image-preview" style="display:none;max-width:150px;max-height:150px;border-radius:8px;border:1px solid var(--line);">
+            <button type="button" class="btn btn-ghost btn-sm" id="tx-transfer-image-remove" style="display:none;">Xóa ảnh</button>
+          </div>
+        </div>
+
+        <div class="field full" id="tx-approval-block" style="display:none;border-top:1px solid var(--line);padding-top:14px;margin-top:2px;">
+          <label style="font-size:13px;font-weight:700;color:var(--ink);">✅ Phê duyệt Giám đốc</label>
+          <div class="helper-text" style="margin-bottom:8px;">Gửi khoản Chi này cho Giám đốc duyệt (đăng nhập đúng email đã cài đặt mới thấy nút duyệt).</div>
+          <select id="tx-approval-target">
+            <option value="">-- Chưa gửi duyệt --</option>
+            <option value="GD">Gửi Giám đốc duyệt</option>
+          </select>
+          <div class="helper-text" id="tx-approval-current-status" style="margin-top:8px;"></div>
+        </div>
+
+        <div class="field full"><label>Ghi chú</label><textarea id="tx-note" rows="2"></textarea></div>
+      </div>
+    </div>
+    <div class="modal-foot"><button class="btn btn-ghost" data-close>Hủy</button><button class="btn btn-primary" id="save-tx-btn">Lưu giao dịch</button></div>
+  </div>
+</div>
+
+<div class="modal-backdrop" id="modal-order">
+  <div class="modal">
+    <div class="modal-head"><h3 id="order-modal-title">Tạo lệnh chi</h3><button class="modal-close" data-close>✕</button></div>
+    <div class="modal-body">
+      <input type="hidden" id="order-id">
+      <div class="form-grid">
+        <div class="field"><label>Ngày đề nghị *</label><input type="date" id="order-date" required></div>
+        <div class="field"><label>Dự án</label><select id="order-project"><option value="">— Không thuộc dự án —</option></select></div>
+        <div class="field"><label>Mã (code)</label>
+          <select id="order-code">
+            <option value="">-- Chọn mã --</option>
+            <option value="QL">QL - Quản lý</option>
+            <option value="VTC">VTC - Vật tư chính</option>
+            <option value="VTP">VTP - Vật tư phụ</option>
+            <option value="NC">NC - Nhân công</option>
+          </select>
+        </div>
+        <div class="field"><label>Loại lệnh chi</label>
+          <select id="order-type">
+            <option value="payment">Thanh toán chi phí</option>
+            <option value="advance_purchase">Tạm ứng mua hàng</option>
+            <option value="advance_salary">Tạm ứng lương</option>
+          </select>
+        </div>
+        <div class="field full"><label>Người/đơn vị chi</label><input id="order-payer" placeholder="VD: Công ty TNHH DVKT Cách Nhiệt Tuấn 75"></div>
+        <div class="field full"><label>Người/đơn vị nhận chi *</label><input id="order-payee" required></div>
+        <div class="field"><label>Số tài khoản nhận (STK)</label><input id="order-payee-bank"></div>
+        <div class="field"><label>MST</label><input id="order-payee-tax"></div>
+        <div class="field full"><label>Lý do chi *</label><input id="order-reason" required placeholder="VD: Thanh toán vật tư đợt 2"></div>
+        <div class="field"><label>Số tiền *</label><input type="text" id="order-amount" required placeholder="0"></div>
+        <div class="field"><label>Trạng thái</label>
+          <select id="order-status"><option value="pending">Chờ duyệt</option><option value="approved">Đã duyệt</option></select>
+          <div class="helper-text">Khi chuyển sang "Đã duyệt", hệ thống tự động ghi khoản chi này vào mục Thu chi.</div>
+          <div class="helper-text" id="order-status-hint" style="display:none;">Chỉ Admin mới được duyệt/đổi trạng thái lệnh chi.</div>
+        </div>
+        <div class="field"><label>Người đề nghị</label><input id="order-requester"></div>
+        <div class="field"><label>Người duyệt</label><input id="order-approver"></div>
+        <div class="field full"><label>Ghi chú</label><textarea id="order-note" rows="2"></textarea></div>
+      </div>
+    </div>
+    <div class="modal-foot"><button class="btn btn-ghost" data-close>Hủy</button><button class="btn btn-primary" id="save-order-btn">Lưu lệnh chi</button></div>
+  </div>
+</div>
+
+<div class="modal-backdrop" id="modal-employee">
+  <div class="modal">
+    <div class="modal-head"><h3>Thêm nhân viên</h3><button class="modal-close" data-close>✕</button></div>
+    <div class="modal-body">
+      <input type="hidden" id="emp-id">
+      <div class="form-grid">
+        <div class="field full"><label>Họ tên *</label><input id="emp-name" required></div>
+        <div class="field"><label>Chức vụ</label><input id="emp-position"></div>
+        <div class="field"><label>Lương cơ bản / tháng</label><input type="text" id="emp-salary" placeholder="0"></div>
+        <div class="field full"><label>Ghi chú</label><textarea id="emp-note" rows="2"></textarea></div>
+      </div>
+    </div>
+    <div class="modal-foot"><button class="btn btn-ghost" data-close>Hủy</button><button class="btn btn-primary" id="save-emp-btn">Lưu nhân viên</button></div>
+  </div>
+</div>
+
+<div class="modal-backdrop" id="modal-timesheet">
+  <div class="modal">
+    <div class="modal-head"><h3>Chấm công</h3><button class="modal-close" data-close>✕</button></div>
+    <div class="modal-body">
+      <input type="hidden" id="ts-id">
+      <div class="form-grid">
+        <div class="field full"><label>Nhân viên *</label><select id="ts-employee" required></select></div>
+        <div class="field"><label>Ngày *</label><input type="date" id="ts-date" required></div>
+        <div class="field"><label>Loại công</label>
+          <select id="ts-worktype">
+            <option value="full">Đủ công (1.0)</option>
+            <option value="half">Nửa công (0.5)</option>
+            <option value="ot">Tăng ca</option>
+            <option value="leave">Nghỉ có phép (0)</option>
+            <option value="absent">Nghỉ không phép (0)</option>
+          </select>
+        </div>
+        <div class="field"><label>Giờ vào</label><input type="time" id="ts-checkin"></div>
+        <div class="field"><label>Giờ ra</label><input type="time" id="ts-checkout"></div>
+        <div class="field full"><label>Ghi chú</label><input id="ts-note"></div>
+      </div>
+    </div>
+    <div class="modal-foot"><button class="btn btn-ghost" data-close>Hủy</button><button class="btn btn-primary" id="save-ts-btn">Lưu chấm công</button></div>
+  </div>
+</div>
+
+<div class="modal-backdrop" id="modal-user">
+  <div class="modal">
+    <div class="modal-head"><h3 id="user-modal-title">Gán quyền người dùng</h3><button class="modal-close" data-close>✕</button></div>
+    <div class="modal-body">
+      <div class="field" style="margin-bottom:14px;">
+        <label>User UID *</label>
+        <input id="user-uid" placeholder="Copy từ Firebase Console > Authentication > Users">
+        <div class="helper-text">Vào Firebase Console → Authentication → Users, copy cột "User UID" của tài khoản cần gán quyền.</div>
+      </div>
+      <div class="form-grid">
+        <div class="field full"><label>Email *</label><input id="user-email-input" placeholder="ten@congty.com"></div>
+        <div class="field"><label>Tên hiển thị</label><input id="user-name"></div>
+        <div class="field"><label>Vai trò *</label>
+          <select id="user-role"><option value="user">Thành viên (User)</option><option value="admin">Quản trị viên (Admin)</option></select>
+        </div>
+      </div>
+    </div>
+    <div class="modal-foot"><button class="btn btn-ghost" data-close>Hủy</button><button class="btn btn-primary" id="save-user-btn">Lưu quyền</button></div>
+  </div>
+</div>
+
+<div id="toast"></div>
+
+<!-- ================= SCRIPTS ================= -->
+<script src="https://www.gstatic.com/firebasejs/10.7.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.7.0/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.7.0/firebase-firestore-compat.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@azure/msal-browser@3/lib/msal-browser.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/pdfjs-dist@3.11.174/build/pdf.min.js"></script>
+<script src="js/firebase-config.js"></script>
+<script src="js/utils.js"></script>
+<script src="js/onedrive.js"></script>
+<script src="js/activitylog.js"></script>
+<script src="js/auth.js"></script>
+<script src="js/projects.js"></script>
+<script src="js/transactions.js"></script>
+<script src="js/invoice-ocr.js"></script>
+<script src="js/import.js"></script>
+<script src="js/invoices-transfers.js"></script>
+<script src="js/reports.js"></script>
+<script src="js/orders.js"></script>
+<script src="js/payroll.js"></script>
+<script src="js/users.js"></script>
+<script src="js/app.js"></script>
+</body>
+</html>
