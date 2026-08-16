@@ -148,7 +148,7 @@ function openProjectModal(id){
   openModal('modal-project');
 }
 
-document.getElementById('btn-add-project').addEventListener('click', ()=> openProjectModal(null));
+document.getElementById('btn-add-project')?.addEventListener('click', ()=> openProjectModal(null));
 
 document.getElementById('save-project-btn').addEventListener('click', async ()=>{
   const id = document.getElementById('project-id').value;
