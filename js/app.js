@@ -24,21 +24,14 @@ document.getElementById('menu-toggle').addEventListener('click', ()=>{
   document.getElementById('sidebar').classList.toggle('open');
 });
 
-// ---------------- Modal "Tạo nhanh" (⚡ Tạo mới) — dùng chung cho cả Admin & User ----------------
-document.getElementById('btn-quick-create')?.addEventListener('click', ()=> openModal('modal-quickcreate'));
-const QC_MAP = {
-  'qc-add-project': 'btn-add-project',
-  'qc-add-tx': 'btn-add-tx',
-  'qc-add-order': 'btn-add-order',
-  'qc-add-employee': 'btn-add-employee',
-  'qc-add-timesheet': 'btn-add-timesheet',
-};
-Object.entries(QC_MAP).forEach(([qcId, targetBtnId])=>{
-  document.getElementById(qcId)?.addEventListener('click', ()=>{
-    closeModal('modal-quickcreate');
-    document.getElementById(targetBtnId)?.click();
-  });
-});
+// ---------------- Modal "Tạo nhanh" (nút + nổi, dùng chung cho MỌI trang) ----------------
+document.getElementById('fab-quick-create')?.addEventListener('click', ()=> openModal('modal-quickcreate'));
+
+document.getElementById('qc-add-project')?.addEventListener('click', ()=>{ closeModal('modal-quickcreate'); openProjectModal(null); });
+document.getElementById('qc-add-tx')?.addEventListener('click', ()=>{ closeModal('modal-quickcreate'); openTxModal(null); });
+document.getElementById('qc-add-order')?.addEventListener('click', ()=>{ closeModal('modal-quickcreate'); openOrderModal(null); });
+document.getElementById('qc-add-employee')?.addEventListener('click', ()=>{ closeModal('modal-quickcreate'); openEmployeeModal(); });
+document.getElementById('qc-add-timesheet')?.addEventListener('click', ()=>{ closeModal('modal-quickcreate'); openTimesheetModal(); });
 
 // ---------------- Định dạng các ô nhập tiền có dấu phẩy ----------------
 ['project-contract-value','project-cost-budget','project-revenue-budget',
@@ -55,6 +48,7 @@ window.__initApp = function(){
   listenPayroll();
   listenApprovers();
   listenActivityLog();
+  listenOcrSettings();
 };
 
 // ---------------- Theme (sáng / tối) ----------------
