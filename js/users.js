@@ -61,6 +61,10 @@ function applyRolePermissions(){
   if(btnUploadFcThu) btnUploadFcThu.style.display = isAdmin() ? '' : 'none';
   const btnUploadFcChi = document.getElementById('btn-upload-fc-chi');
   if(btnUploadFcChi) btnUploadFcChi.style.display = isAdmin() ? '' : 'none';
+  const btnExportTx = document.getElementById('btn-export-tx');
+  if(btnExportTx) btnExportTx.style.display = isAdmin() ? '' : 'none';
+  const btnExportFc = document.getElementById('btn-export-fc');
+  if(btnExportFc) btnExportFc.style.display = isAdmin() ? '' : 'none';
   if(window.renderDashboard) renderDashboard();
   if(window.renderNotifications) renderNotifications();
 }
