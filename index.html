@@ -96,6 +96,7 @@
     <div class="main">
       <button id="menu-toggle">☰</button>
       <div id="approval-banner" style="display:none;"></div>
+      <button id="fab-quick-create" class="fab-btn" title="Tạo nhanh">+</button>
 
       <!-- DASHBOARD -->
       <div class="view active" id="view-dashboard">
@@ -104,7 +105,6 @@
             <h2>Tổng quan</h2>
             <div class="sub">Bức tranh dòng tiền toàn công ty</div>
           </div>
-          <div class="topbar-actions"><button class="btn btn-primary" id="btn-quick-create">⚡ Tạo mới</button></div>
         </div>
         <div class="welcome-card" id="welcome-card">
           <div class="welcome-left">
@@ -156,7 +156,6 @@
       <div class="view" id="view-projects">
         <div class="topbar">
           <div><h2>Dự án</h2><div class="sub">Danh sách dự án & giá trị hợp đồng dự toán</div></div>
-          <div class="topbar-actions"><button class="btn btn-primary" id="btn-add-project">+ Thêm dự án</button></div>
         </div>
         <div class="card"><div class="table-wrap"><table class="data" id="projects-table"></table></div></div>
       </div>
@@ -169,7 +168,6 @@
             <button class="btn btn-ghost" id="btn-export-tx">⬇ Xuất Excel (theo bộ lọc)</button>
             <button class="btn btn-ghost" id="btn-upload-thu" style="display:none;">⬆ Upload Thu (Excel)</button>
             <button class="btn btn-ghost" id="btn-upload-chi" style="display:none;">⬆ Upload Chi (Excel)</button>
-            <button class="btn btn-primary" id="btn-add-tx">+ Nhập giao dịch</button>
           </div>
           <input type="file" id="upload-thu-input" accept=".xlsx,.xls" style="display:none">
           <input type="file" id="upload-chi-input" accept=".xlsx,.xls" style="display:none">
@@ -277,7 +275,6 @@
       <div class="view" id="view-orders">
         <div class="topbar">
           <div><h2>Lệnh chi</h2><div class="sub">Đề nghị & duyệt chi tiền</div></div>
-          <div class="topbar-actions"><button class="btn btn-primary" id="btn-add-order">+ Tạo lệnh chi</button></div>
         </div>
         <div class="filters-bar">
           <select id="ord-filter-status">
@@ -294,9 +291,6 @@
       <div class="view" id="view-payroll">
         <div class="topbar">
           <div><h2>Bảng lương</h2><div class="sub">Tổng hợp lương theo tháng & danh sách nhân viên</div></div>
-          <div class="topbar-actions">
-            <button class="btn btn-primary" id="btn-add-employee">+ Thêm nhân viên</button>
-          </div>
         </div>
         <div class="filters-bar">
           <input type="month" id="payroll-filter-month">
@@ -315,9 +309,6 @@
       <div class="view" id="view-timesheet">
         <div class="topbar">
           <div><h2>Chấm công</h2><div class="sub">Ghi nhận công theo ngày</div></div>
-          <div class="topbar-actions">
-            <button class="btn btn-primary" id="btn-add-timesheet">+ Chấm công</button>
-          </div>
         </div>
         <div class="filters-bar">
           <input type="month" id="ts-filter-month">
@@ -352,6 +343,17 @@
             <div class="field"><label>Email Giám đốc (GĐ)</label><input id="approver-gd-email" placeholder="gd@congty.com"></div>
           </div>
           <button class="btn btn-primary btn-sm" id="save-approvers-btn">Lưu email duyệt chi</button>
+        </div>
+        <div class="card">
+          <div class="card-head"><h3>🔍 Đọc hóa đơn tự động (OCR miễn phí — Tesseract.js)</h3></div>
+          <p class="helper-text" style="margin-bottom:14px;">
+            Dùng cho tính năng "Upload hóa đơn" ở nút ⚡ Tạo mới — đọc chữ trực tiếp trong trình duyệt (miễn phí hoàn toàn, không gọi API trả phí nào).
+            <strong>Lưu ý:</strong> độ chính xác thấp hơn AI trả phí, đặc biệt với ảnh mờ/nghiêng/có watermark — luôn kiểm tra kỹ lại thông tin trước khi lưu. Toàn bộ chữ đọc được sẽ tự động điền vào ô Ghi chú để bạn đối chiếu.
+          </p>
+          <div class="form-grid">
+            <div class="field full"><label>Tên công ty (để nhận diện Thu/Chi đúng)</label><input id="ocr-company-name" placeholder="VD: CÔNG TY TNHH DỊCH VỤ KỸ THUẬT CÁCH NHIỆT TUẤN 75"></div>
+          </div>
+          <button class="btn btn-primary btn-sm" id="save-ocr-settings-btn">Lưu cài đặt OCR</button>
         </div>
         <div class="card"><div class="table-wrap"><table class="data" id="users-table"></table></div></div>
       </div>
@@ -415,10 +417,20 @@
           <span class="qc-icon" style="background:var(--gold-dim);color:var(--gold);">🗓</span>
           <span class="qc-text"><strong>Chấm công</strong><span class="helper-text">Ghi công theo ngày</span></span>
         </button>
+        <button class="qc-item" id="qc-upload-invoice-image">
+          <span class="qc-icon" style="background:var(--teal-dim);color:var(--teal);">📷</span>
+          <span class="qc-text"><strong>Upload hóa đơn (ảnh)</strong><span class="helper-text">AI tự đọc thông tin từ ảnh</span></span>
+        </button>
+        <button class="qc-item" id="qc-upload-invoice-pdf">
+          <span class="qc-icon" style="background:var(--blue-dim, var(--primary-dim));color:var(--primary);">📄</span>
+          <span class="qc-text"><strong>Upload hóa đơn (PDF)</strong><span class="helper-text">AI tự đọc thông tin từ file PDF</span></span>
+        </button>
       </div>
     </div>
   </div>
 </div>
+<input type="file" id="ocr-invoice-image-input" accept="image/*" style="display:none">
+<input type="file" id="ocr-invoice-pdf-input" accept="application/pdf,.pdf" style="display:none">
 
 <div class="modal-backdrop" id="modal-project">
   <div class="modal">
@@ -564,7 +576,26 @@
       <div class="form-grid">
         <div class="field"><label>Ngày đề nghị *</label><input type="date" id="order-date" required></div>
         <div class="field"><label>Dự án</label><select id="order-project"><option value="">— Không thuộc dự án —</option></select></div>
+        <div class="field"><label>Mã (code)</label>
+          <select id="order-code">
+            <option value="">-- Chọn mã --</option>
+            <option value="QL">QL - Quản lý</option>
+            <option value="VTC">VTC - Vật tư chính</option>
+            <option value="VTP">VTP - Vật tư phụ</option>
+            <option value="NC">NC - Nhân công</option>
+          </select>
+        </div>
+        <div class="field"><label>Loại lệnh chi</label>
+          <select id="order-type">
+            <option value="payment">Thanh toán chi phí</option>
+            <option value="advance_purchase">Tạm ứng mua hàng</option>
+            <option value="advance_salary">Tạm ứng lương</option>
+          </select>
+        </div>
+        <div class="field full"><label>Người/đơn vị chi</label><input id="order-payer" placeholder="VD: Công ty TNHH DVKT Cách Nhiệt Tuấn 75"></div>
         <div class="field full"><label>Người/đơn vị nhận chi *</label><input id="order-payee" required></div>
+        <div class="field"><label>Số tài khoản nhận (STK)</label><input id="order-payee-bank"></div>
+        <div class="field"><label>MST</label><input id="order-payee-tax"></div>
         <div class="field full"><label>Lý do chi *</label><input id="order-reason" required placeholder="VD: Thanh toán vật tư đợt 2"></div>
         <div class="field"><label>Số tiền *</label><input type="text" id="order-amount" required placeholder="0"></div>
         <div class="field"><label>Trạng thái</label>
@@ -653,6 +684,8 @@
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@azure/msal-browser@3/lib/msal-browser.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/pdfjs-dist@3.11.174/build/pdf.min.js"></script>
 <script src="js/firebase-config.js"></script>
 <script src="js/utils.js"></script>
 <script src="js/onedrive.js"></script>
@@ -660,6 +693,7 @@
 <script src="js/auth.js"></script>
 <script src="js/projects.js"></script>
 <script src="js/transactions.js"></script>
+<script src="js/invoice-ocr.js"></script>
 <script src="js/import.js"></script>
 <script src="js/invoices-transfers.js"></script>
 <script src="js/reports.js"></script>
