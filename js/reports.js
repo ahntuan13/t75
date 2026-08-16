@@ -63,7 +63,7 @@ function renderDashboard(){
   kpiBox.innerHTML =
     kpiCard('💰','teal','Tổng thu (lũy kế)', `<span class="pos">${fmtVND(totalIn)}</span>`) +
     kpiCard('💸','red','Tổng chi (lũy kế)', `<span class="neg">${fmtVND(totalOut)}</span>`) +
-    kpiCard('📊','blue','Dòng tiền ròng', `<span class="${net>=0?'pos':'neg'}">${fmtVND(net)}</span>`) +
+    kpiCard('📊','blue','Lợi nhuận sau thuế (lũy kế)', `<span class="${net>=0?'pos':'neg'}">${fmtVND(net)}</span>`) +
     kpiCard('▣','purple','Số dự án đang chạy', fmtNum(PROJECTS.filter(p=>p.status==='active').length)) +
     kpiCard('📈','teal','Thu tháng này', `<span class="pos">${fmtVND(monthIn)}</span>`) +
     kpiCard('📉','gold','Chi tháng này', `<span class="neg">${fmtVND(monthOut)}</span>`);
