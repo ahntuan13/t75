@@ -79,10 +79,8 @@
       </div>
 
       <div class="sidebar-foot">
-        <div class="notif-wrap">
-          <button class="notif-bell-btn" id="notif-bell-btn" title="Thông báo">
-            🔔<span class="notif-badge" id="notif-badge" style="display:none;">0</span>
-          </button>
+        <div class="sidebar-notif-pill" id="notif-bell-btn" style="cursor:pointer;position:relative;">
+          🔔 Thông báo <b id="notif-badge">0</b>
           <div class="notif-panel" id="notif-panel" style="display:none;"></div>
         </div>
         <button class="theme-toggle" id="theme-toggle" title="Chuyển giao diện sáng/tối">
@@ -175,7 +173,6 @@
             <button class="btn btn-ghost" id="btn-export-fc">⬇ Xuất Excel (theo bộ lọc)</button>
             <button class="btn btn-ghost" id="btn-upload-fc-thu" style="display:none;">⬆ Upload Thu (Excel)</button>
             <button class="btn btn-ghost" id="btn-upload-fc-chi" style="display:none;">⬆ Upload Chi (Excel)</button>
-            <button class="btn btn-primary" id="btn-add-fc">+ Nhập chi phí cố định</button>
           </div>
           <input type="file" id="upload-fc-thu-input" accept=".xlsx,.xls" style="display:none">
           <input type="file" id="upload-fc-chi-input" accept=".xlsx,.xls" style="display:none">
