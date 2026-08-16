@@ -83,19 +83,24 @@ function renderApprovalBanner(){
   const box = document.getElementById('approval-banner');
   if(!box || !auth.currentUser) return;
   const myEmail = (auth.currentUser.email || '').toLowerCase();
-  const pending = TRANSACTIONS.filter(t=> t.type==='OUT' && t.approvalStatus==='pending' && t.approverEmail && t.approverEmail.toLowerCase()===myEmail);
-  if(pending.length === 0){
+  const pendingTx = TRANSACTIONS.filter(t=> t.type==='OUT' && t.approvalStatus==='pending' && t.approverEmail && t.approverEmail.toLowerCase()===myEmail);
+  const pendingOrders = (typeof ORDERS!=='undefined' ? ORDERS : []).filter(o=> o.approvalStatus==='pending' && o.approverEmail && o.approverEmail.toLowerCase()===myEmail);
+  const totalCount = pendingTx.length + pendingOrders.length;
+  if(totalCount === 0){
     box.style.display = 'none';
     box.innerHTML = '';
     return;
   }
-  const totalAmount = pending.reduce((s,t)=>s+Number(t.amount||0),0);
+  const totalAmount = pendingTx.reduce((s,t)=>s+Number(t.amount||0),0) + pendingOrders.reduce((s,o)=>s+Number(o.amount||0),0);
+  const parts = [];
+  if(pendingTx.length) parts.push(`${pendingTx.length} khoản Chi`);
+  if(pendingOrders.length) parts.push(`${pendingOrders.length} Lệnh chi`);
   box.className = 'approval-banner';
   box.style.display = 'flex';
-  box.innerHTML = `<span>🔔 Bạn có <strong>${pending.length}</strong> khoản Chi (tổng ${fmtVND(totalAmount)}) đang chờ bạn duyệt.</span>
+  box.innerHTML = `<span>🔔 Bạn có ${parts.join(' và ')} (tổng ${fmtVND(totalAmount)}) đang chờ bạn duyệt.</span>
     <button class="btn btn-primary btn-sm" id="approval-banner-goto">Xem ngay</button>`;
   document.getElementById('approval-banner-goto').addEventListener('click', ()=>{
-    document.querySelector('[data-view="transactions"]')?.click();
+    document.querySelector(`[data-view="${pendingOrders.length && !pendingTx.length ? 'orders' : 'transactions'}"]`)?.click();
   });
 }
 
