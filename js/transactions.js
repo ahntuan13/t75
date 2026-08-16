@@ -331,7 +331,7 @@ function txRowHtml(t){
   return `<tr>
       <td>${fmtDate(t.date)}</td>
       <td>${t.type==='IN' ? '<span class="tag tag-in">Thu</span>' : '<span class="tag tag-out">Chi</span>'}</td>
-      <td><strong>${escapeHtml(t.content)}</strong>${t.code? ' <span class="tag tag-gray">'+escapeHtml(t.code)+'</span>':''}</td>
+      <td><strong>${escapeHtml((t.content||'').replace(/^Lệnh chi:\s*/i,''))}</strong>${(t.code && t.code!=='LENHCHI')? ' <span class="tag tag-gray">'+escapeHtml(t.code)+'</span>':''}</td>
       <td>${escapeHtml(t.description||'—')}</td>
       <td class="num" style="color:${t.type==='IN'?'var(--teal)':'var(--red)'}"><strong>${fmtVND(t.amount)}</strong></td>
       <td>${invoiceDone ? '<span class="tag tag-gold">✅ '+(t.invoiceNumber?escapeHtml(t.invoiceNumber):'Đã xuất')+'</span>' : '<span class="tag tag-gray">⏳ Chưa xuất</span>'}</td>
