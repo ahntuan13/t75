@@ -111,10 +111,10 @@ function renderDashboard(){
   const projActual = Object.values(projActualMap)
     .map(p=>({...p, profit: p.revenue - p.cost}))
     .filter(p=> p.revenue>0 || p.cost>0)
-    .sort((a,b)=> (b.revenue+b.cost) - (a.revenue+a.cost))
-    .slice(0,8);
+    .sort((a,b)=> (b.revenue+b.cost) - (a.revenue+a.cost));
 
   const ctx2 = document.getElementById('chart-project-actual');
+  document.getElementById('chart-project-actual').parentElement.style.height = Math.max(320, projActual.length*32+60) + 'px';
   if(chartProjectActual) chartProjectActual.destroy();
   chartProjectActual = new Chart(ctx2, {
     type:'bar',
@@ -136,9 +136,10 @@ function renderDashboard(){
       revenue: p.revenueBudget||0,
       cost: p.costBudget||0,
       profit: (p.revenueBudget||0) - (p.costBudget||0)
-    })).slice(0,10);
+    }));
 
   const ctx3 = document.getElementById('chart-project-budget');
+  document.getElementById('chart-project-budget').parentElement.style.height = Math.max(320, budgetData.length*32+60) + 'px';
   if(chartProjectBudget) chartProjectBudget.destroy();
   chartProjectBudget = new Chart(ctx3, {
     type:'bar',
@@ -226,7 +227,9 @@ function renderReports(){
   const project = document.getElementById('rp-filter-project').value;
   const year = document.getElementById('rp-filter-year').value;
 
-  let rows = TRANSACTIONS.slice();
+  // Gộp cả Chi phí gián tiếp (không gắn dự án) vào báo cáo toàn công ty.
+  // Khi lọc theo 1 dự án cụ thể, Chi phí gián tiếp tự động không xuất hiện (vì không có projectId khớp).
+  let rows = TRANSACTIONS.concat(typeof FIXEDCOSTS!=='undefined' ? FIXEDCOSTS : []);
   if(project) rows = rows.filter(t=>t.projectId===project);
   if(year) rows = rows.filter(t=> yearKey(t.date)===String(year));
 
@@ -281,7 +284,9 @@ function renderPnl(){
   const project = document.getElementById('pnl-filter-project').value;
   const year = document.getElementById('pnl-filter-year').value;
 
-  let rows = TRANSACTIONS.slice();
+  // Gộp cả Chi phí gián tiếp (không gắn dự án) vào báo cáo toàn công ty.
+  // Khi lọc theo 1 dự án cụ thể, Chi phí gián tiếp tự động không xuất hiện (vì không có projectId khớp).
+  let rows = TRANSACTIONS.concat(typeof FIXEDCOSTS!=='undefined' ? FIXEDCOSTS : []);
   if(project) rows = rows.filter(t=>t.projectId===project);
   if(year) rows = rows.filter(t=> yearKey(t.date)===String(year));
 
