@@ -141,16 +141,24 @@ function setTxType(type){
 }
 document.getElementById('seg-in').addEventListener('click', ()=> setTxType('IN'));
 document.getElementById('seg-out').addEventListener('click', ()=> setTxType('OUT'));
+document.getElementById('seg-advance')?.addEventListener('click', ()=>{
+  closeModal('modal-tx');
+  openOrderModal(null, 'advance');
+});
 
 let currentTxTarget = 'transactions'; // 'transactions' | 'fixedCosts'
+let currentTxExplainSourceId = null; // nếu có: đang "giải trình" 1 khoản tạm ứng từ Chi phí gián tiếp -> chuyển sang Thu Chi
 
-function openTxModal(id, prefill, target){
+function openTxModal(id, prefill, target, explainSourceId){
+  currentTxExplainSourceId = explainSourceId || null;
   currentTxTarget = target || 'transactions';
   const isFc = currentTxTarget === 'fixedCosts';
   const sourceArr = isFc ? (typeof FIXEDCOSTS!=='undefined'?FIXEDCOSTS:[]) : TRANSACTIONS;
-  document.getElementById('tx-modal-title').textContent = isFc
-    ? (id ? 'Sửa chi phí cố định' : 'Nhập chi phí cố định')
-    : (id ? 'Sửa giao dịch' : 'Nhập giao dịch thu chi');
+  document.getElementById('tx-modal-title').textContent = currentTxExplainSourceId
+    ? 'Giải trình tạm ứng → chuyển sang Thu Chi'
+    : isFc
+      ? (id ? 'Sửa chi phí gián tiếp' : 'Nhập chi phí gián tiếp')
+      : (id ? 'Sửa giao dịch' : 'Nhập giao dịch thu chi');
   document.getElementById('tx-id').value = id || '';
   const t = id ? sourceArr.find(x=>x.id===id) : (prefill || {});
   // giao dịch mới không có prefill: chưa chọn Thu/Chi, bắt buộc chọn trước.
@@ -229,6 +237,15 @@ document.getElementById('save-tx-btn').addEventListener('click', async ()=>{
     toast('Ảnh quá lớn, vui lòng chọn ảnh khác hoặc chụp ở độ phân giải thấp hơn');
     return;
   }
+  // Đang GIẢI TRÌNH tạm ứng: bắt buộc có Mã + chứng từ hóa đơn và chuyển khoản trước khi chuyển sang Thu Chi
+  if(currentTxExplainSourceId){
+    const code = document.getElementById('tx-code').value.trim();
+    const hasInvoiceProof = document.getElementById('tx-invoice-number').value.trim() || currentInvoiceImage;
+    const hasTransferProof = document.getElementById('tx-bank-account').value.trim() || currentTransferImage;
+    if(!code){ toast('Vui lòng chọn Mã (code) để giải trình'); return; }
+    if(!hasInvoiceProof){ toast('Vui lòng nhập Số hóa đơn hoặc đính kèm ảnh hóa đơn để giải trình'); return; }
+    if(!hasTransferProof){ toast('Vui lòng nhập Số tài khoản hoặc đính kèm ảnh chuyển khoản để giải trình'); return; }
+  }
 
   const proj = (!isFc && projectId) ? projectById(projectId) : null;
   const data = {
@@ -275,14 +292,26 @@ document.getElementById('save-tx-btn').addEventListener('click', async ()=>{
   try{
     if(id){
       await db.collection(targetCollection).doc(id).update(data);
-      toast(isFc ? 'Đã cập nhật chi phí cố định' : 'Đã cập nhật giao dịch');
+      toast(isFc ? 'Đã cập nhật chi phí gián tiếp' : 'Đã cập nhật giao dịch');
       logActivity('update', {projectName: data.projectName, content: data.content, amount: data.amount, type: data.type});
     } else {
       data.createdAt = firebase.firestore.FieldValue.serverTimestamp();
       data.createdBy = auth.currentUser.email;
-      await db.collection(targetCollection).add(data);
-      toast(isFc ? 'Đã lưu chi phí cố định' : 'Đã lưu giao dịch');
+      const newRef = await db.collection(targetCollection).add(data);
+      toast(isFc ? 'Đã lưu chi phí gián tiếp' : 'Đã lưu giao dịch');
       logActivity('create', {projectName: data.projectName, content: data.content, amount: data.amount, type: data.type});
+
+      // Nếu đây là bước GIẢI TRÌNH: đánh dấu bản ghi gốc bên Chi phí gián tiếp là "đã giải trình"
+      // (không xóa — giữ lại để đối chiếu, chỉ gạch ngang/tô xám và loại khỏi tổng Chi phí gián tiếp).
+      if(currentTxExplainSourceId){
+        await db.collection('fixedCosts').doc(currentTxExplainSourceId).update({
+          advanceExplainStatus: 'explained',
+          movedToTransactionId: newRef.id,
+          explainedAt: firebase.firestore.FieldValue.serverTimestamp(),
+          explainedBy: auth.currentUser.email,
+        });
+        toast('✅ Đã giải trình xong — khoản chi đã chuyển sang Thu Chi');
+      }
     }
     closeModal('modal-tx');
   }catch(err){ toast('Lỗi: '+err.message); }
@@ -309,6 +338,8 @@ function txRowHtml(t){
   const transferDone = (t.transferStatus||'pending')==='done';
   const transferDoneLabel = t.type==='IN' ? 'Đã nhận' : 'Đã CK';
   const transferPendingLabel = t.type==='IN' ? 'Chưa nhận' : 'Chưa CK';
+  const isPendingExplain = t.advanceExplainStatus === 'pending';
+  const isExplained = t.advanceExplainStatus === 'explained';
 
   let approvalCell = '—';
   if(t.type === 'OUT'){
@@ -328,10 +359,20 @@ function txRowHtml(t){
     }
   }
 
-  return `<tr>
+  const explainTag = isPendingExplain
+    ? ' <span class="tag tag-gold" title="Tạm ứng chưa xác định dự án/chứng từ">🕐 Chờ giải trình</span>'
+    : isExplained
+      ? ' <span class="tag tag-gray" title="Đã giải trình, xem bản chính thức trong Thu Chi">✅ Đã giải trình → Thu Chi</span>'
+      : '';
+  const explainBtn = isPendingExplain
+    ? `<button class="icon-btn" data-explain-tx="${t.id}" title="Giải trình: gán dự án + chứng từ, chuyển sang Thu Chi">🧾</button>`
+    : '';
+
+  return `<tr${isExplained ? ' class="tx-row-explained"' : ''}>
       <td>${fmtDate(t.date)}</td>
       <td>${t.type==='IN' ? '<span class="tag tag-in">Thu</span>' : '<span class="tag tag-out">Chi</span>'}</td>
-      <td><strong>${escapeHtml((t.content||'').replace(/^Lệnh chi:\s*/i,''))}</strong>${(t.code && t.code!=='LENHCHI')? ' <span class="tag tag-gray">'+escapeHtml(t.code)+'</span>':''}</td>
+      <td>${escapeHtml(t.projectName||'—')}</td>
+      <td><strong>${escapeHtml((t.content||'').replace(/^Lệnh chi:\s*/i,''))}</strong>${(t.code && t.code!=='LENHCHI')? ' <span class="tag tag-gray">'+escapeHtml(t.code)+'</span>':''}${explainTag}</td>
       <td>${escapeHtml(t.description||'—')}</td>
       <td class="num" style="color:${t.type==='IN'?'var(--teal)':'var(--red)'}"><strong>${fmtVND(t.amount)}</strong></td>
       <td>${invoiceDone ? '<span class="tag tag-gold">✅ '+(t.invoiceNumber?escapeHtml(t.invoiceNumber):'Đã xuất')+'</span>' : '<span class="tag tag-gray">⏳ Chưa xuất</span>'}</td>
@@ -340,8 +381,9 @@ function txRowHtml(t){
       <td>
         <div class="row-actions">
           <button class="icon-btn" data-view-tx="${t.id}" title="Xem chi tiết">👁</button>
-          ${isAdmin() ? `<button class="icon-btn" data-edit-tx="${t.id}" title="Sửa">✎</button>` : ''}
-          ${isAdmin() ? `<button class="icon-btn" data-del-tx="${t.id}" title="Xóa">🗑</button>` : ''}
+          ${explainBtn}
+          ${(isAdmin() && !isExplained) ? `<button class="icon-btn" data-edit-tx="${t.id}" title="Sửa">✎</button>` : ''}
+          ${(isAdmin() && !isExplained) ? `<button class="icon-btn" data-del-tx="${t.id}" title="Xóa">🗑</button>` : ''}
         </div>
       </td>
     </tr>`;
@@ -396,26 +438,17 @@ function renderTxTable(){
   }
 
   const theadHtml = `<thead><tr>
-    <th>Ngày</th><th>Loại</th><th>Nội dung</th><th>Diễn giải</th><th>Thành tiền</th><th>Hóa đơn</th><th>CK / Nhận tiền</th><th>Duyệt chi</th><th></th>
+    <th>Ngày</th><th>Loại</th><th>Dự án</th><th>Nội dung</th><th>Diễn giải</th><th>Thành tiền</th><th>Hóa đơn</th><th>CK / Nhận tiền</th><th>Duyệt chi</th><th></th>
   </tr></thead>`;
 
-  // Đang tìm nội dung hoặc đang lọc (dự án/loại/mã/tháng) → hiện bảng PHẲNG, không tách theo dự án,
-  // để dễ rà soát kết quả tìm kiếm/lọc across toàn bộ dữ liệu.
-  const search = document.getElementById('tx-search').value.trim();
-  const hasActiveFilter = search
-    || document.getElementById('tx-filter-project').value
-    || document.getElementById('tx-filter-type').value
-    || document.getElementById('tx-filter-code').value
-    || document.getElementById('tx-filter-month').value;
-
-  if(hasActiveFilter){
-    const flatRows = rows.slice().sort((a,b)=> (b.date||'').localeCompare(a.date||''));
-    const sumIn = flatRows.filter(t=>t.type==='IN').reduce((s,t)=>s+Number(t.amount||0),0);
-    const sumOut = flatRows.filter(t=>t.type==='OUT').reduce((s,t)=>s+Number(t.amount||0),0);
-    wrap.innerHTML = `
+  // Không còn nhóm theo dự án nữa — luôn hiển thị 1 bảng phẳng, sắp theo ngày mới nhất, có thêm cột Dự án riêng.
+  const flatRows = rows.slice().sort((a,b)=> (b.date||'').localeCompare(a.date||''));
+  const sumIn = flatRows.filter(t=>t.type==='IN').reduce((s,t)=>s+Number(t.amount||0),0);
+  const sumOut = flatRows.filter(t=>t.type==='OUT').reduce((s,t)=>s+Number(t.amount||0),0);
+  wrap.innerHTML = `
     <div class="card tx-project-block">
       <div class="tx-project-head">
-        <h4>Kết quả tìm kiếm / lọc (${flatRows.length} giao dịch)</h4>
+        <h4>Thu Chi (${flatRows.length} giao dịch)</h4>
         <div class="tx-project-summary">
           <span style="color:var(--teal)">Thu: <strong>${fmtVND(sumIn)}</strong></span>
           <span style="color:var(--red)">Chi: <strong>${fmtVND(sumOut)}</strong></span>
@@ -429,45 +462,6 @@ function renderTxTable(){
         </table>
       </div>
     </div>`;
-    return;
-  }
-
-  // Không có tìm kiếm/lọc nào đang áp dụng → giữ chế độ xem mặc định: nhóm theo dự án cho dễ tổng quan
-  const groups = {};
-  const order = [];
-  rows.forEach(t=>{
-    const key = t.projectId || '__none__';
-    if(!groups[key]){
-      groups[key] = {name: t.projectName || 'Không thuộc dự án', items: []};
-      order.push(key);
-    }
-    groups[key].items.push(t);
-  });
-  order.sort((a,b)=> groups[a].name.localeCompare(groups[b].name, 'vi'));
-
-  wrap.innerHTML = order.map(key=>{
-    const g = groups[key];
-    const items = [...g.items].sort((a,b)=> (b.date||'').localeCompare(a.date||''));
-    const sumIn = items.filter(t=>t.type==='IN').reduce((s,t)=>s+Number(t.amount||0),0);
-    const sumOut = items.filter(t=>t.type==='OUT').reduce((s,t)=>s+Number(t.amount||0),0);
-    return `
-    <div class="card tx-project-block">
-      <div class="tx-project-head">
-        <h4>${escapeHtml(g.name)}</h4>
-        <div class="tx-project-summary">
-          <span style="color:var(--teal)">Thu: <strong>${fmtVND(sumIn)}</strong></span>
-          <span style="color:var(--red)">Chi: <strong>${fmtVND(sumOut)}</strong></span>
-          <span>Chênh lệch: <strong>${fmtVND(sumIn-sumOut)}</strong></span>
-        </div>
-      </div>
-      <div class="table-wrap">
-        <table class="data">
-          ${theadHtml}
-          <tbody>${items.map(txRowHtml).join('')}</tbody>
-        </table>
-      </div>
-    </div>`;
-  }).join('');
 }
 
 let currentViewSource = 'tx'; // 'tx' | 'fc'
