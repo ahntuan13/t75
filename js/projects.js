@@ -178,12 +178,14 @@ document.getElementById('save-project-btn').addEventListener('click', async ()=>
     if(id){
       await db.collection('projects').doc(id).update(data);
       toast('Đã cập nhật dự án');
+      logActivity('update', {projectName: data.name, content: 'Sửa thông tin dự án', type:'OUT'});
     } else {
       delete data.contractFileUrl; delete data.contractFile; delete data.contractFileName; delete data.contractFileType;
       data.createdAt = firebase.firestore.FieldValue.serverTimestamp();
       data.createdBy = auth.currentUser.email;
       await db.collection('projects').add(data);
       toast('Đã thêm dự án');
+      logActivity('create', {projectName: data.name, content: 'Tạo dự án mới', type:'OUT'});
     }
     closeModal('modal-project');
   }catch(err){ toast('Lỗi: '+err.message); }
