@@ -22,6 +22,12 @@ function listenFixedCosts(){
 
 document.getElementById('btn-add-fc')?.addEventListener('click', ()=> openTxModal(null, null, 'fixedCosts'));
 
+// Chi phí gián tiếp "đang thực tính" — loại bỏ các khoản tạm ứng ĐÃ GIẢI TRÌNH (đã chuyển hẳn sang Thu Chi)
+// để không bị tính trùng. Dùng hàm này ở MỌI nơi cần tính tổng Chi phí gián tiếp (kể cả Dashboard/Báo cáo).
+function activeFixedCosts(){
+  return FIXEDCOSTS.filter(t => t.advanceExplainStatus !== 'explained');
+}
+
 function getFilteredFixedCosts(){
   const type = document.getElementById('fc-filter-type').value;
   const code = document.getElementById('fc-filter-code').value;
@@ -41,12 +47,14 @@ function renderFixedCostsTable(){
   if(!wrap) return;
   const rows = getFilteredFixedCosts();
   if(rows.length===0){
-    wrap.innerHTML = `<div class="card"><div class="empty-state"><div class="big">🏢</div>Chưa có chi phí cố định nào phù hợp bộ lọc.</div></div>`;
+    wrap.innerHTML = `<div class="card"><div class="empty-state"><div class="big">🏢</div>Chưa có chi phí gián tiếp nào phù hợp bộ lọc.</div></div>`;
     return;
   }
   const sorted = rows.slice().sort((a,b)=> (b.date||'').localeCompare(a.date||''));
-  const sumIn = sorted.filter(t=>t.type==='IN').reduce((s,t)=>s+Number(t.amount||0),0);
-  const sumOut = sorted.filter(t=>t.type==='OUT').reduce((s,t)=>s+Number(t.amount||0),0);
+  // Tổng chỉ tính các khoản CHƯA giải trình (khoản đã giải trình được tính bên Thu Chi rồi, tránh trùng)
+  const activeSorted = sorted.filter(t => t.advanceExplainStatus !== 'explained');
+  const sumIn = activeSorted.filter(t=>t.type==='IN').reduce((s,t)=>s+Number(t.amount||0),0);
+  const sumOut = activeSorted.filter(t=>t.type==='OUT').reduce((s,t)=>s+Number(t.amount||0),0);
   const theadHtml = `<thead><tr>
     <th>Ngày</th><th>Loại</th><th>Dự án</th><th>Nội dung</th><th>Diễn giải</th><th>Thành tiền</th><th>Hóa đơn</th><th>CK / Nhận tiền</th><th>Duyệt chi</th><th></th>
   </tr></thead>`;
@@ -60,6 +68,7 @@ function renderFixedCostsTable(){
           <span>Chênh lệch: <strong>${fmtVND(sumIn-sumOut)}</strong></span>
         </div>
       </div>
+      <p class="helper-text" style="margin:-4px 0 10px;">Các khoản tạm ứng đã "🧾 Giải trình" (gạch ngang, tô xám) không được tính vào tổng trên — số liệu chính thức của chúng đã nằm trong mục Thu Chi.</p>
       <div class="table-wrap">
         <table class="data">
           ${theadHtml}
@@ -69,16 +78,35 @@ function renderFixedCostsTable(){
     </div>`;
 }
 
+// Giải trình: chuyển 1 khoản tạm ứng "Chờ giải trình" sang Thu Chi — mở lại đúng form Nhập giao dịch,
+// điền sẵn thông tin cũ, bắt buộc chọn Dự án/Mã và đính kèm chứng từ hóa đơn + chuyển khoản trước khi lưu.
+function openExplainModal(id){
+  const t = FIXEDCOSTS.find(x=>x.id===id);
+  if(!t) return;
+  const prefill = {
+    type: 'OUT',
+    date: t.date,
+    content: t.content,
+    description: t.description,
+    amount: t.amount,
+    note: t.note,
+  };
+  openTxModal(null, prefill, 'transactions', id);
+  toast('Chọn Dự án, Mã và đính kèm hóa đơn + chuyển khoản để hoàn tất giải trình');
+}
+
 document.getElementById('fc-table')?.addEventListener('click', (e)=>{
   const viewId = e.target.closest('[data-view-tx]')?.dataset.viewTx;
   const editId = e.target.closest('[data-edit-tx]')?.dataset.editTx;
   const delId = e.target.closest('[data-del-tx]')?.dataset.delTx;
   const approveId = e.target.closest('[data-approve-tx]')?.dataset.approveTx;
   const rejectId = e.target.closest('[data-reject-tx]')?.dataset.rejectTx;
+  const explainId = e.target.closest('[data-explain-tx]')?.dataset.explainTx;
   if(viewId) openTxViewModal(viewId, 'fc');
   if(editId) openTxModal(editId, null, 'fixedCosts');
+  if(explainId) openExplainModal(explainId);
   if(delId){
-    if(confirmDelete('Xóa khoản chi phí cố định này?')){
+    if(confirmDelete('Xóa khoản chi phí gián tiếp này?')){
       const t = FIXEDCOSTS.find(x=>x.id===delId);
       db.collection('fixedCosts').doc(delId).delete().then(()=>{
         toast('Đã xóa');
@@ -120,7 +148,7 @@ document.getElementById('btn-export-fc')?.addEventListener('click', ()=>{
 
 // ---------------- Upload Thu/Chi (Excel) cho Chi phí gián tiếp ----------------
 // Dùng chung logic parse với import.js (parseImportWorkbook), chỉ khác nơi ghi dữ liệu:
-// không cần khớp dự án — mọi dòng trong file đều được xem là chi phí cố định.
+// không cần khớp dự án — mọi dòng trong file đều được xem là chi phí gián tiếp.
 async function runImportFixedCosts(file, type){
   if(!file) return;
   if(typeof XLSX === 'undefined'){ toast('Chưa tải được thư viện đọc Excel, thử lại sau'); return; }
