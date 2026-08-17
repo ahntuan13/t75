@@ -30,9 +30,7 @@ document.getElementById('btn-dash-quick-create')?.addEventListener('click', ()=>
 
 document.getElementById('qc-add-project')?.addEventListener('click', ()=>{ closeModal('modal-quickcreate'); openProjectModal(null); });
 document.getElementById('qc-add-tx')?.addEventListener('click', ()=>{ closeModal('modal-quickcreate'); openTxModal(null); });
-document.getElementById('qc-add-order')?.addEventListener('click', ()=>{ closeModal('modal-quickcreate'); openOrderModal(null); });
-document.getElementById('qc-add-advance-payment')?.addEventListener('click', ()=>{ closeModal('modal-quickcreate'); openOrderModal(null, 'advance_purchase'); });
-document.getElementById('qc-add-advance-salary')?.addEventListener('click', ()=>{ closeModal('modal-quickcreate'); openOrderModal(null, 'advance_salary'); });
+// Lệnh chi/Tạm ứng giờ được tạo trực tiếp từ trang Lệnh chi/Lệnh tạm ứng (xem js/orders.js), không còn trong Tạo nhanh nữa.
 document.getElementById('qc-add-employee')?.addEventListener('click', ()=>{ closeModal('modal-quickcreate'); openEmployeeModal(); });
 document.getElementById('qc-add-timesheet')?.addEventListener('click', ()=>{ closeModal('modal-quickcreate'); openTimesheetModal(); });
 document.getElementById('qc-add-fc')?.addEventListener('click', ()=>{ closeModal('modal-quickcreate'); openTxModal(null, null, 'fixedCosts'); });
