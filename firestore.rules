@@ -31,6 +31,12 @@ service cloud.firestore {
         && (request.resource.data.approvalStatus == 'approved' || request.resource.data.approvalStatus == 'rejected')
         && resource.data.approverEmail == request.auth.token.email;
     }
+    // Đánh dấu 1 khoản Chi phí gián tiếp là "đã giải trình" (sau khi tạo xong giao dịch chính thức bên Thu Chi)
+    function isExplainUpdate() {
+      return isSignedIn()
+        && changedKeys().hasOnly(['advanceExplainStatus','movedToTransactionId','explainedAt','explainedBy'])
+        && request.resource.data.advanceExplainStatus == 'explained';
+    }
     // Y hệt trên nhưng dùng riêng cho Lệnh chi (paymentOrders)
     function isOrderApprovalSubmit() {
       return isSignedIn()
@@ -69,11 +75,11 @@ service cloud.firestore {
       allow delete: if isAdmin();
     }
 
-    // Chi phí cố định (không gắn dự án cụ thể) — quyền y hệt transactions
+    // Chi phí gián tiếp (không gắn dự án cụ thể) — quyền y hệt transactions, thêm luồng "giải trình"
     match /fixedCosts/{id} {
       allow read: if isSignedIn();
       allow create: if isSignedIn();
-      allow update: if isAdmin() || isSimpleStatusUpdate() || isApprovalSubmit() || isApprovalDecision();
+      allow update: if isAdmin() || isSimpleStatusUpdate() || isApprovalSubmit() || isApprovalDecision() || isExplainUpdate();
       allow delete: if isAdmin();
     }
 
@@ -104,6 +110,11 @@ service cloud.firestore {
     }
 
     match /employees/{id} {
+      allow read: if isSignedIn();
+      allow write: if isAdmin();
+    }
+
+    match /payrollAdjustments/{id} {
       allow read: if isSignedIn();
       allow write: if isAdmin();
     }
