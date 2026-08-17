@@ -15,6 +15,8 @@ function listenFixedCosts(){
     if(window.renderApprovalBanner) renderApprovalBanner();
     if(window.renderNotifications) renderNotifications();
     if(window.renderDashboard) renderDashboard();
+    if(window.renderReports) renderReports();
+    if(window.renderPnl) renderPnl();
   }, (err)=> console.error('fixedCosts listen error', err));
 }
 
@@ -46,7 +48,7 @@ function renderFixedCostsTable(){
   const sumIn = sorted.filter(t=>t.type==='IN').reduce((s,t)=>s+Number(t.amount||0),0);
   const sumOut = sorted.filter(t=>t.type==='OUT').reduce((s,t)=>s+Number(t.amount||0),0);
   const theadHtml = `<thead><tr>
-    <th>Ngày</th><th>Loại</th><th>Nội dung</th><th>Diễn giải</th><th>Thành tiền</th><th>Hóa đơn</th><th>CK / Nhận tiền</th><th>Duyệt chi</th><th></th>
+    <th>Ngày</th><th>Loại</th><th>Dự án</th><th>Nội dung</th><th>Diễn giải</th><th>Thành tiền</th><th>Hóa đơn</th><th>CK / Nhận tiền</th><th>Duyệt chi</th><th></th>
   </tr></thead>`;
   wrap.innerHTML = `
     <div class="card tx-project-block">
