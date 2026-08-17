@@ -343,8 +343,7 @@
         <div class="topbar">
           <div><h2>Lệnh tạm ứng</h2><div class="sub">Xem lại các lệnh Tạm ứng thanh toán / Tạm ứng lương</div></div>
           <div class="topbar-actions">
-            <button class="btn btn-ghost" id="btn-add-advance-payment2">+ Tạm ứng thanh toán</button>
-            <button class="btn btn-primary" id="btn-add-advance-salary2">+ Tạm ứng lương</button>
+            <button class="btn btn-primary" id="btn-add-advance">+ Tạo lệnh tạm ứng</button>
           </div>
         </div>
         <div class="filters-bar">
@@ -582,8 +581,9 @@
         <div class="seg">
           <button type="button" id="seg-in" data-type="IN">↓ Thu (IN)</button>
           <button type="button" id="seg-out" data-type="OUT">↑ Chi (OUT)</button>
+          <button type="button" id="seg-advance">💳 Tạm ứng</button>
         </div>
-        <div class="helper-text" id="tx-type-hint">Chọn Thu hoặc Chi để tiếp tục nhập thông tin.</div>
+        <div class="helper-text" id="tx-type-hint">Chọn Thu, Chi hoặc Tạm ứng để tiếp tục.</div>
       </div>
       <div class="form-grid" id="tx-form-fields" style="display:none;">
         <div class="field full" id="tx-project-field"><label id="tx-project-label">Dự án *</label><select id="tx-project"></select></div>
