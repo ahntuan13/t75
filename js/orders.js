@@ -59,6 +59,7 @@ function openOrderModal(id, context, presetType){
   document.getElementById('order-reason').value = o.reason || '';
   setMoneyInputValue(document.getElementById('order-amount'), o.amount);
   document.getElementById('order-requester').value = o.requester || (auth.currentUser ? auth.currentUser.email : '');
+  document.getElementById('order-explanation').value = o.explanation || '';
   document.getElementById('order-note').value = o.note || '';
   document.getElementById('order-approval-target').value = o.approvalStatus==='pending' ? (o.approverRole||'') : '';
   renderOrderApprovalCurrentStatus(o);
@@ -117,6 +118,7 @@ document.getElementById('save-order-btn').addEventListener('click', async ()=>{
     payeeBank: document.getElementById('order-payee-bank').value.trim(),
     payeeTaxCode: document.getElementById('order-payee-tax').value.trim(),
     requester: document.getElementById('order-requester').value.trim(),
+    explanation: document.getElementById('order-explanation').value.trim(),
     note: document.getElementById('order-note').value.trim(),
   };
 
@@ -230,6 +232,7 @@ function printOrder(id){
       <tr><td class="lbl">Lý do chi:</td><td>${escapeHtml(o.reason)}</td></tr>
       <tr><td class="lbl">Dự án liên quan:</td><td>${escapeHtml(o.projectName||'—')}</td></tr>
       <tr><td class="lbl">Số tiền:</td><td><strong>${fmtVND(o.amount)}</strong></td></tr>
+      ${isAdvanceOrder(o) ? `<tr><td class="lbl">Giải trình:</td><td>${escapeHtml(o.explanation||'—')}</td></tr>` : ''}
       <tr><td class="lbl">Ghi chú:</td><td>${escapeHtml(o.note||'—')}</td></tr>
     </table>
     <div class="sig">
@@ -260,11 +263,16 @@ function orderRowHtml(o){
   if((o.approvalStatus||'none')==='pending' && myEmail && o.approverEmail && myEmail===o.approverEmail.toLowerCase()){
     approveActions = `<button class="icon-btn" data-approve-order="${o.id}" title="Duyệt">✅</button><button class="icon-btn" data-reject-order="${o.id}" title="Từ chối">❌</button>`;
   }
+  const explainTag = isAdvanceOrder(o)
+    ? (o.explanation && o.explanation.trim()
+        ? ' <span class="tag tag-gold" title="Đã có nội dung giải trình">📝 Đã giải trình</span>'
+        : ' <span class="tag tag-gray">⏳ Chưa giải trình</span>')
+    : '';
   return `<tr>
       <td>${fmtDate(o.date)}</td>
       <td>${escapeHtml(ORDER_TYPE_LABELS[o.orderType] || 'Thanh toán chi phí')}</td>
       <td><strong>${escapeHtml(o.payee)}</strong></td>
-      <td>${escapeHtml(o.reason)}</td>
+      <td>${escapeHtml(o.reason)}${explainTag}</td>
       <td>${escapeHtml(o.projectName||'—')}</td>
       <td class="num"><strong>${fmtVND(o.amount)}</strong></td>
       <td>${statusTag(o)} ${approveActions}</td>
