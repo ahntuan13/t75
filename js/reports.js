@@ -53,7 +53,7 @@ function renderDashboard(){
   }
 
   // Gộp cả Thu Chi (theo dự án) và Chi phí gián tiếp (không gắn dự án) vào toàn bộ dòng tiền công ty
-  const ALL_CASHFLOW = TRANSACTIONS.concat(typeof FIXEDCOSTS!=='undefined' ? FIXEDCOSTS : []);
+  const ALL_CASHFLOW = TRANSACTIONS.concat(typeof activeFixedCosts!=='undefined' ? activeFixedCosts() : []);
 
   const totalIn = ALL_CASHFLOW.filter(t=>t.type==='IN').reduce((s,t)=>s+Number(t.amount||0),0);
   const totalOut = ALL_CASHFLOW.filter(t=>t.type==='OUT').reduce((s,t)=>s+Number(t.amount||0),0);
@@ -229,7 +229,7 @@ function renderReports(){
 
   // Gộp cả Chi phí gián tiếp (không gắn dự án) vào báo cáo toàn công ty.
   // Khi lọc theo 1 dự án cụ thể, Chi phí gián tiếp tự động không xuất hiện (vì không có projectId khớp).
-  let rows = TRANSACTIONS.concat(typeof FIXEDCOSTS!=='undefined' ? FIXEDCOSTS : []);
+  let rows = TRANSACTIONS.concat(typeof activeFixedCosts!=='undefined' ? activeFixedCosts() : []);
   if(project) rows = rows.filter(t=>t.projectId===project);
   if(year) rows = rows.filter(t=> yearKey(t.date)===String(year));
 
@@ -286,7 +286,7 @@ function renderPnl(){
 
   // Gộp cả Chi phí gián tiếp (không gắn dự án) vào báo cáo toàn công ty.
   // Khi lọc theo 1 dự án cụ thể, Chi phí gián tiếp tự động không xuất hiện (vì không có projectId khớp).
-  let rows = TRANSACTIONS.concat(typeof FIXEDCOSTS!=='undefined' ? FIXEDCOSTS : []);
+  let rows = TRANSACTIONS.concat(typeof activeFixedCosts!=='undefined' ? activeFixedCosts() : []);
   if(project) rows = rows.filter(t=>t.projectId===project);
   if(year) rows = rows.filter(t=> yearKey(t.date)===String(year));
 
