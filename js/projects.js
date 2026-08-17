@@ -27,6 +27,7 @@ function fillProjectSelects(){
     {sel:'#rp-filter-project', withAll:true},
     {sel:'#pnl-filter-project', withAll:true, allLabel:'Tất cả dự án (tổng công ty)'},
     {sel:'#ord-filter-project', withAll:true},
+    {sel:'#adv-filter-project', withAll:true},
     {sel:'#tx-project', withAll:false},
     {sel:'#order-project', withAll:false, noneLabel:'— Không thuộc dự án —'}
   ];
