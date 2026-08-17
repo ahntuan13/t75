@@ -101,12 +101,14 @@ service cloud.firestore {
       allow read: if isSignedIn();
       allow create: if isSignedIn();
       // User thường được sửa lệnh chi khi CHƯA gửi duyệt (approvalStatus rỗng/'none'),
-      // được GỬI DUYỆT (chuyển sang 'pending'), Admin thì sửa/xóa tự do.
+      // được GỬI DUYỆT (chuyển sang 'pending'), tự do ghi Giải trình bất kỳ lúc nào; Admin thì sửa/xóa tự do.
       // Chỉ đúng email GĐ đã được gán (resource.data.approverEmail) mới được DUYỆT/TỪ CHỐI.
-      allow update: if isAdmin() || isOrderApprovalSubmit() || isOrderApprovalDecision() ||
-        (isSignedIn() && (!('approvalStatus' in resource.data) || resource.data.approvalStatus == 'none' || resource.data.approvalStatus == '')
-          && changedKeys().hasOnly(['date','projectId','projectName','code','orderType','payer','payee','payeeBank','payeeTaxCode','reason','amount','requester','note']));
-      allow delete: if isAdmin();
+      allow update: if isAdmin() || isOrderApprovalSubmit() || isOrderApprovalDecision()
+        || (isSignedIn() && changedKeys().hasOnly(['explanation','explainAllocations','explainedAt','explainedBy','explainStatus']))
+        || (isSignedIn() && (!('approvalStatus' in resource.data) || resource.data.approvalStatus == 'none' || resource.data.approvalStatus == '')
+          && changedKeys().hasOnly(['date','projectId','projectName','code','orderType','payer','payee','payeeBank','payeeTaxCode','reason','amount','requester','note','explanation']));
+      // Kế toán (bất kỳ ai đăng nhập) được quyền xóa Lệnh chi/Lệnh tạm ứng — theo đúng yêu cầu công ty.
+      allow delete: if isSignedIn();
     }
 
     match /employees/{id} {
