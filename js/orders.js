@@ -86,8 +86,7 @@ function applyAdvanceSalaryDefaults(isNew){
 document.getElementById('order-type')?.addEventListener('change', ()=> applyAdvanceSalaryDefaults(!document.getElementById('order-id').value));
 
 document.getElementById('btn-add-order')?.addEventListener('click', ()=> openOrderModal(null, 'payment'));
-document.getElementById('btn-add-advance-payment2')?.addEventListener('click', ()=> openOrderModal(null, 'advance', 'advance_purchase'));
-document.getElementById('btn-add-advance-salary2')?.addEventListener('click', ()=> openOrderModal(null, 'advance', 'advance_salary'));
+document.getElementById('btn-add-advance')?.addEventListener('click', ()=> openOrderModal(null, 'advance'));
 
 function renderOrderApprovalCurrentStatus(o){
   const el = document.getElementById('order-approval-current-status');
@@ -179,6 +178,11 @@ async function decideOrderApproval(id, decision){
         bankName:'', bankAccount: o.payeeBank||'', bankHolder: o.payee||'', transferDate:'',
         note:`Tự động tạo từ ${isAdvance ? 'Lệnh tạm ứng' : 'Lệnh chi'} (${o.payee})${o.payeeTaxCode ? ' — MST: '+o.payeeTaxCode : ''}`,
       };
+      // Tạm ứng không gắn dự án -> vào Chi phí gián tiếp và gắn tag "Chờ giải trình"
+      // (vẫn tính vào tổng Chi phí gián tiếp cho tới khi KT giải trình xong, chuyển hẳn qua Thu Chi).
+      if(isAdvance && !hasProject){
+        txData.advanceExplainStatus = 'pending';
+      }
       if(o.transactionId){
         await db.collection(targetCollection).doc(o.transactionId).update(txData);
       } else {
