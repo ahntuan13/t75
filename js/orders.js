@@ -138,14 +138,17 @@ document.getElementById('save-order-btn').addEventListener('click', async ()=>{
   }
 
   try{
+    const label = isAdvanceOrder(data) ? (ORDER_TYPE_LABELS[data.orderType]||'Lệnh tạm ứng') : 'Lệnh chi';
     if(id){
       await db.collection('paymentOrders').doc(id).update(data);
       toast('Đã cập nhật');
+      logActivity('update', {projectName: label, content: data.reason, amount: data.amount, type: 'OUT'});
     } else {
       data.createdAt = firebase.firestore.FieldValue.serverTimestamp();
       data.createdBy = auth.currentUser.email;
       await db.collection('paymentOrders').add(data);
       toast(isAdvanceOrder(data) ? 'Đã tạo lệnh tạm ứng' : 'Đã tạo lệnh chi');
+      logActivity('create', {projectName: label, content: data.reason, amount: data.amount, type: 'OUT'});
     }
     closeModal('modal-order');
   }catch(err){ toast('Lỗi: '+err.message); }
@@ -164,6 +167,7 @@ async function decideOrderApproval(id, decision){
       approvedAt: firebase.firestore.FieldValue.serverTimestamp(),
     });
     toast(decision==='approved' ? 'Đã duyệt' : 'Đã từ chối');
+    logActivity('approval_decide', {projectName: isAdvanceOrder(o)?'Lệnh tạm ứng':'Lệnh chi', content: o.reason, amount: o.amount, type:'OUT', note: decision==='approved'?'Đã duyệt':'Đã từ chối'});
 
     if(decision === 'approved'){
       const hasProject = !!o.projectId;
@@ -205,45 +209,137 @@ function statusTag(o){
   return '<span class="tag tag-gray">Chưa gửi duyệt</span>';
 }
 
-function printOrder(id){
-  const o = ORDERS.find(x=>x.id===id);
-  if(!o) return;
+// ---------------- IN PHIẾU "ĐỀ XUẤT CHI PHÍ" (theo đúng mẫu công ty) ----------------
+// Dùng chung cho in 1 lệnh (nút 🖨 từng dòng) hoặc in gộp nhiều lệnh cùng lúc (đã chọn checkbox).
+// Nếu 1 lệnh đã có "Giải trình" (nhiều dự án), mỗi khoản phân bổ sẽ tách thành 1 dòng riêng trong phiếu.
+const COMPANY_HEADER = {
+  name: 'TUAN75 INSULATION TECHNICAL SERVICES CO.,LTD',
+  address: 'Add: No. 75, Road D4, Lavender Residential Area, Hamlet 4, Thanh Phu Commune, Vinh Cuu District, Dong Nai Province, Viet Nam',
+  bank: 'Bank number: 0914 288 146 – Eximbank – Dong Nai',
+  tel: 'Tel: 0914 288 146   |   Tax: 3604002848',
+  email: 'Email: hoangtuan@tuan75insulation.com',
+};
+
+function buildProposalRows(orders){
+  const rows = [];
+  orders.forEach(o=>{
+    if(Array.isArray(o.explainAllocations) && o.explainAllocations.length){
+      o.explainAllocations.forEach(a=>{
+        rows.push({
+          project: a.projectName || '—', date: o.date, code: a.code || '',
+          content: a.content || o.reason, description: a.description || '',
+          unit: a.unit || '', qty: a.qty || 1, unitPrice: a.unitPrice || a.amount, amount: a.amount,
+          note: '',
+        });
+      });
+    } else {
+      rows.push({
+        project: o.projectName || 'CASHFLOW_INDIRECT', date: o.date, code: o.code || '',
+        content: o.reason, description: o.explanation || o.note || '',
+        unit: '', qty: 1, unitPrice: o.amount, amount: o.amount,
+        note: '',
+      });
+    }
+  });
+  return rows;
+}
+
+function printOrdersCombined(ids){
+  const orders = ids.map(id=> ORDERS.find(x=>x.id===id)).filter(Boolean);
+  if(orders.length === 0){ toast('Chưa chọn lệnh nào để in'); return; }
+  const rows = buildProposalRows(orders);
+  const total = rows.reduce((s,r)=>s+Number(r.amount||0),0);
+  const now = new Date();
+  const docNo = `PC-${now.getFullYear()}-${now.getMonth()+1}-${now.getDate()}`;
+  const requester = orders[0].requester || '';
+  const approvedBy = orders.find(o=>o.approvedBy)?.approvedBy || '';
+
   const w = window.open('', '_blank');
   w.document.write(`
-    <html><head><title>${isAdvanceOrder(o)?'Lệnh tạm ứng':'Lệnh chi'}</title>
+    <html><head><title>Đề xuất chi phí ${docNo}</title>
     <style>
-      body{font-family:'Times New Roman',serif;padding:40px;color:#111;}
-      h2{text-align:center;text-transform:uppercase;margin-bottom:2px;}
-      .center{text-align:center;}
-      table{width:100%;border-collapse:collapse;margin-top:24px;}
-      td{padding:8px 4px;vertical-align:top;}
-      .lbl{width:200px;font-weight:bold;}
-      .sig{display:flex;justify-content:space-between;margin-top:60px;text-align:center;}
-      .sig div{width:30%;}
+      @page{size:A4 landscape;margin:14mm;}
+      body{font-family:Arial,Helvetica,sans-serif;color:#111;font-size:12.5px;}
+      .header{display:flex;justify-content:space-between;align-items:flex-start;border-bottom:2px solid #7a1f1f;padding-bottom:10px;}
+      .co-name{color:#7a1f1f;font-weight:800;font-size:15px;letter-spacing:.3px;}
+      .co-info{font-size:11px;color:#333;line-height:1.5;margin-top:3px;}
+      .header .date{font-size:12.5px;white-space:nowrap;padding-top:4px;}
+      h1{text-align:center;font-size:20px;letter-spacing:1px;margin:18px 0 6px;}
+      .docno{margin:6px 0 4px;}
+      .docno b{background:#fff6cc;padding:2px 8px;border:1px solid #e0d090;}
+      .section-title{font-weight:700;margin:10px 0 6px;}
+      table{width:100%;border-collapse:collapse;margin-top:6px;}
+      th,td{border:1px solid #999;padding:6px 7px;font-size:11.5px;}
+      th{background:#fff6cc;text-align:center;font-weight:700;}
+      td.num{text-align:right;font-variant-numeric:tabular-nums;}
+      td.center{text-align:center;}
+      tr.total td{font-weight:800;}
+      tr.total td.amt{color:#c0392b;}
+      .sig{display:flex;justify-content:space-between;margin-top:46px;text-align:center;}
+      .sig div{width:31%;}
+      .sig .role{font-weight:700;}
+      .sig .hint{font-size:10.5px;color:#666;}
+      .sig .space{height:70px;}
     </style></head><body>
-    <div class="center">CÔNG TY .....................................<br>Số: ...... /${isAdvanceOrder(o)?'TU':'LC'}</div>
-    <h2>${isAdvanceOrder(o)?'LỆNH TẠM ỨNG':'LỆNH CHI'}</h2>
-    <div class="center">${escapeHtml(ORDER_TYPE_LABELS[o.orderType] || 'Thanh toán chi phí')} — Ngày ${fmtDate(o.date)}</div>
+    <div class="header">
+      <div>
+        <div class="co-name">${COMPANY_HEADER.name}</div>
+        <div class="co-info">
+          ${COMPANY_HEADER.address}<br>
+          ${COMPANY_HEADER.bank}<br>
+          ${COMPANY_HEADER.tel}<br>
+          ${COMPANY_HEADER.email}
+        </div>
+      </div>
+      <div class="date">Đồng Nai, Ngày ${now.getDate()}, tháng ${now.getMonth()+1}, năm ${now.getFullYear()}</div>
+    </div>
+    <h1>ĐỀ XUẤT CHI PHÍ</h1>
+    <div class="docno">Số/: <b>${docNo}</b></div>
+    <div class="section-title">NỘI DUNG ĐỀ XUẤT CHI VÀ SỐ TIỀN CHI:</div>
     <table>
-      <tr><td class="lbl">Người/đơn vị chi:</td><td>${escapeHtml(o.payer||'—')}</td></tr>
-      <tr><td class="lbl">Chi cho (đơn vị/cá nhân):</td><td>${escapeHtml(o.payee)}</td></tr>
-      <tr><td class="lbl">STK nhận:</td><td>${escapeHtml(o.payeeBank||'—')}</td></tr>
-      <tr><td class="lbl">MST:</td><td>${escapeHtml(o.payeeTaxCode||'—')}</td></tr>
-      <tr><td class="lbl">Lý do chi:</td><td>${escapeHtml(o.reason)}</td></tr>
-      <tr><td class="lbl">Dự án liên quan:</td><td>${escapeHtml(o.projectName||'—')}</td></tr>
-      <tr><td class="lbl">Số tiền:</td><td><strong>${fmtVND(o.amount)}</strong></td></tr>
-      ${isAdvanceOrder(o) ? `<tr><td class="lbl">Giải trình:</td><td>${escapeHtml(o.explanation||'—')}</td></tr>` : ''}
-      <tr><td class="lbl">Ghi chú:</td><td>${escapeHtml(o.note||'—')}</td></tr>
+      <thead><tr>
+        <th>DỰ ÁN</th><th>THỜI GIAN</th><th>CODE</th><th>NỘI DUNG</th><th>DIỄN GIẢI</th>
+        <th>ĐVT</th><th>SL</th><th>ĐƠN GIÁ<br>(SAU VAT)</th><th>THÀNH TIỀN</th><th>GHI CHÚ</th>
+      </tr></thead>
+      <tbody>
+        ${rows.map(r=>`<tr>
+          <td>${escapeHtml(r.project)}</td>
+          <td class="center">${fmtDate(r.date)}</td>
+          <td class="center">${escapeHtml(r.code)}</td>
+          <td>${escapeHtml(r.content)}</td>
+          <td>${escapeHtml(r.description)}</td>
+          <td class="center">${escapeHtml(r.unit)}</td>
+          <td class="center">${r.qty}</td>
+          <td class="num">${fmtNum(r.unitPrice)}</td>
+          <td class="num">${fmtNum(r.amount)}</td>
+          <td>${escapeHtml(r.note)}</td>
+        </tr>`).join('')}
+        <tr class="total"><td colspan="8" style="text-align:right;">TỔNG CỘNG:</td><td class="num amt">${fmtNum(total)}</td><td></td></tr>
+      </tbody>
     </table>
     <div class="sig">
-      <div><strong>Người đề nghị</strong><br><br><br>${escapeHtml(o.requester||'')}</div>
-      <div><strong>Kế toán trưởng</strong><br><br><br></div>
-      <div><strong>Giám đốc duyệt chi</strong><br><br><br>${escapeHtml(o.approvedBy||'')}</div>
+      <div><div class="role">Người lập phiếu</div><div class="hint">(Ký, họ tên)</div><div class="space"></div>${escapeHtml(requester)}</div>
+      <div><div class="role">Kế toán</div><div class="hint">(Ký, họ tên)</div><div class="space"></div></div>
+      <div><div class="role">Giám đốc</div><div class="hint">(Ký, họ tên, đóng dấu)</div><div class="space"></div>${escapeHtml(approvedBy)}</div>
     </div>
     </body></html>`);
   w.document.close();
-  w.print();
+  setTimeout(()=> w.print(), 300);
 }
+
+// In 1 lệnh (nút 🖨 từng dòng)
+function printOrder(id){ printOrdersCombined([id]); }
+
+// In các lệnh đã được tick chọn trong 1 bảng (Lệnh chi hoặc Lệnh tạm ứng)
+function printSelectedOrders(tableId){
+  const table = document.getElementById(tableId);
+  if(!table) return;
+  const ids = [...table.querySelectorAll('.order-select-cb:checked')].map(cb=>cb.dataset.orderId);
+  if(ids.length === 0){ toast('Vui lòng tick chọn ít nhất 1 lệnh để in'); return; }
+  printOrdersCombined(ids);
+}
+document.getElementById('btn-print-orders-selected')?.addEventListener('click', ()=> printSelectedOrders('orders-table'));
+document.getElementById('btn-print-advance-selected')?.addEventListener('click', ()=> printSelectedOrders('advance-table'));
 
 // ---------------- LỆNH CHI (chỉ orderType='payment') ----------------
 function getFilteredOrders(){
@@ -269,6 +365,7 @@ function orderRowHtml(o){
         : ' <span class="tag tag-gray">⏳ Chưa giải trình</span>')
     : '';
   return `<tr>
+      <td><input type="checkbox" class="order-select-cb" data-order-id="${o.id}"></td>
       <td>${fmtDate(o.date)}</td>
       <td>${escapeHtml(ORDER_TYPE_LABELS[o.orderType] || 'Thanh toán chi phí')}</td>
       <td><strong>${escapeHtml(o.payee)}</strong></td>
@@ -280,13 +377,14 @@ function orderRowHtml(o){
         <div class="row-actions">
           <button class="icon-btn" data-print-order="${o.id}" title="In">🖨</button>
           <button class="icon-btn" data-edit-order="${o.id}" title="Sửa">✎</button>
-          ${isAdmin() ? `<button class="icon-btn" data-del-order="${o.id}" title="Xóa">🗑</button>` : ''}
+          ${isAdvanceOrder(o) ? `<button class="icon-btn" data-explain-order="${o.id}" title="Giải trình">🧾</button>` : ''}
+          <button class="icon-btn" data-del-order="${o.id}" title="Xóa">🗑</button>
         </div>
       </td>
     </tr>`;
 }
 const ORDER_THEAD = `<thead><tr>
-    <th>Ngày</th><th>Loại</th><th>Người nhận</th><th>Lý do</th><th>Dự án</th><th>Số tiền</th><th>Duyệt</th><th></th>
+    <th></th><th>Ngày</th><th>Loại</th><th>Người nhận</th><th>Lý do</th><th>Dự án</th><th>Số tiền</th><th>Duyệt</th><th></th>
   </tr></thead>`;
 
 function renderOrdersTable(){
@@ -340,11 +438,13 @@ function handleOrderTableClick(e){
   const printId = e.target.closest('[data-print-order]')?.dataset.printOrder;
   const approveId = e.target.closest('[data-approve-order]')?.dataset.approveOrder;
   const rejectId = e.target.closest('[data-reject-order]')?.dataset.rejectOrder;
+  const explainId = e.target.closest('[data-explain-order]')?.dataset.explainOrder;
   if(editId){
     const o = ORDERS.find(x=>x.id===editId);
     openOrderModal(editId, o && isAdvanceOrder(o) ? 'advance' : 'payment');
   }
   if(printId) printOrder(printId);
+  if(explainId) openOrderExplainModal(explainId);
   if(approveId) decideOrderApproval(approveId, 'approved');
   if(rejectId) decideOrderApproval(rejectId, 'rejected');
   if(delId){
@@ -355,7 +455,169 @@ function handleOrderTableClick(e){
           try{ await db.collection(ord.transactionCollection || 'transactions').doc(ord.transactionId).delete(); }catch(err){}
         }
         toast('Đã xóa');
+        if(ord) logActivity('delete', {projectName: isAdvanceOrder(ord)?'Lệnh tạm ứng':'Lệnh chi', content: ord.reason, amount: ord.amount, type:'OUT'});
       });
     }
   }
 }
+
+// =============================================================
+// GIẢI TRÌNH LỆNH TẠM ỨNG — chia 1 lệnh tạm ứng cho tối đa 5 dự án khác nhau.
+// Mỗi khung "Giải trình N" có Dự án riêng -> khi lưu, tự tạo 1 khoản Chi (Thu Chi)
+// cho đúng dự án đó, cộng dồn đúng vào chi phí dự án tương ứng.
+// =============================================================
+
+function fillExplainProjectSelects(){
+  for(let i=1;i<=5;i++){
+    const sel = document.getElementById(`exp${i}-project`);
+    if(!sel) continue;
+    const cur = sel.value;
+    sel.innerHTML = '<option value="">— Không chọn —</option>' + PROJECTS.map(p=>`<option value="${p.id}">${escapeHtml(p.name)}</option>`).join('');
+    if(cur) sel.value = cur;
+  }
+}
+
+function updateExplainAmountCheck(){
+  const order = ORDERS.find(x=>x.id===document.getElementById('exp-order-id').value);
+  let total = 0;
+  for(let i=1;i<=5;i++){
+    total += parseMoneyInput(document.getElementById(`exp${i}-amount`));
+  }
+  const el = document.getElementById('exp-total-check');
+  if(!el) return;
+  const orderAmount = order ? Number(order.amount||0) : 0;
+  const diff = orderAmount - total;
+  el.innerHTML = `Đã phân bổ: <strong>${fmtVND(total)}</strong> / Lệnh gốc: <strong>${fmtVND(orderAmount)}</strong>` +
+    (diff === 0 ? ' <span style="color:var(--teal)">✅ Khớp đủ</span>'
+      : diff > 0 ? ` <span style="color:var(--gold)">⚠️ Còn thiếu ${fmtVND(diff)}</span>`
+      : ` <span style="color:var(--red)">⚠️ Vượt ${fmtVND(-diff)} so với lệnh gốc</span>`);
+}
+
+// Gắn auto-calc SL*Đơn giá -> Thành tiền cho từng khung, và cập nhật lại tổng mỗi khi gõ
+for(let i=1;i<=5;i++){
+  const qtyEl = document.getElementById(`exp${i}-qty`);
+  const priceEl = document.getElementById(`exp${i}-price`);
+  const amountEl = document.getElementById(`exp${i}-amount`);
+  if(!qtyEl || !priceEl || !amountEl) continue;
+  const recalc = ()=>{
+    const qty = Number(qtyEl.value) || 1;
+    const price = parseMoneyInput(priceEl);
+    if(price) setMoneyInputValue(amountEl, qty*price);
+    updateExplainAmountCheck();
+  };
+  qtyEl.addEventListener('input', recalc);
+  priceEl.addEventListener('input', ()=>{ formatMoneyInput(priceEl); recalc(); });
+  amountEl.addEventListener('input', ()=>{ formatMoneyInput(amountEl); updateExplainAmountCheck(); });
+}
+
+function openOrderExplainModal(orderId){
+  const o = ORDERS.find(x=>x.id===orderId);
+  if(!o) return;
+  fillExplainProjectSelects();
+  document.getElementById('exp-order-id').value = orderId;
+  document.getElementById('exp-date').value = todayISO();
+  document.getElementById('exp-payee').value = o.payee || '';
+  document.getElementById('exp-summary').innerHTML =
+    `<strong>${escapeHtml(ORDER_TYPE_LABELS[o.orderType]||'Tạm ứng')}</strong> — ${escapeHtml(o.reason)}<br>Số tiền lệnh gốc: <strong>${fmtVND(o.amount)}</strong>`;
+
+  const existing = Array.isArray(o.explainAllocations) ? o.explainAllocations : [];
+  for(let i=1;i<=5;i++){
+    const a = existing[i-1] || {};
+    document.getElementById(`exp${i}-project`).value = a.projectId || '';
+    document.getElementById(`exp${i}-code`).value = a.code || '';
+    document.getElementById(`exp${i}-content`).value = a.content || '';
+    document.getElementById(`exp${i}-desc`).value = a.description || '';
+    document.getElementById(`exp${i}-unit`).value = a.unit || '';
+    document.getElementById(`exp${i}-qty`).value = a.qty || 1;
+    setMoneyInputValue(document.getElementById(`exp${i}-price`), a.unitPrice);
+    setMoneyInputValue(document.getElementById(`exp${i}-amount`), a.amount);
+  }
+  document.getElementById('exp-approval-target').value = '';
+  updateExplainAmountCheck();
+  openModal('modal-order-explain');
+}
+
+document.getElementById('save-explain-btn')?.addEventListener('click', async ()=>{
+  const orderId = document.getElementById('exp-order-id').value;
+  const o = ORDERS.find(x=>x.id===orderId);
+  if(!o) return;
+  const date = document.getElementById('exp-date').value || todayISO();
+
+  const blocks = [];
+  for(let i=1;i<=5;i++){
+    const projectId = document.getElementById(`exp${i}-project`).value;
+    const amount = parseMoneyInput(document.getElementById(`exp${i}-amount`));
+    if(!projectId || !amount) continue; // khung để trống -> bỏ qua
+    const proj = projectById(projectId);
+    blocks.push({
+      projectId, projectName: proj ? proj.name : '',
+      code: document.getElementById(`exp${i}-code`).value,
+      content: document.getElementById(`exp${i}-content`).value.trim() || o.reason,
+      description: document.getElementById(`exp${i}-desc`).value.trim(),
+      unit: document.getElementById(`exp${i}-unit`).value.trim(),
+      qty: Number(document.getElementById(`exp${i}-qty`).value) || 1,
+      unitPrice: parseMoneyInput(document.getElementById(`exp${i}-price`)),
+      amount,
+    });
+  }
+  if(blocks.length === 0){ toast('Vui lòng điền ít nhất 1 khung Giải trình (chọn Dự án + Số tiền)'); return; }
+
+  const approvalTarget = document.getElementById('exp-approval-target').value;
+  let approverEmail = '';
+  if(approvalTarget){
+    approverEmail = APPROVERS.gdEmail || '';
+    if(!approverEmail){ toast('Chưa cài đặt email Giám đốc — vào mục Người dùng để nhập trước.'); return; }
+  }
+
+  try{
+    const CHUNK = 400;
+    const batch = db.batch();
+    blocks.forEach(b=>{
+      const ref = db.collection('transactions').doc();
+      const txData = {
+        type:'OUT', projectId: b.projectId, projectName: b.projectName,
+        date, code: b.code, content: b.content, description: b.description,
+        unit: b.unit, qty: b.qty, unitPrice: b.unitPrice, amount: b.amount,
+        invoiceNumber:'', invoiceDate:'', bankName:'', bankAccount:'', bankHolder:'', transferDate:'',
+        note: `Giải trình từ Lệnh tạm ứng (${o.payee}) — ${o.reason}`,
+        invoiceImage:'', transferImage:'', invoiceStatus:'pending', transferStatus:'pending',
+        createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+        createdBy: auth.currentUser.email,
+      };
+      if(approvalTarget){
+        txData.approvalStatus = 'pending';
+        txData.approverRole = approvalTarget;
+        txData.approverEmail = approverEmail;
+        txData.approvalSubmittedAt = firebase.firestore.FieldValue.serverTimestamp();
+        txData.approvedBy = '';
+        txData.approvedAt = '';
+      }
+      batch.set(ref, txData);
+    });
+    await batch.commit();
+
+    const orderUpdate = {
+      explainAllocations: blocks,
+      explainedAt: firebase.firestore.FieldValue.serverTimestamp(),
+      explainedBy: auth.currentUser.email,
+    };
+    await db.collection('paymentOrders').doc(orderId).update(orderUpdate);
+
+    // Nếu lệnh này trước đó đã tự động vào Chi phí gián tiếp (do chưa gắn dự án) -> đánh dấu đã giải trình,
+    // loại khỏi tổng Chi phí gián tiếp (số liệu chính thức giờ nằm trong Thu Chi, tránh tính trùng).
+    if(o.transactionCollection === 'fixedCosts' && o.transactionId){
+      try{
+        await db.collection('fixedCosts').doc(o.transactionId).update({
+          advanceExplainStatus: 'explained',
+          movedToTransactionId: orderId,
+          explainedAt: firebase.firestore.FieldValue.serverTimestamp(),
+          explainedBy: auth.currentUser.email,
+        });
+      }catch(err){ console.error('mark fixedCosts explained error', err); }
+    }
+
+    toast(`✅ Đã giải trình xong — tạo ${blocks.length} khoản Chi phân bổ theo dự án`);
+    logActivity('update', {projectName:'Giải trình tạm ứng', content: o.reason, amount: blocks.reduce((s,b)=>s+b.amount,0), type:'OUT'});
+    closeModal('modal-order-explain');
+  }catch(err){ toast('Lỗi: '+err.message); }
+});
