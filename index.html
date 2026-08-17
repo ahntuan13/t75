@@ -50,12 +50,19 @@
         <div class="nav-item active" data-view="dashboard"><span class="ic">◈</span> Tổng quan</div>
       </div>
 
-      <div class="nav-label">Hồ sơ</div>
+      <div class="nav-label">Dự án</div>
       <div class="nav-group">
         <div class="nav-item" data-view="projects" style="display:none"><span class="ic">▣</span> Dự án</div>
+      </div>
+
+      <div class="nav-label">Dòng tiền</div>
+      <div class="nav-group">
         <div class="nav-item" data-view="fixedcosts"><span class="ic">🏢</span> Chi phí gián tiếp</div>
         <div class="nav-item" data-view="transactions"><span class="ic">⇄</span> Thu Chi</div>
-        <div class="nav-item" data-view="orders"><span class="ic">📝</span> Lệnh chi</div>
+      </div>
+
+      <div class="nav-label">Chứng từ</div>
+      <div class="nav-group">
         <div class="nav-item" data-view="invoices"><span class="ic">🧾</span> Hóa đơn</div>
         <div class="nav-item" data-view="transfers"><span class="ic">🏦</span> Chuyển khoản</div>
       </div>
@@ -68,6 +75,8 @@
 
       <div class="nav-label">Chi & lương</div>
       <div class="nav-group">
+        <div class="nav-item" data-view="orders"><span class="ic">📝</span> Lệnh chi</div>
+        <div class="nav-item" data-view="advance"><span class="ic">💳</span> Lệnh tạm ứng</div>
         <div class="nav-item" data-view="payroll"><span class="ic">💵</span> Bảng lương</div>
         <div class="nav-item" data-view="timesheet"><span class="ic">🗓</span> Chấm công</div>
       </div>
@@ -314,6 +323,7 @@
       <div class="view" id="view-orders">
         <div class="topbar">
           <div><h2>Lệnh chi</h2><div class="sub">Đề nghị & duyệt chi tiền</div></div>
+          <div class="topbar-actions"><button class="btn btn-primary" id="btn-add-order">+ Tạo lệnh chi</button></div>
         </div>
         <div class="filters-bar">
           <select id="ord-filter-status">
@@ -326,6 +336,28 @@
           <select id="ord-filter-project"><option value="">Tất cả dự án</option></select>
         </div>
         <div class="card"><div class="table-wrap"><table class="data" id="orders-table"></table></div></div>
+      </div>
+
+      <!-- LỆNH TẠM ỨNG -->
+      <div class="view" id="view-advance">
+        <div class="topbar">
+          <div><h2>Lệnh tạm ứng</h2><div class="sub">Xem lại các lệnh Tạm ứng thanh toán / Tạm ứng lương</div></div>
+          <div class="topbar-actions">
+            <button class="btn btn-ghost" id="btn-add-advance-payment2">+ Tạm ứng thanh toán</button>
+            <button class="btn btn-primary" id="btn-add-advance-salary2">+ Tạm ứng lương</button>
+          </div>
+        </div>
+        <div class="filters-bar">
+          <select id="adv-filter-status">
+            <option value="">Tất cả trạng thái</option>
+            <option value="none">Chưa gửi duyệt</option>
+            <option value="pending">🟡 Chờ duyệt</option>
+            <option value="approved">✅ Đã duyệt</option>
+            <option value="rejected">❌ Từ chối</option>
+          </select>
+          <select id="adv-filter-project"><option value="">Tất cả dự án</option></select>
+        </div>
+        <div class="card"><div class="table-wrap"><table class="data" id="advance-table"></table></div></div>
       </div>
 
       <!-- PAYROLL -->
@@ -471,18 +503,6 @@
         <button class="qc-item" id="qc-add-tx">
           <span class="qc-icon" style="background:var(--teal-dim);color:var(--teal);">⇄</span>
           <span class="qc-text"><strong>Nhập giao dịch</strong><span class="helper-text">Ghi nhận Thu / Chi</span></span>
-        </button>
-        <button class="qc-item" id="qc-add-order">
-          <span class="qc-icon" style="background:var(--red-dim);color:var(--red);">📝</span>
-          <span class="qc-text"><strong>Tạo lệnh chi</strong><span class="helper-text">Lập lệnh chi mới</span></span>
-        </button>
-        <button class="qc-item" id="qc-add-advance-payment">
-          <span class="qc-icon" style="background:var(--gold-dim);color:var(--gold);">💳</span>
-          <span class="qc-text"><strong>Tạm ứng thanh toán</strong><span class="helper-text">Đề nghị tạm ứng chi phí</span></span>
-        </button>
-        <button class="qc-item" id="qc-add-advance-salary">
-          <span class="qc-icon" style="background:var(--gold-dim);color:var(--gold);">💰</span>
-          <span class="qc-text"><strong>Tạm ứng lương</strong><span class="helper-text">Đề nghị tạm ứng lương NV</span></span>
         </button>
         <button class="qc-item" id="qc-add-timesheet">
           <span class="qc-icon" style="background:var(--gold-dim);color:var(--gold);">🗓</span>
@@ -672,7 +692,11 @@
           </select>
         </div>
         <div class="field full"><label>Người/đơn vị chi</label><input id="order-payer" placeholder="VD: Công ty TNHH DVKT Cách Nhiệt Tuấn 75"></div>
-        <div class="field full"><label>Người/đơn vị nhận chi *</label><input id="order-payee" required></div>
+        <div class="field full">
+          <label>Người/đơn vị nhận chi *</label>
+          <input id="order-payee" list="order-payee-employees" required autocomplete="off">
+          <datalist id="order-payee-employees"></datalist>
+        </div>
         <div class="field"><label>Số tài khoản nhận (STK)</label><input id="order-payee-bank"></div>
         <div class="field"><label>MST</label><input id="order-payee-tax"></div>
         <div class="field full"><label>Lý do chi *</label><input id="order-reason" required placeholder="VD: Thanh toán vật tư đợt 2"></div>
