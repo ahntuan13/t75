@@ -140,10 +140,12 @@
           </div>
           <div class="card">
             <div class="card-head"><h3>Doanh thu / Chi phí / Lợi nhuận thực tế theo dự án</h3></div>
+            <div id="chart-project-actual-summary"></div>
             <div class="chart-wrap" style="height:460px;"><canvas id="chart-project-actual"></canvas></div>
           </div>
           <div class="card">
             <div class="card-head"><h3>Giá trị hợp đồng đã ký</h3></div>
+            <div id="chart-project-budget-summary"></div>
             <div class="chart-wrap"><canvas id="chart-project-budget"></canvas></div>
           </div>
         </div>
@@ -515,10 +517,6 @@
           <span class="qc-icon" style="background:var(--purple-dim);color:var(--purple);">👤</span>
           <span class="qc-text"><strong>Thêm nhân viên</strong><span class="helper-text">Thêm hồ sơ nhân viên</span></span>
         </button>
-        <button class="qc-item" id="qc-add-fc">
-          <span class="qc-icon" style="background:var(--pink-dim);color:var(--pink);">🏢</span>
-          <span class="qc-text"><strong>Chi phí gián tiếp</strong><span class="helper-text">Chi phí không gắn dự án</span></span>
-        </button>
         <button class="qc-item" id="qc-upload-invoice-image">
           <span class="qc-icon" style="background:var(--teal-dim);color:var(--teal);">📷</span>
           <span class="qc-text"><strong>Upload hóa đơn (ảnh)</strong><span class="helper-text">AI tự đọc thông tin từ ảnh</span></span>
@@ -814,7 +812,7 @@
             <option value="NC">NC - Nhân công</option>
           </select>
         </div>
-        <div class="field"><label>Loại lệnh chi</label>
+        <div class="field" id="order-type-field"><label>Loại lệnh chi</label>
           <select id="order-type">
             <option value="payment">Thanh toán chi phí</option>
             <option value="advance_purchase">Tạm ứng thanh toán</option>
@@ -842,6 +840,12 @@
           <div class="helper-text" id="order-approval-current-status" style="margin-top:8px;"></div>
         </div>
         <div class="field full">
+          <label>📎 Đính kèm tập tin (mọi loại file)</label>
+          <div class="helper-text" style="margin-bottom:6px;">Chọn tối đa 1 file (ảnh, PDF, Word, Excel...), tối đa ~2MB.</div>
+          <input type="file" id="order-attachment-input">
+          <div id="order-attachment-status" style="margin-top:8px;"></div>
+        </div>
+        <div class="field full" id="order-explanation-field">
           <label>📝 Giải trình</label>
           <div class="helper-text" style="margin-bottom:6px;">KT ghi rõ khoản tạm ứng này đã/sẽ dùng vào việc gì, chi tiết chứng từ liên quan (nếu có).</div>
           <textarea id="order-explanation" rows="3" placeholder="VD: Đã chi cho Mr.Liêm mua vật tư công trình URC ngày.../ đính kèm hóa đơn số..."></textarea>
@@ -948,7 +952,11 @@
         <div class="field full"><label>Email *</label><input id="user-email-input" placeholder="ten@congty.com"></div>
         <div class="field"><label>Tên hiển thị</label><input id="user-name"></div>
         <div class="field"><label>Vai trò *</label>
-          <select id="user-role"><option value="user">Thành viên (User)</option><option value="admin">Quản trị viên (Admin)</option></select>
+          <select id="user-role">
+            <option value="user">Thành viên (User / Kế toán)</option>
+            <option value="subadmin">Sub-admin (Giám đốc — chỉ xem & duyệt)</option>
+            <option value="admin">Quản trị viên (Admin)</option>
+          </select>
         </div>
       </div>
     </div>
