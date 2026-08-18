@@ -111,15 +111,15 @@ function renderDashboard(){
   const projActual = Object.values(projActualMap)
     .map(p=>({...p, profit: p.revenue - p.cost}))
     .filter(p=> p.revenue>0 || p.cost>0)
-    .sort((a,b)=> (a.revenue+a.cost) - (b.revenue+b.cost));
+    .sort((a,b)=> (b.revenue+b.cost) - (a.revenue+a.cost));
 
   const ctx2 = document.getElementById('chart-project-actual');
   const totalRevenueActual = projActual.reduce((s,p)=>s+p.revenue,0);
   const totalCostActual = projActual.reduce((s,p)=>s+p.cost,0);
   document.getElementById('chart-project-actual-summary').innerHTML = `
     <div class="chart-total-panel">
-      <div class="chart-total-box cost"><div class="lbl">Tổng chi phí thực tế</div><div class="val">${fmtVND(totalCostActual)}</div></div>
       <div class="chart-total-box revenue"><div class="lbl">Tổng doanh thu thực tế</div><div class="val">${fmtVND(totalRevenueActual)}</div></div>
+      <div class="chart-total-box cost"><div class="lbl">Tổng chi phí thực tế</div><div class="val">${fmtVND(totalCostActual)}</div></div>
       <div class="chart-total-box profit"><div class="lbl">Tổng lợi nhuận thực tế</div><div class="val">${fmtVND(totalRevenueActual-totalCostActual)}</div></div>
     </div>`;
   document.getElementById('chart-project-actual').parentElement.style.height = Math.max(320, projActual.length*32+60) + 'px';
@@ -145,15 +145,15 @@ function renderDashboard(){
       cost: p.costBudget||0,
       profit: (p.revenueBudget||0) - (p.costBudget||0)
     }))
-    .sort((a,b)=> (a.revenue+a.cost) - (b.revenue+b.cost));
+    .sort((a,b)=> (b.revenue+b.cost) - (a.revenue+a.cost));
 
   const ctx3 = document.getElementById('chart-project-budget');
   const totalRevenueBudget = budgetData.reduce((s,p)=>s+p.revenue,0);
   const totalCostBudget = budgetData.reduce((s,p)=>s+p.cost,0);
   document.getElementById('chart-project-budget-summary').innerHTML = `
     <div class="chart-total-panel">
-      <div class="chart-total-box cost"><div class="lbl">Chi phí dự toán</div><div class="val">${fmtVND(totalCostBudget)}</div></div>
       <div class="chart-total-box revenue"><div class="lbl">Doanh thu dự toán</div><div class="val">${fmtVND(totalRevenueBudget)}</div></div>
+      <div class="chart-total-box cost"><div class="lbl">Chi phí dự toán</div><div class="val">${fmtVND(totalCostBudget)}</div></div>
       <div class="chart-total-box profit"><div class="lbl">Lợi nhuận dự toán</div><div class="val">${fmtVND(totalRevenueBudget-totalCostBudget)}</div></div>
     </div>`;
   document.getElementById('chart-project-budget').parentElement.style.height = Math.max(320, budgetData.length*32+60) + 'px';
@@ -262,9 +262,9 @@ function renderReports(){
   const totalIn = rows.filter(t=>t.type==='IN').reduce((s,t)=>s+Number(t.amount||0),0);
   const totalOut = rows.filter(t=>t.type==='OUT').reduce((s,t)=>s+Number(t.amount||0),0);
   document.getElementById('rp-kpis').innerHTML =
-    kpiCard('💰','teal','Tổng thu', `<span class="pos">${fmtVND(totalIn)}</span>`) +
-    kpiCard('💸','red','Tổng chi', `<span class="neg">${fmtVND(totalOut)}</span>`) +
-    kpiCard('📊','blue','Dòng tiền ròng', `<span class="${totalIn-totalOut>=0?'pos':'neg'}">${fmtVND(totalIn-totalOut)}</span>`) +
+    kpiCard('💰','teal','Tổng thu (lũy kế)', `<span class="pos">${fmtVND(totalIn)}</span>`) +
+    kpiCard('💸','red','Tổng chi (lũy kế)', `<span class="neg">${fmtVND(totalOut)}</span>`) +
+    kpiCard('📊','blue','Lợi nhuận sau thuế (lũy kế)', `<span class="${totalIn-totalOut>=0?'pos':'neg'}">${fmtVND(totalIn-totalOut)}</span>`) +
     kpiCard('🗓','purple','Số kỳ có phát sinh', fmtNum(data.length));
 
   const ctx = document.getElementById('chart-report');
@@ -327,9 +327,9 @@ function renderPnl(){
   const totalLntt = totalRevenue-totalCost;
   const margin = totalRevenue ? (totalLntt/totalRevenue*100) : 0;
   document.getElementById('pnl-kpis').innerHTML =
-    kpiCard('💰','teal','Tổng doanh thu', `<span class="pos">${fmtVND(totalRevenue)}</span>`) +
-    kpiCard('💸','red','Tổng chi phí', `<span class="neg">${fmtVND(totalCost)}</span>`) +
-    kpiCard('📈','blue','Lợi nhuận trước thuế', `<span class="${totalLntt>=0?'pos':'neg'}">${fmtVND(totalLntt)}</span>`) +
+    kpiCard('💰','teal','Tổng thu (lũy kế)', `<span class="pos">${fmtVND(totalRevenue)}</span>`) +
+    kpiCard('💸','red','Tổng chi (lũy kế)', `<span class="neg">${fmtVND(totalCost)}</span>`) +
+    kpiCard('📈','blue','Lợi nhuận sau thuế (lũy kế)', `<span class="${totalLntt>=0?'pos':'neg'}">${fmtVND(totalLntt)}</span>`) +
     kpiCard('🎯','gold','Biên lợi nhuận', `${margin.toFixed(1)}%`);
 
   const ctx = document.getElementById('chart-pnl');
