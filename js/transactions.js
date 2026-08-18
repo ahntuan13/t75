@@ -484,27 +484,28 @@ function openTxViewModal(id, source){
     ${row('Thành tiền', '<strong style="color:'+(t.type==='IN'?'var(--teal)':'var(--red)')+'">'+fmtVND(t.amount)+'</strong>')}
   </dl>`;
 
-  // Trạng thái hóa đơn — bất kỳ ai đăng nhập cũng bấm đổi được (không cần quyền Admin)
+  // Trạng thái hóa đơn — ai đăng nhập cũng bấm đổi được, TRỪ Sub-admin (GĐ chỉ xem)
   const invoiceIssued = (t.invoiceStatus||'pending')==='issued';
+  const roDisabled = (typeof isSubAdmin==='function' && isSubAdmin()) ? 'disabled style="opacity:.5;cursor:not-allowed;"' : '';
   html += `<div class="tx-view-section"><h5>🧾 Thông tin hóa đơn</h5>
     <div class="seg tx-status-toggle" style="max-width:340px;">
-      <button type="button" class="${invoiceIssued?'active-gold':''}" data-status-toggle="invoiceStatus" data-status-value="issued" data-tx-id="${t.id}">✅ Đã xuất hóa đơn</button>
-      <button type="button" class="${!invoiceIssued?'active-gray':''}" data-status-toggle="invoiceStatus" data-status-value="pending" data-tx-id="${t.id}">⏳ Chưa xuất hóa đơn</button>
+      <button type="button" ${roDisabled} class="${invoiceIssued?'active-gold':''}" data-status-toggle="invoiceStatus" data-status-value="issued" data-tx-id="${t.id}">✅ Đã xuất hóa đơn</button>
+      <button type="button" ${roDisabled} class="${!invoiceIssued?'active-gray':''}" data-status-toggle="invoiceStatus" data-status-value="pending" data-tx-id="${t.id}">⏳ Chưa xuất hóa đơn</button>
     </div>
     <dl class="tx-view-grid" style="margin-top:10px;">
       ${row('Số hóa đơn', escapeHtml(t.invoiceNumber||''))}
       ${row('Ngày hóa đơn', t.invoiceDate ? fmtDate(t.invoiceDate) : '')}
     </dl>${t.invoiceImage ? `<div class="tx-view-images"><img src="${t.invoiceImage}" data-lightbox="${t.invoiceImage}"></div>` : ''}</div>`;
 
-  // Trạng thái CK/nhận tiền — nhãn động theo Thu/Chi, ai cũng đổi được
+  // Trạng thái CK/nhận tiền — nhãn động theo Thu/Chi, ai cũng đổi được, TRỪ Sub-admin (GĐ chỉ xem)
   const transferDone = (t.transferStatus||'pending')==='done';
   const doneLabel = t.type==='IN' ? '✅ Đã nhận tiền' : '✅ Đã chuyển khoản';
   const pendingLabel = t.type==='IN' ? '⏳ Chưa nhận tiền' : '⏳ Chưa chuyển khoản';
   const sectionTitle = t.type==='IN' ? '🏦 Thông tin nhận tiền' : '🏦 Thông tin chuyển khoản';
   html += `<div class="tx-view-section"><h5>${sectionTitle}</h5>
     <div class="seg tx-status-toggle" style="max-width:340px;">
-      <button type="button" class="${transferDone?'active-gold':''}" data-status-toggle="transferStatus" data-status-value="done" data-tx-id="${t.id}">${doneLabel}</button>
-      <button type="button" class="${!transferDone?'active-gray':''}" data-status-toggle="transferStatus" data-status-value="pending" data-tx-id="${t.id}">${pendingLabel}</button>
+      <button type="button" ${roDisabled} class="${transferDone?'active-gold':''}" data-status-toggle="transferStatus" data-status-value="done" data-tx-id="${t.id}">${doneLabel}</button>
+      <button type="button" ${roDisabled} class="${!transferDone?'active-gray':''}" data-status-toggle="transferStatus" data-status-value="pending" data-tx-id="${t.id}">${pendingLabel}</button>
     </div>
     <dl class="tx-view-grid" style="margin-top:10px;">
       ${row('Ngân hàng', escapeHtml(t.bankName||''))}
