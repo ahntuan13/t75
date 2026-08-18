@@ -130,7 +130,7 @@ function renderEmployeesTable(){
       <td class="num">${fmtVND(e.effectiveRate)}${e.payType==='daily'?'/ngày':'/tháng'}</td>
       <td>
         <div class="row-actions">
-          <button class="icon-btn" data-edit-emp="${e.id}" title="Sửa">✎</button>
+          ${!isSubAdmin() ? `<button class="icon-btn" data-edit-emp="${e.id}" title="Sửa">✎</button>` : ''}
           ${isAdmin() ? `<button class="icon-btn" data-del-emp="${e.id}" title="Xóa">🗑</button>` : ''}
         </div>
       </td>
@@ -308,7 +308,7 @@ function renderTimesheetTable(){
       <td class="num"><strong>${h.total}h</strong></td>
       <td>
         <div class="row-actions">
-          <button class="icon-btn" data-edit-ts="${t.id}" title="Sửa">✎</button>
+          ${!isSubAdmin() ? `<button class="icon-btn" data-edit-ts="${t.id}" title="Sửa">✎</button>` : ''}
           ${isAdmin() ? `<button class="icon-btn" data-del-ts="${t.id}" title="Xóa">🗑</button>` : ''}
         </div>
       </td>
