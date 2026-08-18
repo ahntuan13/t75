@@ -74,9 +74,20 @@ function renderProjectsTable(){
       </td>
     </tr>`;
   }).join('');
+  const totalContractValue = PROJECTS.reduce((s,p)=>s+Number(p.contractValue||0),0);
+  const totalRevenue = (TRANSACTIONS||[]).filter(t=>t.type==='IN' && t.projectId).reduce((s,t)=>s+Number(t.amount||0),0);
+  const totalSpend = (TRANSACTIONS||[]).filter(t=>t.type==='OUT' && t.projectId).reduce((s,t)=>s+Number(t.amount||0),0);
+  const totalsRow = `<tr style="background:var(--bg-soft);font-weight:700;">
+      <td colspan="3">TỔNG CỘNG (${PROJECTS.length} dự án)</td>
+      <td class="num">${fmtVND(totalContractValue)}</td>
+      <td class="num" style="color:var(--teal)">${fmtVND(totalRevenue)}</td>
+      <td class="num" style="color:var(--red)">${fmtVND(totalSpend)}</td>
+      <td class="num">${fmtVND(totalRevenue-totalSpend)}</td>
+      <td></td>
+    </tr>`;
   table.innerHTML = `<thead><tr>
     <th>Dự án</th><th>Mã</th><th>Trạng thái</th><th>Giá trị HĐ</th><th>Đã thu (thực tế)</th><th>Đã chi (thực tế)</th><th>Chênh lệch</th><th></th>
-  </tr></thead><tbody>${rows}</tbody>`;
+  </tr></thead><tbody>${totalsRow}${rows}</tbody>`;
 }
 
 let currentContractFiles = []; // [{url, name, uploadedAt}]
@@ -135,6 +146,10 @@ function openProjectModal(id){
   setMoneyInputValue(document.getElementById('project-cost-budget'), p.costBudget);
   setMoneyInputValue(document.getElementById('project-revenue-budget'), p.revenueBudget);
   document.getElementById('project-status').value = p.status || 'active';
+  document.getElementById('project-sign-date').value = p.signDate || (id ? '' : todayISO());
+  document.getElementById('project-completion-date').value = p.completionDate || '';
+  document.getElementById('project-warranty-years').value = p.warrantyYears || '';
+  document.getElementById('project-warranty-start').value = p.warrantyStartDate || '';
   document.getElementById('project-note').value = p.note || '';
   // ưu tiên mảng nhiều file mới (contractFiles); nếu dự án cũ chỉ có 1 file (contractFileUrl/contractFile) thì tự chuyển thành mảng 1 phần tử
   if(Array.isArray(p.contractFiles) && p.contractFiles.length){
@@ -151,6 +166,15 @@ function openProjectModal(id){
 
 document.getElementById('btn-add-project')?.addEventListener('click', ()=> openProjectModal(null));
 
+// Tự ghi lại "Ngày bắt đầu tính bảo hành" đúng thời điểm chuyển Trạng thái sang "Còn giữ 5% bảo hành"
+// (chỉ ghi 1 lần khi CHUYỂN SANG, không ghi đè lại nếu đã có sẵn từ trước).
+document.getElementById('project-status')?.addEventListener('change', (e)=>{
+  const warrantyStartEl = document.getElementById('project-warranty-start');
+  if(e.target.value === 'warranty' && !warrantyStartEl.value){
+    warrantyStartEl.value = todayISO();
+  }
+});
+
 document.getElementById('save-project-btn').addEventListener('click', async ()=>{
   const id = document.getElementById('project-id').value;
   const name = document.getElementById('project-name').value.trim();
@@ -166,6 +190,10 @@ document.getElementById('save-project-btn').addEventListener('click', async ()=>
     costBudget: parseMoneyInput(document.getElementById('project-cost-budget')),
     revenueBudget: parseMoneyInput(document.getElementById('project-revenue-budget')),
     status: document.getElementById('project-status').value,
+    signDate: document.getElementById('project-sign-date').value,
+    completionDate: document.getElementById('project-completion-date').value,
+    warrantyYears: document.getElementById('project-warranty-years').value,
+    warrantyStartDate: document.getElementById('project-warranty-start').value,
     note: document.getElementById('project-note').value.trim(),
     contractFiles: currentContractFiles,
     // xóa field cũ (single-file) để tránh dữ liệu thừa/nhầm lẫn khi đọc lại
