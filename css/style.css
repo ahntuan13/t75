@@ -250,6 +250,13 @@ tr td.tx-subhead-empty{color:var(--ink-faint);font-style:italic;font-size:12.5px
 .chart-total-box.cost .val{background:#3B57D9;}
 .chart-total-box.revenue .val{background:#C0392B;}
 .chart-total-box.profit .val{background:#7A9A3B;}
+.exp-block{border-top:1px solid var(--line);padding-top:12px;margin-top:8px;}
+.exp-block-title{font-size:13px;font-weight:700;color:var(--ink);margin-bottom:8px;display:block;}
+.exp-row{display:flex;gap:10px;flex-wrap:wrap;margin-bottom:8px;}
+.exp-row .field{flex:1;min-width:120px;margin-bottom:0;}
+.exp-row .field.grow2{flex:2;}
+.exp-row .field.grow-sm{flex:0.6;min-width:70px;}
+@media (max-width:720px){ .exp-row{flex-direction:column;} .exp-row .field{width:100%;} }
 tr.tx-row-explained td{opacity:.5;}
 tr.tx-row-explained td:not(:last-child){text-decoration:line-through;}
 .approval-banner{display:flex;align-items:center;gap:12px;justify-content:space-between;background:var(--gold-dim);color:var(--gold);border-radius:12px;padding:12px 16px;margin-bottom:16px;font-weight:600;font-size:13.5px;flex-wrap:wrap;}
