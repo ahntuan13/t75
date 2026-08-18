@@ -202,6 +202,7 @@
             <option value="VTC">VTC - Vật tư chính</option>
             <option value="VTP">VTP - Vật tư phụ</option>
             <option value="NC">NC - Nhân công</option>
+            <option value="TAX">TAX - Thuế</option>
           </select>
           <input type="month" id="fc-filter-month">
           <div class="spacer"></div>
@@ -235,6 +236,7 @@
             <option value="VTC">VTC - Vật tư chính</option>
             <option value="VTP">VTP - Vật tư phụ</option>
             <option value="NC">NC - Nhân công</option>
+            <option value="TAX">TAX - Thuế</option>
           </select>
           <input type="month" id="tx-filter-month">
           <div class="spacer"></div>
@@ -399,6 +401,10 @@
       <div class="view" id="view-timesheet">
         <div class="topbar">
           <div><h2>Chấm công</h2><div class="sub">3 ca Sáng / Chiều / Tối mỗi ngày — ca Tối (từ 17:01) tự tính là giờ tăng ca</div></div>
+          <div class="topbar-actions">
+            <button class="btn btn-ghost" id="btn-upload-timesheet">⬆ Upload bảng chấm công (Excel)</button>
+          </div>
+          <input type="file" id="upload-timesheet-input" accept=".xlsx,.xls" style="display:none">
         </div>
         <div class="filters-bar">
           <input type="month" id="ts-filter-month">
@@ -565,11 +571,22 @@
           <div class="helper-text">Tự ghi lại ngày khi bạn chuyển Trạng thái sang "Còn giữ 5% bảo hành".</div>
         </div>
         <div class="field full">
-          <label>File hợp đồng (upload thẳng lên OneDrive công ty — 1 dự án có thể có nhiều hợp đồng)</label>
-          <input type="file" id="project-contract-file" accept="image/*,.pdf,application/pdf">
-          <div class="helper-text">File tối đa 4MB. Chọn file xong tự thêm vào danh sách bên dưới, không thay thế file cũ. Lần đầu upload sẽ hiện popup đăng nhập Microsoft 365 công ty — nếu trình duyệt chặn popup, bấm cho phép popup của trang này.</div>
-          <div id="project-contract-file-status" style="margin-top:8px;"></div>
+          <label>📄 Scan hợp đồng (upload thẳng lên OneDrive công ty — có thể nhiều file)</label>
+          <input type="file" id="project-file-contract" accept="image/*,.pdf,application/pdf">
+          <div id="project-files-contract" style="margin-top:8px;"></div>
         </div>
+        <div class="field full">
+          <label>💰 Scan hồ sơ thanh toán (lần 1, 2, 3...)</label>
+          <div class="helper-text" style="margin-bottom:6px;">Mỗi lần upload tự đánh số "Lần N" theo thứ tự — kế toán (User) cũng upload được mục này.</div>
+          <input type="file" id="project-file-payment" accept="image/*,.pdf,application/pdf">
+          <div id="project-files-payment" style="margin-top:8px;"></div>
+        </div>
+        <div class="field full">
+          <label>📊 Hồ sơ quyết toán</label>
+          <input type="file" id="project-file-settlement" accept="image/*,.pdf,application/pdf">
+          <div id="project-files-settlement" style="margin-top:8px;"></div>
+        </div>
+        <div class="helper-text field full">File tối đa 4MB/file. Lần đầu upload sẽ hiện popup đăng nhập Microsoft 365 công ty — nếu trình duyệt chặn popup, bấm cho phép popup của trang này.</div>
         <div class="field full"><label>Link hợp đồng khác (Google Drive, dùng khi file lớn)</label><input id="project-contract-link" placeholder="https://drive.google.com/..."></div>
         <div class="field"><label>Trạng thái</label>
           <select id="project-status"><option value="active">Đang thực hiện</option><option value="warranty">Còn giữ 5% bảo hành</option><option value="done">Hoàn thành</option><option value="paused">Tạm dừng</option></select>
@@ -615,6 +632,7 @@
             <option value="VTC">VTC - Vật tư chính</option>
             <option value="VTP">VTP - Vật tư phụ</option>
             <option value="NC">NC - Nhân công</option>
+            <option value="TAX">TAX - Thuế</option>
           </select>
         </div>
         <div class="field full"><label>Nội dung *</label><input id="tx-content" required placeholder="VD: Thanh toán chi phí vật tư"></div>
@@ -688,7 +706,7 @@
 </div>
 
 <div class="modal-backdrop" id="modal-order-explain">
-  <div class="modal" style="max-width:1180px;width:94vw;">
+  <div class="modal" style="max-width:1180px;width:100%;">
     <div class="modal-head"><h3>🧾 Giải chi lệnh tạm ứng</h3><button class="modal-close" data-close>✕</button></div>
     <div class="modal-body">
       <input type="hidden" id="exp-order-id">
@@ -709,6 +727,7 @@
                 <option value="VTC">VTC - Vật tư chính</option>
                 <option value="VTP">VTP - Vật tư phụ</option>
                 <option value="NC">NC - Nhân công</option>
+            <option value="TAX">TAX - Thuế</option>
               </select>
             </div>
             <div class="field grow2"><label>Nội dung</label><input id="exp1-content" placeholder="VD: Tạm ứng chi phí công trình"></div>
@@ -733,6 +752,7 @@
                 <option value="VTC">VTC - Vật tư chính</option>
                 <option value="VTP">VTP - Vật tư phụ</option>
                 <option value="NC">NC - Nhân công</option>
+            <option value="TAX">TAX - Thuế</option>
               </select>
             </div>
             <div class="field grow2"><label>Nội dung</label><input id="exp2-content" placeholder="VD: Tạm ứng chi phí công trình"></div>
@@ -757,6 +777,7 @@
                 <option value="VTC">VTC - Vật tư chính</option>
                 <option value="VTP">VTP - Vật tư phụ</option>
                 <option value="NC">NC - Nhân công</option>
+            <option value="TAX">TAX - Thuế</option>
               </select>
             </div>
             <div class="field grow2"><label>Nội dung</label><input id="exp3-content" placeholder="VD: Tạm ứng chi phí công trình"></div>
@@ -781,6 +802,7 @@
                 <option value="VTC">VTC - Vật tư chính</option>
                 <option value="VTP">VTP - Vật tư phụ</option>
                 <option value="NC">NC - Nhân công</option>
+            <option value="TAX">TAX - Thuế</option>
               </select>
             </div>
             <div class="field grow2"><label>Nội dung</label><input id="exp4-content" placeholder="VD: Tạm ứng chi phí công trình"></div>
@@ -805,6 +827,7 @@
                 <option value="VTC">VTC - Vật tư chính</option>
                 <option value="VTP">VTP - Vật tư phụ</option>
                 <option value="NC">NC - Nhân công</option>
+            <option value="TAX">TAX - Thuế</option>
               </select>
             </div>
             <div class="field grow2"><label>Nội dung</label><input id="exp5-content" placeholder="VD: Tạm ứng chi phí công trình"></div>
@@ -848,6 +871,7 @@
             <option value="VTC">VTC - Vật tư chính</option>
             <option value="VTP">VTP - Vật tư phụ</option>
             <option value="NC">NC - Nhân công</option>
+            <option value="TAX">TAX - Thuế</option>
           </select>
         </div>
         <div class="field" id="order-type-field"><label>Loại lệnh chi</label>
