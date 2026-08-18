@@ -96,21 +96,20 @@ function renderApprovalBanner(){
     return;
   }
   const totalAmount = pendingTx.reduce((s,t)=>s+Number(t.amount||0),0) + allPendingOrders.reduce((s,o)=>s+Number(o.amount||0),0);
-  const parts = [];
-  if(pendingTx.length) parts.push(`${pendingTx.length} khoản Chi`);
-  if(pendingPaymentOrders.length) parts.push(`${pendingPaymentOrders.length} Lệnh chi`);
-  if(pendingAdvanceOrders.length) parts.push(`${pendingAdvanceOrders.length} Lệnh tạm ứng`);
+  const lines = [];
+  if(pendingTx.length) lines.push(`<div>🔔 Bạn có <strong>${pendingTx.length} khoản</strong> cần duyệt trong mục <strong>Thu Chi</strong>. <button class="btn btn-ghost btn-sm" data-goto-approval="transactions">Xem ngay</button></div>`);
+  if(pendingPaymentOrders.length) lines.push(`<div>🔔 Bạn có <strong>${pendingPaymentOrders.length} lệnh chi</strong> cần duyệt trong mục <strong>Lệnh chi</strong>. <button class="btn btn-ghost btn-sm" data-goto-approval="orders">Xem ngay</button></div>`);
+  if(pendingAdvanceOrders.length) lines.push(`<div>🔔 Bạn có <strong>${pendingAdvanceOrders.length} tạm ứng</strong> cần duyệt trong mục <strong>Lệnh tạm ứng</strong>. <button class="btn btn-ghost btn-sm" data-goto-approval="advance">Xem ngay</button></div>`);
   box.className = 'approval-banner';
   box.style.display = 'flex';
-  box.innerHTML = `<span>🔔 Bạn có ${parts.join(', ')} (tổng ${fmtVND(totalAmount)}) đang chờ bạn duyệt.</span>
-    <button class="btn btn-primary btn-sm" id="approval-banner-goto">Xem ngay</button>`;
-  // Điều hướng tới đúng trang có nhiều việc chờ nhất (ưu tiên Thu Chi > Lệnh chi > Lệnh tạm ứng)
-  let target = 'transactions';
-  if(pendingTx.length === 0){
-    target = pendingPaymentOrders.length >= pendingAdvanceOrders.length ? 'orders' : 'advance';
-  }
-  document.getElementById('approval-banner-goto').addEventListener('click', ()=>{
-    document.querySelector(`[data-view="${target}"]`)?.click();
+  box.style.flexDirection = 'column';
+  box.style.alignItems = 'flex-start';
+  box.style.gap = '6px';
+  box.innerHTML = `<div style="font-size:11.5px;color:var(--ink-faint);margin-bottom:2px;">Tổng ${fmtVND(totalAmount)} đang chờ bạn duyệt:</div>` + lines.join('');
+  box.querySelectorAll('[data-goto-approval]').forEach(btn=>{
+    btn.addEventListener('click', ()=>{
+      document.querySelector(`[data-view="${btn.dataset.gotoApproval}"]`)?.click();
+    });
   });
 }
 
@@ -447,7 +446,7 @@ function renderTxTable(){
   }
 
   const theadHtml = `<thead><tr>
-    <th>Ngày</th><th>Loại</th><th>Dự án</th><th>Nội dung</th><th>Diễn giải</th><th>Thành tiền</th><th>Hóa đơn</th><th>CK / Nhận tiền</th><th>Duyệt chi</th><th></th>
+    <th>Ngày</th><th>Loại</th><th>Dự án</th><th>Nội dung</th><th>Diễn giải</th><th>Thành tiền</th><th>Trạng thái hóa đơn</th><th>Trạng thái CK/Nhận tiền</th><th>Trạng thái duyệt</th><th></th>
   </tr></thead>`;
 
   // Không còn nhóm theo dự án nữa — luôn hiển thị 1 bảng phẳng, sắp theo ngày mới nhất, có thêm cột Dự án riêng.
