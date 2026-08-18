@@ -86,6 +86,11 @@ function applyRolePermissions(){
   if(btnUploadFcThu) btnUploadFcThu.style.display = isAdmin() ? '' : 'none';
   const btnUploadFcChi = document.getElementById('btn-upload-fc-chi');
   if(btnUploadFcChi) btnUploadFcChi.style.display = isAdmin() ? '' : 'none';
+  // Sub-admin (GĐ) chỉ xem + duyệt, không có quyền tạo mới bất cứ gì -> ẩn cả 2 điểm vào "Tạo nhanh".
+  const fabBtn = document.getElementById('fab-quick-create');
+  if(fabBtn) fabBtn.style.display = isSubAdmin() ? 'none' : '';
+  const dashQcBtn = document.getElementById('btn-dash-quick-create');
+  if(dashQcBtn) dashQcBtn.style.display = isSubAdmin() ? 'none' : '';
   const btnExportTx = document.getElementById('btn-export-tx');
   if(btnExportTx) btnExportTx.style.display = isAdmin() ? '' : 'none';
   const btnExportFc = document.getElementById('btn-export-fc');
