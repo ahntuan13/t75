@@ -10,6 +10,8 @@
 // =============================================================
 
 let ORDERS = [];
+let currentOrderAttachment = ''; // base64 data URL của file đính kèm (mọi loại file)
+let currentOrderAttachmentName = '';
 
 function listenOrders(){
   db.collection('paymentOrders').orderBy('date','desc').onSnapshot((snap)=>{
@@ -43,6 +45,9 @@ function openOrderModal(id, context, presetType){
   } else {
     typeSelect.innerHTML = `<option value="payment">Thanh toán chi phí</option>`;
   }
+  // Lệnh chi (Thanh toán chi phí) không cần chọn Loại lệnh chi (chỉ 1 lựa chọn) và không cần Giải trình
+  document.getElementById('order-type-field').style.display = effectiveContext === 'advance' ? '' : 'none';
+  document.getElementById('order-explanation-field').style.display = effectiveContext === 'advance' ? '' : 'none';
 
   document.getElementById('order-modal-title').textContent = id
     ? 'Sửa lệnh chi'
@@ -60,6 +65,10 @@ function openOrderModal(id, context, presetType){
   setMoneyInputValue(document.getElementById('order-amount'), o.amount);
   document.getElementById('order-requester').value = o.requester || (auth.currentUser ? auth.currentUser.email : '');
   document.getElementById('order-explanation').value = o.explanation || '';
+  currentOrderAttachment = o.attachment || '';
+  currentOrderAttachmentName = o.attachmentName || '';
+  document.getElementById('order-attachment-input').value = '';
+  renderOrderAttachmentStatus();
   document.getElementById('order-note').value = o.note || '';
   document.getElementById('order-approval-target').value = o.approvalStatus==='pending' ? (o.approverRole||'') : '';
   renderOrderApprovalCurrentStatus(o);
@@ -85,6 +94,38 @@ function applyAdvanceSalaryDefaults(isNew){
   }
 }
 document.getElementById('order-type')?.addEventListener('change', ()=> applyAdvanceSalaryDefaults(!document.getElementById('order-id').value));
+
+function renderOrderAttachmentStatus(){
+  const el = document.getElementById('order-attachment-status');
+  if(!el) return;
+  if(currentOrderAttachment){
+    el.innerHTML = `<a href="${currentOrderAttachment}" target="_blank" class="tag tag-blue">📎 ${escapeHtml(currentOrderAttachmentName||'Xem file')}</a> <button type="button" class="btn btn-ghost btn-sm" id="order-attachment-remove">Xóa file</button>`;
+    document.getElementById('order-attachment-remove').addEventListener('click', ()=>{
+      currentOrderAttachment = ''; currentOrderAttachmentName = '';
+      document.getElementById('order-attachment-input').value = '';
+      renderOrderAttachmentStatus();
+    });
+  } else {
+    el.innerHTML = `<span class="helper-text">Chưa có file đính kèm.</span>`;
+  }
+}
+document.getElementById('order-attachment-input')?.addEventListener('change', (e)=>{
+  const file = e.target.files[0];
+  if(!file) return;
+  if(file.size > 2*1024*1024){
+    toast('File quá lớn (>2MB), vui lòng chọn file nhỏ hơn');
+    e.target.value = '';
+    return;
+  }
+  const reader = new FileReader();
+  reader.onload = ()=>{
+    currentOrderAttachment = reader.result;
+    currentOrderAttachmentName = file.name;
+    renderOrderAttachmentStatus();
+  };
+  reader.onerror = ()=> toast('Không đọc được file');
+  reader.readAsDataURL(file);
+});
 
 document.getElementById('btn-add-order')?.addEventListener('click', ()=> openOrderModal(null, 'payment'));
 document.getElementById('btn-add-advance')?.addEventListener('click', ()=> openOrderModal(null, 'advance'));
@@ -119,6 +160,8 @@ document.getElementById('save-order-btn').addEventListener('click', async ()=>{
     payeeTaxCode: document.getElementById('order-payee-tax').value.trim(),
     requester: document.getElementById('order-requester').value.trim(),
     explanation: document.getElementById('order-explanation').value.trim(),
+    attachment: currentOrderAttachment,
+    attachmentName: currentOrderAttachmentName,
     note: document.getElementById('order-note').value.trim(),
   };
 
