@@ -546,6 +546,24 @@
         <div class="field"><label>Giá trị hợp đồng (đã VAT)</label><input type="text" id="project-contract-value" placeholder="0"></div>
         <div class="field"><label>Chi phí dự toán</label><input type="text" id="project-cost-budget" placeholder="0"></div>
         <div class="field"><label>Doanh thu dự toán</label><input type="text" id="project-revenue-budget" placeholder="0"></div>
+        <div class="field"><label>Ngày ký hợp đồng</label><input type="date" id="project-sign-date"></div>
+        <div class="field"><label>Ngày hoàn thành</label><input type="date" id="project-completion-date"></div>
+        <div class="field">
+          <label>Thời gian bảo hành</label>
+          <select id="project-warranty-years">
+            <option value="">— Không áp dụng —</option>
+            <option value="1">1 năm</option>
+            <option value="2">2 năm</option>
+            <option value="3">3 năm</option>
+            <option value="4">4 năm</option>
+            <option value="5">5 năm</option>
+          </select>
+        </div>
+        <div class="field">
+          <label>Ngày bắt đầu tính bảo hành</label>
+          <input type="date" id="project-warranty-start" disabled>
+          <div class="helper-text">Tự ghi lại ngày khi bạn chuyển Trạng thái sang "Còn giữ 5% bảo hành".</div>
+        </div>
         <div class="field full">
           <label>File hợp đồng (upload thẳng lên OneDrive công ty — 1 dự án có thể có nhiều hợp đồng)</label>
           <input type="file" id="project-contract-file" accept="image/*,.pdf,application/pdf">
@@ -670,8 +688,8 @@
 </div>
 
 <div class="modal-backdrop" id="modal-order-explain">
-  <div class="modal" style="max-width:720px;">
-    <div class="modal-head"><h3>🧾 Giải trình lệnh tạm ứng</h3><button class="modal-close" data-close>✕</button></div>
+  <div class="modal" style="max-width:1180px;width:94vw;">
+    <div class="modal-head"><h3>🧾 Giải chi lệnh tạm ứng</h3><button class="modal-close" data-close>✕</button></div>
     <div class="modal-body">
       <input type="hidden" id="exp-order-id">
       <div id="exp-summary" class="tx-view-note" style="margin-bottom:14px;"></div>
@@ -680,105 +698,125 @@
         <div class="field"><label>Người/đơn vị nhận chi (gốc)</label><input id="exp-payee" disabled></div>
         <p class="helper-text field full" style="margin:0;">Do 1 lệnh tạm ứng có thể được chi cho nhiều dự án khác nhau, điền tối đa 5 khung bên dưới — mỗi khung là 1 khoản phân bổ cho 1 dự án. Chi phí sẽ tự động cộng vào đúng dự án tương ứng trong Thu Chi.</p>
 
-        <div class="field full" style="border-top:1px solid var(--line);padding-top:14px;margin-top:4px;">
-          <label style="font-size:13px;font-weight:700;color:var(--ink);">Giải trình 1</label>
+        <div class="exp-block">
+          <label class="exp-block-title">Giải chi 1</label>
+          <div class="exp-row">
+            <div class="field grow2"><label>Dự án</label><select id="exp1-project"><option value="">— Không chọn (INDIRECT) —</option></select></div>
+            <div class="field"><label>Mã (code)</label>
+              <select id="exp1-code">
+                <option value="">-- Chọn mã --</option>
+                <option value="QL">QL - Quản lý</option>
+                <option value="VTC">VTC - Vật tư chính</option>
+                <option value="VTP">VTP - Vật tư phụ</option>
+                <option value="NC">NC - Nhân công</option>
+              </select>
+            </div>
+            <div class="field grow2"><label>Nội dung</label><input id="exp1-content" placeholder="VD: Tạm ứng chi phí công trình"></div>
+            <div class="field grow2"><label>Diễn giải</label><input id="exp1-desc"></div>
+          </div>
+          <div class="exp-row">
+            <div class="field"><label>ĐVT</label><input id="exp1-unit" placeholder="lot, tháng..."></div>
+            <div class="field grow-sm"><label>SL</label><input type="number" id="exp1-qty" value="1"></div>
+            <div class="field"><label>Đơn giá</label><input type="text" id="exp1-price" placeholder="0"></div>
+            <div class="field"><label>Thành tiền</label><input type="text" id="exp1-amount" placeholder="0"></div>
+          </div>
         </div>
-        <div class="field"><label>Dự án</label><select id="exp1-project"><option value="">— Không chọn —</option></select></div>
-        <div class="field"><label>Mã (code)</label>
-          <select id="exp1-code">
-            <option value="">-- Chọn mã --</option>
-            <option value="QL">QL - Quản lý</option>
-            <option value="VTC">VTC - Vật tư chính</option>
-            <option value="VTP">VTP - Vật tư phụ</option>
-            <option value="NC">NC - Nhân công</option>
-          </select>
-        </div>
-        <div class="field full"><label>Nội dung</label><input id="exp1-content" placeholder="VD: Tạm ứng chi phí công trình"></div>
-        <div class="field full"><label>Diễn giải</label><input id="exp1-desc"></div>
-        <div class="field"><label>ĐVT</label><input id="exp1-unit" placeholder="lot, tháng..."></div>
-        <div class="field"><label>SL</label><input type="number" id="exp1-qty" value="1"></div>
-        <div class="field"><label>Đơn giá</label><input type="text" id="exp1-price" placeholder="0"></div>
-        <div class="field"><label>Thành tiền</label><input type="text" id="exp1-amount" placeholder="0"></div>
 
-        <div class="field full" style="border-top:1px solid var(--line);padding-top:14px;margin-top:4px;">
-          <label style="font-size:13px;font-weight:700;color:var(--ink);">Giải trình 2</label>
+        <div class="exp-block">
+          <label class="exp-block-title">Giải chi 2</label>
+          <div class="exp-row">
+            <div class="field grow2"><label>Dự án</label><select id="exp2-project"><option value="">— Không chọn (INDIRECT) —</option></select></div>
+            <div class="field"><label>Mã (code)</label>
+              <select id="exp2-code">
+                <option value="">-- Chọn mã --</option>
+                <option value="QL">QL - Quản lý</option>
+                <option value="VTC">VTC - Vật tư chính</option>
+                <option value="VTP">VTP - Vật tư phụ</option>
+                <option value="NC">NC - Nhân công</option>
+              </select>
+            </div>
+            <div class="field grow2"><label>Nội dung</label><input id="exp2-content" placeholder="VD: Tạm ứng chi phí công trình"></div>
+            <div class="field grow2"><label>Diễn giải</label><input id="exp2-desc"></div>
+          </div>
+          <div class="exp-row">
+            <div class="field"><label>ĐVT</label><input id="exp2-unit" placeholder="lot, tháng..."></div>
+            <div class="field grow-sm"><label>SL</label><input type="number" id="exp2-qty" value="1"></div>
+            <div class="field"><label>Đơn giá</label><input type="text" id="exp2-price" placeholder="0"></div>
+            <div class="field"><label>Thành tiền</label><input type="text" id="exp2-amount" placeholder="0"></div>
+          </div>
         </div>
-        <div class="field"><label>Dự án</label><select id="exp2-project"><option value="">— Không chọn —</option></select></div>
-        <div class="field"><label>Mã (code)</label>
-          <select id="exp2-code">
-            <option value="">-- Chọn mã --</option>
-            <option value="QL">QL - Quản lý</option>
-            <option value="VTC">VTC - Vật tư chính</option>
-            <option value="VTP">VTP - Vật tư phụ</option>
-            <option value="NC">NC - Nhân công</option>
-          </select>
-        </div>
-        <div class="field full"><label>Nội dung</label><input id="exp2-content" placeholder="VD: Tạm ứng chi phí công trình"></div>
-        <div class="field full"><label>Diễn giải</label><input id="exp2-desc"></div>
-        <div class="field"><label>ĐVT</label><input id="exp2-unit" placeholder="lot, tháng..."></div>
-        <div class="field"><label>SL</label><input type="number" id="exp2-qty" value="1"></div>
-        <div class="field"><label>Đơn giá</label><input type="text" id="exp2-price" placeholder="0"></div>
-        <div class="field"><label>Thành tiền</label><input type="text" id="exp2-amount" placeholder="0"></div>
 
-        <div class="field full" style="border-top:1px solid var(--line);padding-top:14px;margin-top:4px;">
-          <label style="font-size:13px;font-weight:700;color:var(--ink);">Giải trình 3</label>
+        <div class="exp-block">
+          <label class="exp-block-title">Giải chi 3</label>
+          <div class="exp-row">
+            <div class="field grow2"><label>Dự án</label><select id="exp3-project"><option value="">— Không chọn (INDIRECT) —</option></select></div>
+            <div class="field"><label>Mã (code)</label>
+              <select id="exp3-code">
+                <option value="">-- Chọn mã --</option>
+                <option value="QL">QL - Quản lý</option>
+                <option value="VTC">VTC - Vật tư chính</option>
+                <option value="VTP">VTP - Vật tư phụ</option>
+                <option value="NC">NC - Nhân công</option>
+              </select>
+            </div>
+            <div class="field grow2"><label>Nội dung</label><input id="exp3-content" placeholder="VD: Tạm ứng chi phí công trình"></div>
+            <div class="field grow2"><label>Diễn giải</label><input id="exp3-desc"></div>
+          </div>
+          <div class="exp-row">
+            <div class="field"><label>ĐVT</label><input id="exp3-unit" placeholder="lot, tháng..."></div>
+            <div class="field grow-sm"><label>SL</label><input type="number" id="exp3-qty" value="1"></div>
+            <div class="field"><label>Đơn giá</label><input type="text" id="exp3-price" placeholder="0"></div>
+            <div class="field"><label>Thành tiền</label><input type="text" id="exp3-amount" placeholder="0"></div>
+          </div>
         </div>
-        <div class="field"><label>Dự án</label><select id="exp3-project"><option value="">— Không chọn —</option></select></div>
-        <div class="field"><label>Mã (code)</label>
-          <select id="exp3-code">
-            <option value="">-- Chọn mã --</option>
-            <option value="QL">QL - Quản lý</option>
-            <option value="VTC">VTC - Vật tư chính</option>
-            <option value="VTP">VTP - Vật tư phụ</option>
-            <option value="NC">NC - Nhân công</option>
-          </select>
-        </div>
-        <div class="field full"><label>Nội dung</label><input id="exp3-content" placeholder="VD: Tạm ứng chi phí công trình"></div>
-        <div class="field full"><label>Diễn giải</label><input id="exp3-desc"></div>
-        <div class="field"><label>ĐVT</label><input id="exp3-unit" placeholder="lot, tháng..."></div>
-        <div class="field"><label>SL</label><input type="number" id="exp3-qty" value="1"></div>
-        <div class="field"><label>Đơn giá</label><input type="text" id="exp3-price" placeholder="0"></div>
-        <div class="field"><label>Thành tiền</label><input type="text" id="exp3-amount" placeholder="0"></div>
 
-        <div class="field full" style="border-top:1px solid var(--line);padding-top:14px;margin-top:4px;">
-          <label style="font-size:13px;font-weight:700;color:var(--ink);">Giải trình 4</label>
+        <div class="exp-block">
+          <label class="exp-block-title">Giải chi 4</label>
+          <div class="exp-row">
+            <div class="field grow2"><label>Dự án</label><select id="exp4-project"><option value="">— Không chọn (INDIRECT) —</option></select></div>
+            <div class="field"><label>Mã (code)</label>
+              <select id="exp4-code">
+                <option value="">-- Chọn mã --</option>
+                <option value="QL">QL - Quản lý</option>
+                <option value="VTC">VTC - Vật tư chính</option>
+                <option value="VTP">VTP - Vật tư phụ</option>
+                <option value="NC">NC - Nhân công</option>
+              </select>
+            </div>
+            <div class="field grow2"><label>Nội dung</label><input id="exp4-content" placeholder="VD: Tạm ứng chi phí công trình"></div>
+            <div class="field grow2"><label>Diễn giải</label><input id="exp4-desc"></div>
+          </div>
+          <div class="exp-row">
+            <div class="field"><label>ĐVT</label><input id="exp4-unit" placeholder="lot, tháng..."></div>
+            <div class="field grow-sm"><label>SL</label><input type="number" id="exp4-qty" value="1"></div>
+            <div class="field"><label>Đơn giá</label><input type="text" id="exp4-price" placeholder="0"></div>
+            <div class="field"><label>Thành tiền</label><input type="text" id="exp4-amount" placeholder="0"></div>
+          </div>
         </div>
-        <div class="field"><label>Dự án</label><select id="exp4-project"><option value="">— Không chọn —</option></select></div>
-        <div class="field"><label>Mã (code)</label>
-          <select id="exp4-code">
-            <option value="">-- Chọn mã --</option>
-            <option value="QL">QL - Quản lý</option>
-            <option value="VTC">VTC - Vật tư chính</option>
-            <option value="VTP">VTP - Vật tư phụ</option>
-            <option value="NC">NC - Nhân công</option>
-          </select>
-        </div>
-        <div class="field full"><label>Nội dung</label><input id="exp4-content" placeholder="VD: Tạm ứng chi phí công trình"></div>
-        <div class="field full"><label>Diễn giải</label><input id="exp4-desc"></div>
-        <div class="field"><label>ĐVT</label><input id="exp4-unit" placeholder="lot, tháng..."></div>
-        <div class="field"><label>SL</label><input type="number" id="exp4-qty" value="1"></div>
-        <div class="field"><label>Đơn giá</label><input type="text" id="exp4-price" placeholder="0"></div>
-        <div class="field"><label>Thành tiền</label><input type="text" id="exp4-amount" placeholder="0"></div>
 
-        <div class="field full" style="border-top:1px solid var(--line);padding-top:14px;margin-top:4px;">
-          <label style="font-size:13px;font-weight:700;color:var(--ink);">Giải trình 5</label>
+        <div class="exp-block">
+          <label class="exp-block-title">Giải chi 5</label>
+          <div class="exp-row">
+            <div class="field grow2"><label>Dự án</label><select id="exp5-project"><option value="">— Không chọn (INDIRECT) —</option></select></div>
+            <div class="field"><label>Mã (code)</label>
+              <select id="exp5-code">
+                <option value="">-- Chọn mã --</option>
+                <option value="QL">QL - Quản lý</option>
+                <option value="VTC">VTC - Vật tư chính</option>
+                <option value="VTP">VTP - Vật tư phụ</option>
+                <option value="NC">NC - Nhân công</option>
+              </select>
+            </div>
+            <div class="field grow2"><label>Nội dung</label><input id="exp5-content" placeholder="VD: Tạm ứng chi phí công trình"></div>
+            <div class="field grow2"><label>Diễn giải</label><input id="exp5-desc"></div>
+          </div>
+          <div class="exp-row">
+            <div class="field"><label>ĐVT</label><input id="exp5-unit" placeholder="lot, tháng..."></div>
+            <div class="field grow-sm"><label>SL</label><input type="number" id="exp5-qty" value="1"></div>
+            <div class="field"><label>Đơn giá</label><input type="text" id="exp5-price" placeholder="0"></div>
+            <div class="field"><label>Thành tiền</label><input type="text" id="exp5-amount" placeholder="0"></div>
+          </div>
         </div>
-        <div class="field"><label>Dự án</label><select id="exp5-project"><option value="">— Không chọn —</option></select></div>
-        <div class="field"><label>Mã (code)</label>
-          <select id="exp5-code">
-            <option value="">-- Chọn mã --</option>
-            <option value="QL">QL - Quản lý</option>
-            <option value="VTC">VTC - Vật tư chính</option>
-            <option value="VTP">VTP - Vật tư phụ</option>
-            <option value="NC">NC - Nhân công</option>
-          </select>
-        </div>
-        <div class="field full"><label>Nội dung</label><input id="exp5-content" placeholder="VD: Tạm ứng chi phí công trình"></div>
-        <div class="field full"><label>Diễn giải</label><input id="exp5-desc"></div>
-        <div class="field"><label>ĐVT</label><input id="exp5-unit" placeholder="lot, tháng..."></div>
-        <div class="field"><label>SL</label><input type="number" id="exp5-qty" value="1"></div>
-        <div class="field"><label>Đơn giá</label><input type="text" id="exp5-price" placeholder="0"></div>
-        <div class="field"><label>Thành tiền</label><input type="text" id="exp5-amount" placeholder="0"></div>
 
         <div class="field full" style="border-top:1px solid var(--line);padding-top:14px;margin-top:6px;">
           <label style="font-size:13px;font-weight:700;color:var(--ink);">✅ Phê duyệt Giám đốc</label>
@@ -846,7 +884,7 @@
           <div id="order-attachment-status" style="margin-top:8px;"></div>
         </div>
         <div class="field full" id="order-explanation-field">
-          <label>📝 Giải trình</label>
+          <label>📝 Giải chi</label>
           <div class="helper-text" style="margin-bottom:6px;">KT ghi rõ khoản tạm ứng này đã/sẽ dùng vào việc gì, chi tiết chứng từ liên quan (nếu có).</div>
           <textarea id="order-explanation" rows="3" placeholder="VD: Đã chi cho Mr.Liêm mua vật tư công trình URC ngày.../ đính kèm hóa đơn số..."></textarea>
         </div>
