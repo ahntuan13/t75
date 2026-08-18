@@ -26,19 +26,23 @@ function computeNotifications(){
 
   const amAdmin = typeof isAdmin==='function' && isAdmin();
   const isGD = typeof APPROVERS !== 'undefined' && APPROVERS.gdEmail && APPROVERS.gdEmail.toLowerCase() === myEmail;
+  const isAdv = (typeof isAdvanceOrder==='function') ? isAdvanceOrder : ()=>false;
 
   // 1) Đang chờ duyệt: Admin thấy TOÀN BỘ (mọi yêu cầu, dù gửi cho ai); GĐ chỉ thấy đúng cái gửi cho mình.
+  // Mỗi mục ghi rõ "section" (Thu Chi / Lệnh chi / Lệnh tạm ứng) để GĐ biết chính xác cần vào đâu duyệt.
   const pendingForMe = [];
   if(amAdmin){
     TRANSACTIONS.filter(t=> t.type==='OUT' && t.approvalStatus==='pending')
-      .forEach(t=> pendingForMe.push({ label: `Chi: ${t.content}`, amount: t.amount, view: 'transactions' }));
+      .forEach(t=> pendingForMe.push({ label: t.content, amount: t.amount, view: 'transactions', section: 'Thu Chi' }));
     (typeof ORDERS!=='undefined' ? ORDERS : []).filter(o=> o.approvalStatus==='pending')
-      .forEach(o=> pendingForMe.push({ label: `Lệnh chi: ${o.reason}`, amount: o.amount, view: (typeof isAdvanceOrder==='function' && isAdvanceOrder(o)) ? 'advance' : 'orders' }));
+      .forEach(o=> pendingForMe.push({ label: o.reason, amount: o.amount,
+        view: isAdv(o) ? 'advance' : 'orders', section: isAdv(o) ? 'Lệnh tạm ứng' : 'Lệnh chi' }));
   } else if(isGD){
     TRANSACTIONS.filter(t=> t.type==='OUT' && t.approvalStatus==='pending' && (t.approverEmail||'').toLowerCase()===myEmail)
-      .forEach(t=> pendingForMe.push({ label: `Chi: ${t.content}`, amount: t.amount, view: 'transactions' }));
+      .forEach(t=> pendingForMe.push({ label: t.content, amount: t.amount, view: 'transactions', section: 'Thu Chi' }));
     (typeof ORDERS!=='undefined' ? ORDERS : []).filter(o=> o.approvalStatus==='pending' && (o.approverEmail||'').toLowerCase()===myEmail)
-      .forEach(o=> pendingForMe.push({ label: `Lệnh chi: ${o.reason}`, amount: o.amount, view: (typeof isAdvanceOrder==='function' && isAdvanceOrder(o)) ? 'advance' : 'orders' }));
+      .forEach(o=> pendingForMe.push({ label: o.reason, amount: o.amount,
+        view: isAdv(o) ? 'advance' : 'orders', section: isAdv(o) ? 'Lệnh tạm ứng' : 'Lệnh chi' }));
   }
 
   // 2) Đã có kết quả duyệt: Admin thấy TOÀN BỘ (toàn công ty, trong N ngày gần đây);
@@ -92,7 +96,7 @@ function renderNotifications(){
   let html = '';
   html += section('🟡 Đang chờ bạn duyệt', pendingForMe, (n)=> `
     <div class="notif-item" data-notif-view="${n.view}">
-      <div class="notif-title">${escapeHtml(n.label)}</div>
+      <div class="notif-title">[${escapeHtml(n.section)}] ${escapeHtml(n.label)}</div>
       <div>${fmtVND(n.amount)}</div>
     </div>`);
   html += section('✅ Đã có kết quả duyệt', decidedForMe, (n)=> `
