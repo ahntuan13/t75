@@ -244,9 +244,9 @@ tr.tx-subhead-in td{color:var(--teal);}
 tr.tx-subhead-out td{color:var(--red);}
 tr td.tx-subhead-empty{color:var(--ink-faint);font-style:italic;font-size:12.5px;}
 .chart-total-panel{display:flex;gap:12px;margin-bottom:14px;flex-wrap:wrap;}
-.chart-total-box{flex:1;min-width:150px;background:#1E2433;border-radius:12px;padding:12px 14px;text-align:center;color:#fff;}
-.chart-total-box .lbl{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.04em;opacity:.85;margin-bottom:6px;}
-.chart-total-box .val{font-size:16px;font-weight:800;padding:6px 8px;border-radius:8px;}
+.chart-total-box{flex:1;min-width:150px;background:#fff;border:1px solid var(--line);border-radius:12px;padding:12px 14px;text-align:center;box-shadow:var(--shadow);}
+.chart-total-box .lbl{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.04em;color:var(--ink-dim);margin-bottom:6px;}
+.chart-total-box .val{font-size:16px;font-weight:800;padding:6px 8px;border-radius:8px;color:#fff;}
 .chart-total-box.cost .val{background:#3B57D9;}
 .chart-total-box.revenue .val{background:#C0392B;}
 .chart-total-box.profit .val{background:#7A9A3B;}
