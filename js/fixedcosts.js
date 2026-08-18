@@ -56,7 +56,7 @@ function renderFixedCostsTable(){
   const sumIn = activeSorted.filter(t=>t.type==='IN').reduce((s,t)=>s+Number(t.amount||0),0);
   const sumOut = activeSorted.filter(t=>t.type==='OUT').reduce((s,t)=>s+Number(t.amount||0),0);
   const theadHtml = `<thead><tr>
-    <th>Ngày</th><th>Loại</th><th>Dự án</th><th>Nội dung</th><th>Diễn giải</th><th>Thành tiền</th><th>Hóa đơn</th><th>CK / Nhận tiền</th><th>Duyệt chi</th><th></th>
+    <th>Ngày</th><th>Loại</th><th>Dự án</th><th>Nội dung</th><th>Diễn giải</th><th>Thành tiền</th><th>Trạng thái hóa đơn</th><th>Trạng thái CK/Nhận tiền</th><th>Trạng thái duyệt</th><th></th>
   </tr></thead>`;
   wrap.innerHTML = `
     <div class="card tx-project-block">
@@ -68,7 +68,6 @@ function renderFixedCostsTable(){
           <span>Chênh lệch: <strong>${fmtVND(sumIn-sumOut)}</strong></span>
         </div>
       </div>
-      <p class="helper-text" style="margin:-4px 0 10px;">Các khoản tạm ứng đã "🧾 Giải trình" (gạch ngang, tô xám) không được tính vào tổng trên — số liệu chính thức của chúng đã nằm trong mục Thu Chi.</p>
       <div class="table-wrap">
         <table class="data">
           ${theadHtml}
@@ -225,10 +224,18 @@ document.getElementById('upload-fc-chi-input')?.addEventListener('change', (e)=>
 
 // ---------------- Chuyển dữ liệu cũ: các giao dịch project = INDIRECT trong Thu Chi -> Chi phí gián tiếp ----------------
 // Chạy 1 LẦN DUY NHẤT (thủ công, Admin bấm) để dọn dữ liệu cũ đã lỡ nằm trong Thu Chi trước khi có mục này.
+// Bắt cả 2 trường hợp cần chuyển:
+// 1) projectName literal = "INDIRECT" (dữ liệu cũ từ thời Excel gốc).
+// 2) Giao dịch KHÔNG CÓ dự án (blank) nhưng được HỆ THỐNG tự tạo ra từ 1 Lệnh chi/Tạm ứng
+//    (nhận diện qua ghi chú "Tự động tạo từ...") — đây chính là các lệnh chi cũ tạo ra TRƯỚC KHI
+//    mục Chi phí gián tiếp tồn tại, nên vẫn còn nằm lạc trong Thu Chi.
 async function migrateIndirectToFixedCosts(){
-  const indirectTx = TRANSACTIONS.filter(t => (t.projectName||'').trim().toUpperCase() === 'INDIRECT');
-  if(indirectTx.length === 0){ alert('Không tìm thấy giao dịch nào thuộc dự án INDIRECT trong Thu Chi.'); return; }
-  if(!confirm(`Tìm thấy ${indirectTx.length} giao dịch thuộc "INDIRECT" trong Thu Chi.\n\nBấm OK để CHUYỂN toàn bộ sang mục Chi phí gián tiếp, sau đó XÓA khỏi Thu Chi (tránh trùng lặp).\n\nThao tác này không hoàn tác được, hãy chắc chắn trước khi tiếp tục.`)) return;
+  const indirectTx = TRANSACTIONS.filter(t =>
+    (t.projectName||'').trim().toUpperCase() === 'INDIRECT' ||
+    (!t.projectId && !t.projectName && t.note && t.note.startsWith('Tự động tạo từ'))
+  );
+  if(indirectTx.length === 0){ alert('Không tìm thấy giao dịch nào cần chuyển sang Chi phí gián tiếp.'); return; }
+  if(!confirm(`Tìm thấy ${indirectTx.length} giao dịch không thuộc dự án nào (INDIRECT hoặc do Lệnh chi cũ tự tạo) đang nằm lạc trong Thu Chi.\n\nBấm OK để CHUYỂN toàn bộ sang mục Chi phí gián tiếp, sau đó XÓA khỏi Thu Chi (tránh trùng lặp).\n\nThao tác này không hoàn tác được, hãy chắc chắn trước khi tiếp tục.`)) return;
 
   try{
     const CHUNK = 400;
@@ -236,13 +243,21 @@ async function migrateIndirectToFixedCosts(){
       const batch = db.batch();
       indirectTx.slice(i, i+CHUNK).forEach(t=>{
         const { id, ...rest } = t;
-        const ref = db.collection('fixedCosts').doc();
-        batch.set(ref, { ...rest, projectId:'', projectName:'', code: rest.code || 'INDIRECT' });
+        const newRef = db.collection('fixedCosts').doc();
+        batch.set(newRef, { ...rest, projectId:'', projectName:'', code: rest.code || 'INDIRECT' });
         batch.delete(db.collection('transactions').doc(id));
+        // Nếu giao dịch này gắn với 1 Lệnh chi/Tạm ứng (paymentOrders.transactionId trỏ về đây),
+        // cập nhật lại đúng địa chỉ mới để lần sau không bị lạc nữa.
+        const linkedOrder = (typeof ORDERS!=='undefined'?ORDERS:[]).find(o=>o.transactionId===id);
+        if(linkedOrder){
+          batch.update(db.collection('paymentOrders').doc(linkedOrder.id), {
+            transactionId: newRef.id, transactionCollection: 'fixedCosts',
+          });
+        }
       });
       await batch.commit();
     }
-    toast(`✅ Đã chuyển ${indirectTx.length} giao dịch INDIRECT sang Chi phí gián tiếp`);
+    toast(`✅ Đã chuyển ${indirectTx.length} giao dịch sang Chi phí gián tiếp`);
   }catch(err){
     alert('Lỗi khi chuyển dữ liệu: ' + err.message);
   }
