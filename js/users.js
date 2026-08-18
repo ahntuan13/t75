@@ -2,11 +2,22 @@
 // ROLES & PERMISSIONS (admin / user)
 // =============================================================
 
-let CURRENT_ROLE = 'user'; // 'admin' | 'user' — mặc định an toàn là user
+// =============================================================
+// ROLES & PERMISSIONS (admin / subadmin / user)
+// - admin: toàn quyền (xem, sửa, xóa mọi mục, quản trị người dùng)
+// - subadmin (Giám đốc): xem đầy đủ mọi mục ở chế độ VIEW-ONLY (không sửa/xóa),
+//   chỉ được Duyệt/Từ chối các yêu cầu gửi tới (theo đúng email được gán)
+// - user (Kế toán): nhập liệu, sửa được phần lớn, KHÔNG được xóa 1 số mục nhạy cảm
+// =============================================================
+
+let CURRENT_ROLE = 'user'; // 'admin' | 'subadmin' | 'user' — mặc định an toàn là user
 let CURRENT_USER_NAME = '';
 let APP_USERS = [];
 
 function isAdmin(){ return CURRENT_ROLE === 'admin'; }
+function isSubAdmin(){ return CURRENT_ROLE === 'subadmin'; }
+// Được XEM đầy đủ các mục quản trị/báo cáo (Admin hoặc Sub-admin) — nhưng KHÔNG đồng nghĩa được sửa/xóa
+function canView(){ return isAdmin() || isSubAdmin(); }
 
 // Gọi ngay sau khi đăng nhập thành công, TRƯỚC khi tải dữ liệu khác,
 // để mọi bảng biểu render đúng quyền ngay từ đầu.
@@ -17,12 +28,12 @@ async function ensureUserRole(){
   try{
     const snap = await ref.get();
     if(snap.exists){
-      CURRENT_ROLE = snap.data().role === 'admin' ? 'admin' : 'user';
+      const r = snap.data().role;
+      CURRENT_ROLE = (r === 'admin' || r === 'subadmin') ? r : 'user';
       CURRENT_USER_NAME = snap.data().name || email.split('@')[0];
     } else {
       // Tài khoản đăng nhập lần đầu -> tự tạo hồ sơ với quyền User (an toàn).
-      // Quyền Admin phải được một Admin khác gán tay (hoặc admin đầu tiên tự
-      // gán 1 lần qua Firestore Console, xem README).
+      // Quyền Admin/Sub-admin phải được một Admin khác gán tay (xem README).
       CURRENT_USER_NAME = email.split('@')[0];
       await ref.set({
         email, role:'user', name: CURRENT_USER_NAME,
@@ -39,19 +50,33 @@ async function ensureUserRole(){
   if(isAdmin()) listenAppUsers();
 }
 
+const ROLE_LABELS = {
+  admin: 'Quản trị viên (Admin)',
+  subadmin: 'Sub-admin (Giám đốc)',
+  user: 'Thành viên',
+};
+
 function applyRolePermissions(){
   const label = document.getElementById('user-role-label');
-  if(label) label.textContent = isAdmin() ? 'Quản trị viên (Admin)' : 'Thành viên';
-  // Chỉ Admin được xem: Dự án, Báo cáo (dòng tiền theo kỳ, lãi lỗ), quản trị người dùng, lịch sử chỉnh sửa.
+  if(label) label.textContent = ROLE_LABELS[CURRENT_ROLE] || 'Thành viên';
+  // Admin và Sub-admin (GĐ) đều được XEM: Dự án, Báo cáo (dòng tiền theo kỳ, lãi lỗ).
+  // Quản trị người dùng & Lịch sử chỉnh sửa: CHỈ Admin.
   // "Tổng quan thu chi", "Hóa đơn", "Chuyển khoản": User VẪN xem được (chỉ không sửa/xóa — đã chặn ở nút + Firestore rules).
-  const adminOnlyViews = ['users','activitylog','projects','reports','pnl'];
+  const adminOnlyViews = ['users','activitylog'];           // chỉ Admin
+  const viewOnlyForSubAdmin = ['projects','reports','pnl'];  // Admin + Sub-admin (GĐ) xem được
   adminOnlyViews.forEach(view=>{
     const nav = document.querySelector(`[data-view="${view}"]`);
     if(nav) nav.style.display = isAdmin() ? '' : 'none';
   });
+  viewOnlyForSubAdmin.forEach(view=>{
+    const nav = document.querySelector(`[data-view="${view}"]`);
+    if(nav) nav.style.display = canView() ? '' : 'none';
+  });
+  const allRestrictedViews = adminOnlyViews.concat(viewOnlyForSubAdmin);
   const activeView = document.querySelector('.nav-item.active');
-  if(!isAdmin() && activeView && adminOnlyViews.includes(activeView.dataset.view)){
-    document.querySelector('[data-view="dashboard"]')?.click();
+  if(activeView && allRestrictedViews.includes(activeView.dataset.view)){
+    const stillAllowed = adminOnlyViews.includes(activeView.dataset.view) ? isAdmin() : canView();
+    if(!stillAllowed) document.querySelector('[data-view="dashboard"]')?.click();
   }
   const btnUploadThu = document.getElementById('btn-upload-thu');
   if(btnUploadThu) btnUploadThu.style.display = isAdmin() ? '' : 'none';
