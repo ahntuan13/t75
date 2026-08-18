@@ -1,14 +1,13 @@
 // =============================================================
-// CHUÔNG THÔNG BÁO 🔔 — dành cho cả User & Giám đốc
+// CHUÔNG THÔNG BÁO 🔔 — dành cho cả 3 vai trò (Admin / Sub-admin GĐ / User)
 // Vì app không có server chạy nền (cron), thông báo được TÍNH ĐỘNG
 // mỗi khi dữ liệu thay đổi (không lưu "đã đọc/chưa đọc" riêng) —
 // luôn hiển thị đúng những gì đang thực sự cần bạn chú ý lúc này.
 //
-// 3 loại thông báo:
-// 1) GĐ: các khoản Chi / Lệnh chi đang chờ GĐ duyệt.
-// 2) User: các khoản mình đã gửi duyệt vừa được GĐ Duyệt/Từ chối (trong 3 ngày gần nhất).
-// 3) User: hóa đơn mình nhập đã quá 7 ngày mà CHƯA xuất hóa đơn hoặc còn thiếu
-//    thông tin (số HĐ / ngày HĐ).
+// Phân luồng theo vai trò:
+// - Admin: nhận ĐẦY ĐỦ mọi thông báo trong toàn công ty (từ User lẫn GĐ), không giới hạn theo email cá nhân.
+// - Sub-admin (GĐ): chỉ nhận thông báo "đang chờ mình duyệt" (do Admin/User gửi tới đúng email GĐ).
+// - User: chỉ nhận thông báo "đã có kết quả duyệt" cho đúng khoản mình tạo, và nhắc hóa đơn quá hạn của mình.
 // =============================================================
 
 const NOTIF_RECENT_DECISION_DAYS = 3;
@@ -25,27 +24,36 @@ function computeNotifications(){
   const myEmail = (auth.currentUser && auth.currentUser.email || '').toLowerCase();
   if(!myEmail) return { pendingForMe: [], decidedForMe: [], invoiceOverdue: [] };
 
+  const amAdmin = typeof isAdmin==='function' && isAdmin();
   const isGD = typeof APPROVERS !== 'undefined' && APPROVERS.gdEmail && APPROVERS.gdEmail.toLowerCase() === myEmail;
 
-  // 1) GĐ: đang chờ chính mình duyệt
+  // 1) Đang chờ duyệt: Admin thấy TOÀN BỘ (mọi yêu cầu, dù gửi cho ai); GĐ chỉ thấy đúng cái gửi cho mình.
   const pendingForMe = [];
-  if(isGD){
+  if(amAdmin){
+    TRANSACTIONS.filter(t=> t.type==='OUT' && t.approvalStatus==='pending')
+      .forEach(t=> pendingForMe.push({ label: `Chi: ${t.content}`, amount: t.amount, view: 'transactions' }));
+    (typeof ORDERS!=='undefined' ? ORDERS : []).filter(o=> o.approvalStatus==='pending')
+      .forEach(o=> pendingForMe.push({ label: `Lệnh chi: ${o.reason}`, amount: o.amount, view: 'orders' }));
+  } else if(isGD){
     TRANSACTIONS.filter(t=> t.type==='OUT' && t.approvalStatus==='pending' && (t.approverEmail||'').toLowerCase()===myEmail)
       .forEach(t=> pendingForMe.push({ label: `Chi: ${t.content}`, amount: t.amount, view: 'transactions' }));
     (typeof ORDERS!=='undefined' ? ORDERS : []).filter(o=> o.approvalStatus==='pending' && (o.approverEmail||'').toLowerCase()===myEmail)
       .forEach(o=> pendingForMe.push({ label: `Lệnh chi: ${o.reason}`, amount: o.amount, view: 'orders' }));
   }
 
-  // 2) User: khoản mình tạo vừa được GĐ Duyệt/Từ chối (trong N ngày gần đây)
+  // 2) Đã có kết quả duyệt: Admin thấy TOÀN BỘ (toàn công ty, trong N ngày gần đây);
+  //    User/GĐ chỉ thấy đúng khoản CHÍNH MÌNH đã tạo.
   const decidedForMe = [];
-  TRANSACTIONS.filter(t=> t.type==='OUT' && (t.approvalStatus==='approved' || t.approvalStatus==='rejected') && (t.createdBy||'').toLowerCase()===myEmail)
+  TRANSACTIONS.filter(t=> t.type==='OUT' && (t.approvalStatus==='approved' || t.approvalStatus==='rejected')
+      && (amAdmin || (t.createdBy||'').toLowerCase()===myEmail))
     .forEach(t=>{
       const days = daysSince(t.approvedAt);
       if(days!==null && days <= NOTIF_RECENT_DECISION_DAYS){
         decidedForMe.push({ label: `Chi: ${t.content}`, amount: t.amount, status: t.approvalStatus, view: 'transactions' });
       }
     });
-  (typeof ORDERS!=='undefined' ? ORDERS : []).filter(o=> (o.approvalStatus==='approved' || o.approvalStatus==='rejected') && (o.createdBy||'').toLowerCase()===myEmail)
+  (typeof ORDERS!=='undefined' ? ORDERS : []).filter(o=> (o.approvalStatus==='approved' || o.approvalStatus==='rejected')
+      && (amAdmin || (o.createdBy||'').toLowerCase()===myEmail))
     .forEach(o=>{
       const days = daysSince(o.approvedAt);
       if(days!==null && days <= NOTIF_RECENT_DECISION_DAYS){
@@ -53,9 +61,9 @@ function computeNotifications(){
       }
     });
 
-  // 3) User: hóa đơn mình nhập quá 7 ngày chưa xuất / thiếu thông tin
+  // 3) Hóa đơn quá hạn: Admin thấy TOÀN BỘ công ty; User chỉ thấy đúng khoản mình nhập.
   const invoiceOverdue = TRANSACTIONS.filter(t=>{
-    if((t.createdBy||'').toLowerCase() !== myEmail) return false;
+    if(!amAdmin && (t.createdBy||'').toLowerCase() !== myEmail) return false;
     const days = daysSince(t.createdAt);
     if(days===null || days < NOTIF_INVOICE_OVERDUE_DAYS) return false;
     const notIssued = (t.invoiceStatus||'pending') !== 'issued';
