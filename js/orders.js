@@ -134,8 +134,28 @@ function renderOrderApprovalCurrentStatus(o){
   const el = document.getElementById('order-approval-current-status');
   if(!el) return;
   const roleLabel = 'Giám đốc';
+  const myEmail = (auth.currentUser && auth.currentUser.email || '').toLowerCase();
+  const canDecide = o.approvalStatus==='pending' && o.approverEmail && myEmail === o.approverEmail.toLowerCase();
+
   if(!o.approvalStatus || o.approvalStatus==='none'){ el.textContent = 'Chưa gửi duyệt.'; return; }
-  if(o.approvalStatus==='pending') el.innerHTML = `🟡 Đang chờ ${roleLabel} (${escapeHtml(o.approverEmail||'')}) duyệt.`;
+
+  if(o.approvalStatus==='pending'){
+    el.innerHTML = `🟡 Đang chờ ${roleLabel} (${escapeHtml(o.approverEmail||'')}) duyệt.` +
+      (canDecide ? `<div style="margin-top:10px;display:flex;gap:8px;">
+          <button type="button" class="btn btn-primary btn-sm" id="order-modal-approve-btn">✅ Duyệt</button>
+          <button type="button" class="btn btn-ghost btn-sm" id="order-modal-reject-btn">❌ Từ chối</button>
+        </div>` : '');
+    if(canDecide){
+      document.getElementById('order-modal-approve-btn').addEventListener('click', async ()=>{
+        await decideOrderApproval(o.id, 'approved');
+        closeModal('modal-order');
+      });
+      document.getElementById('order-modal-reject-btn').addEventListener('click', async ()=>{
+        await decideOrderApproval(o.id, 'rejected');
+        closeModal('modal-order');
+      });
+    }
+  }
   else if(o.approvalStatus==='approved') el.innerHTML = `✅ Đã được ${roleLabel} duyệt (${escapeHtml(o.approvedBy||'')}).`;
   else if(o.approvalStatus==='rejected') el.innerHTML = `❌ Đã bị ${roleLabel} từ chối (${escapeHtml(o.approvedBy||'')}).`;
 }
