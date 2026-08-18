@@ -63,12 +63,14 @@ function renderProjectsTable(){
       <td>${escapeHtml(p.code||'—')}${(Array.isArray(p.contractFiles)&&p.contractFiles.length) ? ` <a href="${p.contractFiles[0].url}" target="_blank" class="tag tag-blue" title="Xem file hợp đồng (${p.contractFiles.length} file)">📎 HĐ${p.contractFiles.length>1?' ×'+p.contractFiles.length:''}</a>` : ((p.contractFileUrl||p.contractFile||p.contractLink) ? ` <a href="${p.contractFileUrl||p.contractFile||p.contractLink}" target="_blank" class="tag tag-blue" title="Xem file hợp đồng">📎 HĐ</a>` : '')}</td>
       <td>${statusTag}</td>
       <td class="num">${fmtVND(p.contractValue)}</td>
+      <td class="num">${fmtVND(p.costBudget)}</td>
+      <td class="num">${fmtVND(p.revenueBudget)}</td>
       <td class="num" style="color:var(--teal)">${fmtVND(revenue)}</td>
       <td class="num" style="color:var(--red)">${fmtVND(spend)}</td>
       <td class="num"><strong>${fmtVND(revenue-spend)}</strong></td>
       <td>
         <div class="row-actions">
-          ${isAdmin() ? `<button class="icon-btn" data-edit-project="${p.id}" title="Sửa">✎</button>` : ''}
+          ${!isSubAdmin() ? `<button class="icon-btn" data-edit-project="${p.id}" title="Sửa / Đính kèm hồ sơ">✎</button>` : ''}
           ${isAdmin() ? `<button class="icon-btn" data-del-project="${p.id}" title="Xóa">🗑</button>` : ''}
         </div>
       </td>
@@ -80,32 +82,38 @@ function renderProjectsTable(){
   const totalsRow = `<tr style="background:var(--bg-soft);font-weight:700;">
       <td colspan="3">TỔNG CỘNG (${PROJECTS.length} dự án)</td>
       <td class="num">${fmtVND(totalContractValue)}</td>
+      <td class="num">${fmtVND(PROJECTS.reduce((s,p)=>s+Number(p.costBudget||0),0))}</td>
+      <td class="num">${fmtVND(PROJECTS.reduce((s,p)=>s+Number(p.revenueBudget||0),0))}</td>
       <td class="num" style="color:var(--teal)">${fmtVND(totalRevenue)}</td>
       <td class="num" style="color:var(--red)">${fmtVND(totalSpend)}</td>
       <td class="num">${fmtVND(totalRevenue-totalSpend)}</td>
       <td></td>
     </tr>`;
   table.innerHTML = `<thead><tr>
-    <th>Dự án</th><th>Mã</th><th>Trạng thái</th><th>Giá trị HĐ</th><th>Đã thu (thực tế)</th><th>Đã chi (thực tế)</th><th>Chênh lệch</th><th></th>
+    <th>Dự án</th><th>Mã</th><th>Trạng thái</th><th>Giá trị HĐ</th><th>Chi phí dự toán</th><th>Doanh thu dự toán</th><th>Đã thu (thực tế)</th><th>Đã chi (thực tế)</th><th>Chênh lệch</th><th></th>
   </tr></thead><tbody>${totalsRow}${rows}</tbody>`;
 }
 
-let currentContractFiles = []; // [{url, name, uploadedAt}]
+let currentContractFiles = []; // [{url, name, uploadedAt, category, label}] — category: 'contract'|'payment'|'settlement'
 
 function renderContractFileStatus(){
-  const el = document.getElementById('project-contract-file-status');
-  if(!el) return;
-  if(currentContractFiles.length === 0){
-    el.innerHTML = `<span class="helper-text">Chưa có file hợp đồng nào.</span>`;
-    return;
-  }
-  el.innerHTML = currentContractFiles.map((f, idx)=>
-    `<div style="display:flex;align-items:center;gap:8px;margin-bottom:6px;">
-      <a href="${f.url}" target="_blank" class="tag tag-blue">📎 ${escapeHtml(f.name || 'Xem file trên OneDrive')}</a>
-      <button type="button" class="btn btn-ghost btn-sm" data-remove-contract-file="${idx}">Xóa</button>
-    </div>`
-  ).join('');
-  el.querySelectorAll('[data-remove-contract-file]').forEach(btn=>{
+  ['contract','payment','settlement'].forEach(cat=>{
+    const el = document.getElementById(`project-files-${cat}`);
+    if(!el) return;
+    const files = currentContractFiles.filter(f=> (f.category||'contract')===cat);
+    if(files.length === 0){
+      el.innerHTML = `<span class="helper-text">Chưa có file nào.</span>`;
+      return;
+    }
+    el.innerHTML = files.map((f)=>{
+      const idx = currentContractFiles.indexOf(f);
+      return `<div style="display:flex;align-items:center;gap:8px;margin-bottom:6px;">
+        <a href="${f.url}" target="_blank" class="tag tag-blue">📎 ${escapeHtml(f.label ? f.label+': ' : '')}${escapeHtml(f.name || 'Xem file trên OneDrive')}</a>
+        <button type="button" class="btn btn-ghost btn-sm" data-remove-contract-file="${idx}">Xóa</button>
+      </div>`;
+    }).join('');
+  });
+  document.querySelectorAll('[data-remove-contract-file]').forEach(btn=>{
     btn.addEventListener('click', ()=>{
       currentContractFiles.splice(Number(btn.dataset.removeContractFile), 1);
       renderContractFileStatus();
@@ -113,23 +121,35 @@ function renderContractFileStatus(){
   });
 }
 
-document.getElementById('project-contract-file').addEventListener('change', async (e)=>{
-  const file = e.target.files[0];
-  if(!file) return;
-  const el = document.getElementById('project-contract-file-status');
-  el.innerHTML = `<span class="helper-text">⏳ Đang tải "${escapeHtml(file.name)}" lên OneDrive công ty... (có thể hiện popup đăng nhập Microsoft 365 lần đầu)</span>`;
+async function handleProjectFileUpload(file, category, statusElId){
+  const el = document.getElementById(statusElId);
+  if(el) el.innerHTML = `<span class="helper-text">⏳ Đang tải "${escapeHtml(file.name)}" lên OneDrive công ty... (có thể hiện popup đăng nhập Microsoft 365 lần đầu)</span>`;
   try{
     const projName = document.getElementById('project-name').value.trim() || 'KhongTenDuAn';
-    const folder = 'Projects/' + projName.replace(/[^\w\-]+/g, '_');
+    const folder = 'Projects/' + projName.replace(/[^\w\-]+/g, '_') + '/' + category;
     const result = await msUploadFile(file, folder);
-    currentContractFiles.push({ url: result.webUrl, name: result.name, uploadedAt: new Date().toISOString() });
-    toast('Đã thêm file hợp đồng');
+    let label = '';
+    if(category === 'payment'){
+      const countSoFar = currentContractFiles.filter(f=>f.category==='payment').length;
+      label = `Lần ${countSoFar+1}`;
+    }
+    currentContractFiles.push({ url: result.webUrl, name: result.name, uploadedAt: new Date().toISOString(), category, label });
+    toast('Đã thêm file');
   }catch(err){
     toast('Lỗi tải lên OneDrive: ' + err.message);
-    el.innerHTML = `<span class="helper-text" style="color:var(--red)">Tải lên thất bại: ${escapeHtml(err.message)}</span>`;
   }
-  e.target.value = '';
   renderContractFileStatus();
+}
+
+[['project-file-contract','contract','project-files-contract'],
+ ['project-file-payment','payment','project-files-payment'],
+ ['project-file-settlement','settlement','project-files-settlement']].forEach(([inputId, category, statusId])=>{
+  document.getElementById(inputId)?.addEventListener('change', async (e)=>{
+    const file = e.target.files[0];
+    if(!file) return;
+    await handleProjectFileUpload(file, category, statusId);
+    e.target.value = '';
+  });
 });
 
 function openProjectModal(id){
@@ -151,15 +171,18 @@ function openProjectModal(id){
   document.getElementById('project-warranty-years').value = p.warrantyYears || '';
   document.getElementById('project-warranty-start').value = p.warrantyStartDate || '';
   document.getElementById('project-note').value = p.note || '';
-  // ưu tiên mảng nhiều file mới (contractFiles); nếu dự án cũ chỉ có 1 file (contractFileUrl/contractFile) thì tự chuyển thành mảng 1 phần tử
+  // ưu tiên mảng nhiều file mới (contractFiles); nếu dự án cũ chỉ có 1 file (contractFileUrl/contractFile) thì tự chuyển thành mảng 1 phần tử,
+  // gắn category='contract' để hiện đúng vào khung "Scan hợp đồng"
   if(Array.isArray(p.contractFiles) && p.contractFiles.length){
-    currentContractFiles = p.contractFiles.slice();
+    currentContractFiles = p.contractFiles.map(f=> ({category:'contract', ...f}));
   } else if(p.contractFileUrl || p.contractFile){
-    currentContractFiles = [{ url: p.contractFileUrl || p.contractFile, name: p.contractFileName || 'Hợp đồng' }];
+    currentContractFiles = [{ url: p.contractFileUrl || p.contractFile, name: p.contractFileName || 'Hợp đồng', category:'contract' }];
   } else {
     currentContractFiles = [];
   }
-  document.getElementById('project-contract-file').value = '';
+  document.getElementById('project-file-contract').value = '';
+  document.getElementById('project-file-payment').value = '';
+  document.getElementById('project-file-settlement').value = '';
   renderContractFileStatus();
   openModal('modal-project');
 }
