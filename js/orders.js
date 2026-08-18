@@ -45,12 +45,14 @@ function openOrderModal(id, context, presetType){
   } else {
     typeSelect.innerHTML = `<option value="payment">Thanh toán chi phí</option>`;
   }
-  // Lệnh chi (Thanh toán chi phí) không cần chọn Loại lệnh chi (chỉ 1 lựa chọn) và không cần Giải trình
+  // Lệnh chi (Thanh toán chi phí) không cần chọn Loại lệnh chi (chỉ 1 lựa chọn); Đính kèm chỉ dành cho Lệnh chi;
+  // Giải trình + đính kèm không cần nữa ở Lệnh tạm ứng vì đã có luồng "🧾 Giải trình" riêng (5 khung, đầy đủ hơn).
   document.getElementById('order-type-field').style.display = effectiveContext === 'advance' ? '' : 'none';
-  document.getElementById('order-explanation-field').style.display = effectiveContext === 'advance' ? '' : 'none';
+  document.getElementById('order-explanation-field').style.display = 'none';
+  document.getElementById('order-attachment-field').style.display = effectiveContext === 'advance' ? 'none' : '';
 
   document.getElementById('order-modal-title').textContent = id
-    ? 'Sửa lệnh chi'
+    ? (effectiveContext === 'advance' ? 'Sửa lệnh tạm ứng' : 'Sửa lệnh chi')
     : (effectiveContext === 'advance' ? 'Tạo lệnh tạm ứng' : 'Tạo lệnh chi');
   document.getElementById('order-id').value = id || '';
   document.getElementById('order-date').value = o.date || todayISO();
@@ -239,7 +241,7 @@ async function decideOrderApproval(id, decision){
       const txData = {
         type:'OUT',
         projectId: hasProject ? o.projectId : '', projectName: hasProject ? (o.projectName || '') : '',
-        date: o.date, code: hasProject ? (o.code || '') : (o.code || (isAdvance ? 'INDIRECT' : '')),
+        date: o.date, code: hasProject ? (o.code || '') : (o.code || 'INDIRECT'),
         content: o.reason,
         description: `Chi cho ${o.payee}` + (o.payer ? ` (từ ${o.payer})` : '') + (o.note ? ' — '+o.note : ''),
         unit:'', qty:0, unitPrice:0, amount: o.amount,
@@ -266,7 +268,13 @@ async function decideOrderApproval(id, decision){
 
 function statusTag(o){
   const status = o.approvalStatus || 'none';
-  if(status==='approved') return '<span class="tag tag-in">✅ Đã duyệt</span>';
+  if(status==='approved'){
+    // Tạm ứng đã duyệt nhưng chưa giải trình xong -> "Đã duyệt, chờ giải chi" (rõ ràng hơn cho KT)
+    if(isAdvanceOrder(o) && !(o.explanation && o.explanation.trim())){
+      return '<span class="tag tag-in">✅ Đã duyệt, chờ giải chi</span>';
+    }
+    return '<span class="tag tag-in">✅ Đã duyệt</span>';
+  }
   if(status==='rejected') return '<span class="tag tag-out">❌ Từ chối</span>';
   if(status==='pending') return '<span class="tag tag-gold">🟡 Chờ duyệt</span>';
   return '<span class="tag tag-gray">Chưa gửi duyệt</span>';
@@ -481,14 +489,14 @@ function orderRowHtml(o){
         <div class="row-actions">
           <button class="icon-btn" data-print-order="${o.id}" title="In">🖨</button>
           <button class="icon-btn" data-edit-order="${o.id}" title="Sửa">✎</button>
-          ${isAdvanceOrder(o) ? `<button class="icon-btn" data-explain-order="${o.id}" title="Giải trình">🧾</button>` : ''}
+          ${(isAdvanceOrder(o) && !isSubAdmin()) ? `<button class="icon-btn" data-explain-order="${o.id}" title="Giải trình (chỉ Kế toán)">🧾</button>` : ''}
           <button class="icon-btn" data-del-order="${o.id}" title="Xóa">🗑</button>
         </div>
       </td>
     </tr>`;
 }
 const ORDER_THEAD = `<thead><tr>
-    <th></th><th>Ngày</th><th>Loại</th><th>Người nhận</th><th>Lý do</th><th>Dự án</th><th>Số tiền</th><th>Duyệt</th><th></th>
+    <th></th><th>Ngày</th><th>Loại</th><th>Người nhận</th><th>Lý do</th><th>Dự án</th><th>Số tiền</th><th>Trạng thái</th><th></th>
   </tr></thead>`;
 
 function renderOrdersTable(){
