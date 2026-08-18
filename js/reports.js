@@ -111,9 +111,17 @@ function renderDashboard(){
   const projActual = Object.values(projActualMap)
     .map(p=>({...p, profit: p.revenue - p.cost}))
     .filter(p=> p.revenue>0 || p.cost>0)
-    .sort((a,b)=> (b.revenue+b.cost) - (a.revenue+a.cost));
+    .sort((a,b)=> (a.revenue+a.cost) - (b.revenue+b.cost));
 
   const ctx2 = document.getElementById('chart-project-actual');
+  const totalRevenueActual = projActual.reduce((s,p)=>s+p.revenue,0);
+  const totalCostActual = projActual.reduce((s,p)=>s+p.cost,0);
+  document.getElementById('chart-project-actual-summary').innerHTML = `
+    <div class="chart-total-panel">
+      <div class="chart-total-box cost"><div class="lbl">Tổng chi phí thực tế</div><div class="val">${fmtVND(totalCostActual)}</div></div>
+      <div class="chart-total-box revenue"><div class="lbl">Tổng doanh thu thực tế</div><div class="val">${fmtVND(totalRevenueActual)}</div></div>
+      <div class="chart-total-box profit"><div class="lbl">Tổng lợi nhuận thực tế</div><div class="val">${fmtVND(totalRevenueActual-totalCostActual)}</div></div>
+    </div>`;
   document.getElementById('chart-project-actual').parentElement.style.height = Math.max(320, projActual.length*32+60) + 'px';
   if(chartProjectActual) chartProjectActual.destroy();
   chartProjectActual = new Chart(ctx2, {
@@ -136,9 +144,18 @@ function renderDashboard(){
       revenue: p.revenueBudget||0,
       cost: p.costBudget||0,
       profit: (p.revenueBudget||0) - (p.costBudget||0)
-    }));
+    }))
+    .sort((a,b)=> (a.revenue+a.cost) - (b.revenue+b.cost));
 
   const ctx3 = document.getElementById('chart-project-budget');
+  const totalRevenueBudget = budgetData.reduce((s,p)=>s+p.revenue,0);
+  const totalCostBudget = budgetData.reduce((s,p)=>s+p.cost,0);
+  document.getElementById('chart-project-budget-summary').innerHTML = `
+    <div class="chart-total-panel">
+      <div class="chart-total-box cost"><div class="lbl">Chi phí dự toán</div><div class="val">${fmtVND(totalCostBudget)}</div></div>
+      <div class="chart-total-box revenue"><div class="lbl">Doanh thu dự toán</div><div class="val">${fmtVND(totalRevenueBudget)}</div></div>
+      <div class="chart-total-box profit"><div class="lbl">Lợi nhuận dự toán</div><div class="val">${fmtVND(totalRevenueBudget-totalCostBudget)}</div></div>
+    </div>`;
   document.getElementById('chart-project-budget').parentElement.style.height = Math.max(320, budgetData.length*32+60) + 'px';
   if(chartProjectBudget) chartProjectBudget.destroy();
   chartProjectBudget = new Chart(ctx3, {
