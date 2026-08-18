@@ -33,12 +33,12 @@ function computeNotifications(){
     TRANSACTIONS.filter(t=> t.type==='OUT' && t.approvalStatus==='pending')
       .forEach(t=> pendingForMe.push({ label: `Chi: ${t.content}`, amount: t.amount, view: 'transactions' }));
     (typeof ORDERS!=='undefined' ? ORDERS : []).filter(o=> o.approvalStatus==='pending')
-      .forEach(o=> pendingForMe.push({ label: `Lệnh chi: ${o.reason}`, amount: o.amount, view: 'orders' }));
+      .forEach(o=> pendingForMe.push({ label: `Lệnh chi: ${o.reason}`, amount: o.amount, view: (typeof isAdvanceOrder==='function' && isAdvanceOrder(o)) ? 'advance' : 'orders' }));
   } else if(isGD){
     TRANSACTIONS.filter(t=> t.type==='OUT' && t.approvalStatus==='pending' && (t.approverEmail||'').toLowerCase()===myEmail)
       .forEach(t=> pendingForMe.push({ label: `Chi: ${t.content}`, amount: t.amount, view: 'transactions' }));
     (typeof ORDERS!=='undefined' ? ORDERS : []).filter(o=> o.approvalStatus==='pending' && (o.approverEmail||'').toLowerCase()===myEmail)
-      .forEach(o=> pendingForMe.push({ label: `Lệnh chi: ${o.reason}`, amount: o.amount, view: 'orders' }));
+      .forEach(o=> pendingForMe.push({ label: `Lệnh chi: ${o.reason}`, amount: o.amount, view: (typeof isAdvanceOrder==='function' && isAdvanceOrder(o)) ? 'advance' : 'orders' }));
   }
 
   // 2) Đã có kết quả duyệt: Admin thấy TOÀN BỘ (toàn công ty, trong N ngày gần đây);
@@ -57,7 +57,7 @@ function computeNotifications(){
     .forEach(o=>{
       const days = daysSince(o.approvedAt);
       if(days!==null && days <= NOTIF_RECENT_DECISION_DAYS){
-        decidedForMe.push({ label: `Lệnh chi: ${o.reason}`, amount: o.amount, status: o.approvalStatus, view: 'orders' });
+        decidedForMe.push({ label: `Lệnh chi: ${o.reason}`, amount: o.amount, status: o.approvalStatus, view: (typeof isAdvanceOrder==='function' && isAdvanceOrder(o)) ? 'advance' : 'orders' });
       }
     });
 
