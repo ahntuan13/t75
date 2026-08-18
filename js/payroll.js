@@ -160,26 +160,36 @@ document.getElementById('upload-employees-input')?.addEventListener('change', as
     const buf = await file.arrayBuffer();
     const wb = XLSX.read(buf, {type:'array'});
     const sheet = wb.Sheets[wb.SheetNames[0]];
-    const rows = XLSX.utils.sheet_to_json(sheet, {defval:''});
+    // Đọc dạng MẢNG THÔ (không dùng header dòng 1) vì file lương gốc có nhiều dòng tiêu đề gộp ô
+    // phía trên, và nhóm "QUẢN LÝ"/"CÔNG NHÂN" là 1 DÒNG PHÂN CÁCH chứ không phải 1 cột riêng.
+    const rows = XLSX.utils.sheet_to_json(sheet, {header:1, defval:'', raw:true});
     if(rows.length===0){ alert('Không đọc được dòng dữ liệu nào.'); return; }
-    // Chấp nhận nhiều kiểu tên cột khác nhau cho linh hoạt
-    const norm = (s)=> stripDiacritics ? stripDiacritics(String(s)) : String(s).toLowerCase();
-    const pick = (row, keys) => { for(const k of Object.keys(row)){ if(keys.some(kw=>norm(k).includes(kw))) return row[k]; } return ''; };
 
+    // Cột: B(1)=STT, C(2)=Tên, D(3)=Chức vụ, E(4)=Lương HĐLĐ/BHXH, F(5)=Lương hiệu quả
+    let currentGroup = 'monthly'; // mặc định Quản lý cho tới khi gặp dòng "CÔNG NHÂN"
     const existingNames = new Set(EMPLOYEES.map(x=>x.name.trim().toLowerCase()));
     const toAdd = [];
-    rows.forEach(row=>{
-      const name = String(pick(row, ['ten nhan vien','ho ten','ten'])||'').trim();
-      if(!name || existingNames.has(name.toLowerCase())) return;
-      const position = String(pick(row, ['chuc vu'])||'').trim();
-      const contractSalary = toNumber(pick(row, ['hdld','hop dong','bhxh']));
-      const effectiveRate = toNumber(pick(row, ['hieu qua']));
-      const payTypeRaw = norm(pick(row, ['nhom','loai','pay type'])||'');
-      const payType = payTypeRaw.includes('cong nhan') || payTypeRaw.includes('daily') ? 'daily' : 'monthly';
-      toAdd.push({name, position, contractSalary, effectiveRate, payType});
-    });
-    if(toAdd.length===0){ alert('Không có nhân viên mới nào để thêm (có thể đã tồn tại sẵn hoặc thiếu cột Tên).'); return; }
-    if(!confirm(`Đọc được ${rows.length} dòng, tìm thấy ${toAdd.length} nhân viên mới (bỏ qua trùng tên). Thêm vào danh sách?`)) return;
+    for(const row of rows){
+      const c = row[2], d = row[3];
+      const cText = String(c||'').trim();
+      if(cText === 'QUẢN LÝ'){ currentGroup = 'monthly'; continue; }
+      if(cText === 'CÔNG NHÂN'){ currentGroup = 'daily'; continue; }
+      // Dòng nhân viên hợp lệ: có STT là số ở cột B, Tên ở cột C, và Chức vụ ở cột D PHẢI LÀ CHỮ
+      // (bảng phân bổ dự án phía cuối file cũng có số ở cột B nhưng cột D lại là số tiền -> tự loại bỏ đúng chỗ này)
+      const stt = row[1];
+      if(typeof stt !== 'number' || !cText || typeof d !== 'string' || !d.trim()) continue;
+      if(existingNames.has(cText.toLowerCase())) continue;
+      toAdd.push({
+        name: cText,
+        position: d.trim(),
+        contractSalary: toNumber(row[4]),
+        effectiveRate: toNumber(row[5]),
+        payType: currentGroup,
+      });
+      existingNames.add(cText.toLowerCase());
+    }
+    if(toAdd.length===0){ alert('Không tìm thấy nhân viên mới nào để thêm (có thể đã tồn tại sẵn, hoặc file không đúng định dạng Bảng lương gốc của công ty).'); return; }
+    if(!confirm(`Đọc được ${toAdd.length} nhân viên mới (${toAdd.filter(x=>x.payType==='monthly').length} Quản lý + ${toAdd.filter(x=>x.payType==='daily').length} Công nhân). Thêm vào danh sách?`)) return;
 
     const batch = db.batch();
     toAdd.forEach(emp=>{
@@ -188,6 +198,113 @@ document.getElementById('upload-employees-input')?.addEventListener('change', as
     });
     await batch.commit();
     toast(`Đã thêm ${toAdd.length} nhân viên mới`);
+  }catch(err){ alert('Lỗi đọc file: ' + err.message); }
+});
+
+// ---------------- Upload bảng chấm công (Excel) — đọc đúng mẫu file gốc công ty ----------------
+// Mẫu file: dòng ngày (VD dòng 3) mỗi ngày chiếm 3 cột SÁNG/CHIỀU/TỐI liên tiếp; dòng dưới đó là
+// tiêu đề phụ "SÁNG/CHIỀU/TỐI" lặp lại; từ đó trở xuống mỗi nhân viên chiếm 2 dòng (dòng Dự án +
+// dòng Số giờ), có thể cách nhau 1 dòng trống. File KHÔNG có tên nhân viên — vì vậy áp dụng ĐÚNG
+// THEO THỨ TỰ đang có trong danh sách Bảng lương (dòng 1 của file ↔ nhân viên đầu tiên, ...).
+document.getElementById('btn-upload-timesheet')?.addEventListener('click', ()=> document.getElementById('upload-timesheet-input').click());
+document.getElementById('upload-timesheet-input')?.addEventListener('change', async (e)=>{
+  const file = e.target.files[0];
+  e.target.value = '';
+  if(!file) return;
+  if(typeof XLSX === 'undefined'){ toast('Chưa tải được thư viện Excel'); return; }
+  if(EMPLOYEES.length === 0){ alert('Chưa có nhân viên nào trong Bảng lương — vui lòng thêm/nhập nhân viên trước.'); return; }
+  try{
+    const buf = await file.arrayBuffer();
+    const wb = XLSX.read(buf, {type:'array', cellDates:true});
+    const sheet = wb.Sheets[wb.SheetNames[0]];
+    const rows = XLSX.utils.sheet_to_json(sheet, {header:1, raw:true, defval:null});
+
+    // 1) Tìm dòng tiêu đề phụ "SÁNG/CHIỀU/TỐI" lặp lại nhiều lần -> xác định vị trí cột từng ca
+    let subheaderRowIdx = -1;
+    for(let r=0; r<Math.min(rows.length, 15); r++){
+      const count = (rows[r]||[]).filter(v=> v==='SÁNG').length;
+      if(count >= 2){ subheaderRowIdx = r; break; }
+    }
+    if(subheaderRowIdx === -1){ alert('Không tìm thấy dòng tiêu đề "SÁNG/CHIỀU/TỐI" — file có đúng định dạng bảng chấm công gốc không?'); return; }
+    const dateRowIdx = subheaderRowIdx - 3; // dòng ngày nằm 3 dòng phía trên (đúng theo mẫu công ty)
+    const dateRow = rows[dateRowIdx] || [];
+
+    // 2) Xác định các cột bắt đầu mỗi ngày (mỗi ngày = 3 cột SÁNG/CHIỀU/TỐI liên tiếp)
+    // Chỉ lấy đúng các ngày CÙNG THÁNG với ngày đầu tiên tìm thấy — 1 số file mẫu có dư 1 cột
+    // "mùng 1 tháng sau" ở cuối, không thuộc về tháng đang chấm công.
+    const dayCols = []; // [{col, date}]
+    let targetMonth = null, targetYear = null;
+    for(let c=0; c<dateRow.length; c++){
+      const v = dateRow[c];
+      if(v instanceof Date && !isNaN(v)){
+        if(targetMonth === null){ targetMonth = v.getMonth(); targetYear = v.getFullYear(); }
+        if(v.getMonth() === targetMonth && v.getFullYear() === targetYear){
+          dayCols.push({col:c, date: v});
+        }
+      }
+    }
+    if(dayCols.length === 0){ alert('Không tìm thấy cột ngày nào trong file.'); return; }
+
+    // 3) Quét từ sau dòng tiêu đề phụ, gom các "dòng Dự án" hợp lệ (cột B hoặc E là số) theo ĐÚNG THỨ TỰ xuất hiện
+    const employeeRows = []; // [{projectRow, hoursRow}]
+    let r = subheaderRowIdx + 2;
+    let lastFound = r;
+    while(r < rows.length && r - lastFound < 6){
+      const row = rows[r] || [];
+      const isProjectRow = typeof row[1]==='number' || typeof row[4]==='number';
+      if(isProjectRow){
+        // dòng Số giờ là dòng NGAY SAU (có thể cách 0 dòng), tìm dòng gần nhất phía dưới không phải "dòng Dự án" tiếp theo
+        const hoursRow = rows[r+1] || [];
+        employeeRows.push({projectRow: row, hoursRow});
+        lastFound = r;
+        r += 2;
+      } else {
+        r += 1;
+      }
+    }
+    if(employeeRows.length === 0){ alert('Không đọc được dòng chấm công nào.'); return; }
+
+    const month = dayCols[0].date.getMonth()+1;
+    const year = dayCols[0].date.getFullYear();
+    const monthKeyStr = `${year}-${String(month).padStart(2,'0')}`;
+    const n = Math.min(employeeRows.length, EMPLOYEES.length);
+    const skipped = employeeRows.length - n;
+
+    if(!confirm(`Đọc được chấm công tháng ${month}/${year} cho ${employeeRows.length} dòng nhân viên trong file.\n`+
+      `Sẽ áp dụng theo ĐÚNG THỨ TỰ hiện có trong Bảng lương (${EMPLOYEES.length} nhân viên) — dòng 1 = "${EMPLOYEES[0]?.name}", ...\n`+
+      (skipped>0 ? `⚠️ ${skipped} dòng cuối trong file sẽ bị bỏ qua vì Bảng lương không đủ nhân viên tương ứng.\n` : '')+
+      `Dữ liệu chấm công cũ (nếu có) của tháng ${monthKeyStr} cho các nhân viên này sẽ bị GHI ĐÈ. Tiếp tục?`)) return;
+
+    const CHUNK = 400;
+    let opCount = 0;
+    let batch = db.batch();
+    for(let i=0; i<n; i++){
+      const emp = EMPLOYEES[i];
+      const {projectRow, hoursRow} = employeeRows[i];
+      for(const {col, date} of dayCols){
+        const dateStr = `${date.getFullYear()}-${String(date.getMonth()+1).padStart(2,'0')}-${String(date.getDate()).padStart(2,'0')}`;
+        const buildShift = (offset)=>{
+          const projectName = projectRow[col+offset];
+          const hours = hoursRow[col+offset];
+          if(!projectName && !hours) return {projectId:'', projectName:'', hours:0};
+          const proj = PROJECTS.find(p=> p.name === projectName);
+          return { projectId: proj ? proj.id : '', projectName: projectName || '', hours: Number(hours)||0 };
+        };
+        const shifts = { sang: buildShift(0), chieu: buildShift(1), toi: buildShift(2) };
+        if(!shifts.sang.hours && !shifts.chieu.hours && !shifts.toi.hours) continue; // ngày không có công -> bỏ qua, không tạo dòng rỗng
+        const docId = `${emp.id}_${dateStr}`;
+        batch.set(db.collection('timesheets').doc(docId), {
+          employeeId: emp.id, employeeName: emp.name, date: dateStr, shifts,
+          note: 'Nhập từ Excel', importedFromExcel: true,
+          createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+          createdBy: auth.currentUser.email,
+        });
+        opCount++;
+        if(opCount >= CHUNK){ await batch.commit(); batch = db.batch(); opCount = 0; }
+      }
+    }
+    if(opCount > 0) await batch.commit();
+    toast(`✅ Đã nhập chấm công tháng ${monthKeyStr} cho ${n} nhân viên`);
   }catch(err){ alert('Lỗi đọc file: ' + err.message); }
 });
 
