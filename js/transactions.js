@@ -85,23 +85,32 @@ function renderApprovalBanner(){
   if(!box || !auth.currentUser) return;
   const myEmail = (auth.currentUser.email || '').toLowerCase();
   const pendingTx = TRANSACTIONS.filter(t=> t.type==='OUT' && t.approvalStatus==='pending' && t.approverEmail && t.approverEmail.toLowerCase()===myEmail);
-  const pendingOrders = (typeof ORDERS!=='undefined' ? ORDERS : []).filter(o=> o.approvalStatus==='pending' && o.approverEmail && o.approverEmail.toLowerCase()===myEmail);
-  const totalCount = pendingTx.length + pendingOrders.length;
+  const allPendingOrders = (typeof ORDERS!=='undefined' ? ORDERS : []).filter(o=> o.approvalStatus==='pending' && o.approverEmail && o.approverEmail.toLowerCase()===myEmail);
+  const isAdv = (typeof isAdvanceOrder==='function') ? isAdvanceOrder : ()=>false;
+  const pendingPaymentOrders = allPendingOrders.filter(o=> !isAdv(o));
+  const pendingAdvanceOrders = allPendingOrders.filter(o=> isAdv(o));
+  const totalCount = pendingTx.length + allPendingOrders.length;
   if(totalCount === 0){
     box.style.display = 'none';
     box.innerHTML = '';
     return;
   }
-  const totalAmount = pendingTx.reduce((s,t)=>s+Number(t.amount||0),0) + pendingOrders.reduce((s,o)=>s+Number(o.amount||0),0);
+  const totalAmount = pendingTx.reduce((s,t)=>s+Number(t.amount||0),0) + allPendingOrders.reduce((s,o)=>s+Number(o.amount||0),0);
   const parts = [];
   if(pendingTx.length) parts.push(`${pendingTx.length} khoản Chi`);
-  if(pendingOrders.length) parts.push(`${pendingOrders.length} Lệnh chi`);
+  if(pendingPaymentOrders.length) parts.push(`${pendingPaymentOrders.length} Lệnh chi`);
+  if(pendingAdvanceOrders.length) parts.push(`${pendingAdvanceOrders.length} Lệnh tạm ứng`);
   box.className = 'approval-banner';
   box.style.display = 'flex';
-  box.innerHTML = `<span>🔔 Bạn có ${parts.join(' và ')} (tổng ${fmtVND(totalAmount)}) đang chờ bạn duyệt.</span>
+  box.innerHTML = `<span>🔔 Bạn có ${parts.join(', ')} (tổng ${fmtVND(totalAmount)}) đang chờ bạn duyệt.</span>
     <button class="btn btn-primary btn-sm" id="approval-banner-goto">Xem ngay</button>`;
+  // Điều hướng tới đúng trang có nhiều việc chờ nhất (ưu tiên Thu Chi > Lệnh chi > Lệnh tạm ứng)
+  let target = 'transactions';
+  if(pendingTx.length === 0){
+    target = pendingPaymentOrders.length >= pendingAdvanceOrders.length ? 'orders' : 'advance';
+  }
   document.getElementById('approval-banner-goto').addEventListener('click', ()=>{
-    document.querySelector(`[data-view="${pendingOrders.length && !pendingTx.length ? 'orders' : 'transactions'}"]`)?.click();
+    document.querySelector(`[data-view="${target}"]`)?.click();
   });
 }
 
