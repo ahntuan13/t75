@@ -113,6 +113,15 @@ function renderDashboard(){
     .filter(p=> p.revenue>0 || p.cost>0)
     .sort((a,b)=> (b.revenue+b.cost) - (a.revenue+a.cost));
 
+  // Chèn thêm "INDIRECT" (Chi phí gián tiếp — không gắn dự án cụ thể) làm dòng CUỐI CÙNG của biểu đồ,
+  // và cộng vào cả 3 ô tổng bên trên cho đúng bức tranh toàn công ty.
+  const activeFc = (typeof activeFixedCosts==='function') ? activeFixedCosts() : [];
+  const indirectRevenue = activeFc.filter(t=>t.type==='IN').reduce((s,t)=>s+Number(t.amount||0),0);
+  const indirectCost = activeFc.filter(t=>t.type==='OUT').reduce((s,t)=>s+Number(t.amount||0),0);
+  if(indirectRevenue>0 || indirectCost>0){
+    projActual.push({name:'INDIRECT (Chi phí gián tiếp)', revenue:indirectRevenue, cost:indirectCost, profit:indirectRevenue-indirectCost, isIndirect:true});
+  }
+
   const ctx2 = document.getElementById('chart-project-actual');
   const totalRevenueActual = projActual.reduce((s,p)=>s+p.revenue,0);
   const totalCostActual = projActual.reduce((s,p)=>s+p.cost,0);
@@ -124,12 +133,16 @@ function renderDashboard(){
     </div>`;
   document.getElementById('chart-project-actual').parentElement.style.height = Math.max(320, projActual.length*32+60) + 'px';
   if(chartProjectActual) chartProjectActual.destroy();
+  // Tô màu nâu nhạt riêng cho dòng INDIRECT để dễ phân biệt với các dự án thật
+  const revenueColors = projActual.map(p=> p.isIndirect ? '#B08968' : CHART_COLORS.teal);
+  const costColors = projActual.map(p=> p.isIndirect ? '#8B5E3C' : CHART_COLORS.red);
+  const profitColors = projActual.map(p=> p.isIndirect ? '#C9A27E' : CHART_COLORS.gold);
   chartProjectActual = new Chart(ctx2, {
     type:'bar',
     data:{ labels: projActual.map(p=>p.name), datasets:[
-      {label:'Doanh thu thực tế', data:projActual.map(p=>p.revenue), backgroundColor:CHART_COLORS.teal, borderRadius:4},
-      {label:'Chi phí thực tế', data:projActual.map(p=>p.cost), backgroundColor:CHART_COLORS.red, borderRadius:4},
-      {label:'Lợi nhuận thực tế', data:projActual.map(p=>p.profit), backgroundColor:CHART_COLORS.gold, borderRadius:4}
+      {label:'Doanh thu thực tế', data:projActual.map(p=>p.revenue), backgroundColor:revenueColors, borderRadius:4},
+      {label:'Chi phí thực tế', data:projActual.map(p=>p.cost), backgroundColor:costColors, borderRadius:4},
+      {label:'Lợi nhuận thực tế', data:projActual.map(p=>p.profit), backgroundColor:profitColors, borderRadius:4}
     ]},
     options:{indexAxis:'y', responsive:true, maintainAspectRatio:false,
       scales:{ x:{grid:{color:CHART_COLORS.grid}, ticks:{callback:v=>fmtNum(v)}}, y:{grid:{display:false}} },
