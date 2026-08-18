@@ -11,6 +11,21 @@ service cloud.firestore {
     function isAdmin() {
       return isSignedIn() && myRole() == 'admin';
     }
+    function isSubAdmin() {
+      return isSignedIn() && myRole() == 'subadmin';
+    }
+    // Dùng để CHẶN Sub-admin (Giám đốc) khỏi các thao tác "Giải trình" —
+    // GĐ chỉ được Xem + Duyệt/Từ chối, việc giải chi thuộc về Kế toán (User) và Admin.
+    function isNotSubAdmin() {
+      return isSignedIn() && myRole() != 'subadmin';
+    }
+    // Nhận diện giao dịch được HỆ THỐNG tự tạo khi 1 Lệnh chi/Tạm ứng được DUYỆT
+    // (không phải do người dùng tự tay tạo/giải trình) — cho phép việc này xảy ra
+    // như một HỆ QUẢ của hành động Duyệt hợp lệ của GĐ, nhưng KHÔNG cho phép GĐ
+    // tự ý tạo giao dịch nào khác (kể cả qua luồng Giải trình).
+    function isSystemGeneratedFromApproval() {
+      return request.resource.data.note is string && request.resource.data.note.matches('^Tự động tạo từ.*');
+    }
     function changedKeys() {
       return request.resource.data.diff(resource.data).affectedKeys();
     }
@@ -68,18 +83,20 @@ service cloud.firestore {
 
     match /transactions/{id} {
       allow read: if isSignedIn();
-      // User thường chỉ được NHẬP MỚI giao dịch; sửa/xóa toàn bộ chỉ Admin;
-      // riêng đổi trạng thái Hóa đơn/Chuyển khoản và luồng Gửi duyệt/Duyệt/Từ chối Chi thì User cũng được (có kiểm soát field).
-      allow create: if isSignedIn();
-      allow update: if isAdmin() || isSimpleStatusUpdate() || isApprovalSubmit() || isApprovalDecision();
+      // User/Admin nhập mới tự do; Sub-admin (GĐ) CHỈ được phép tạo khi đây là giao dịch
+      // hệ thống tự sinh ra do chính GĐ vừa Duyệt 1 lệnh (không được tự tay tạo/giải trình).
+      allow create: if isSignedIn() && (isNotSubAdmin() || isSystemGeneratedFromApproval());
+      // riêng đổi trạng thái Hóa đơn/Chuyển khoản và luồng Gửi duyệt/Duyệt/Từ chối Chi: KHÔNG áp dụng cho Sub-admin (GĐ chỉ xem).
+      allow update: if isAdmin() || (isNotSubAdmin() && isSimpleStatusUpdate()) || (isNotSubAdmin() && isApprovalSubmit()) || isApprovalDecision();
       allow delete: if isAdmin();
     }
 
     // Chi phí gián tiếp (không gắn dự án cụ thể) — quyền y hệt transactions, thêm luồng "giải trình"
     match /fixedCosts/{id} {
       allow read: if isSignedIn();
-      allow create: if isSignedIn();
-      allow update: if isAdmin() || isSimpleStatusUpdate() || isApprovalSubmit() || isApprovalDecision() || isExplainUpdate();
+      allow create: if isSignedIn() && (isNotSubAdmin() || isSystemGeneratedFromApproval());
+      // isExplainUpdate (đánh dấu đã giải trình): CHỈ Kế toán (User)/Admin — GĐ không được quyền giải chi.
+      allow update: if isAdmin() || (isNotSubAdmin() && isSimpleStatusUpdate()) || (isNotSubAdmin() && isApprovalSubmit()) || isApprovalDecision() || (isNotSubAdmin() && isExplainUpdate());
       allow delete: if isAdmin();
     }
 
@@ -99,16 +116,17 @@ service cloud.firestore {
 
     match /paymentOrders/{id} {
       allow read: if isSignedIn();
-      allow create: if isSignedIn();
+      allow create: if isSignedIn() && isNotSubAdmin();
       // User thường được sửa lệnh chi khi CHƯA gửi duyệt (approvalStatus rỗng/'none'),
       // được GỬI DUYỆT (chuyển sang 'pending'), tự do ghi Giải trình bất kỳ lúc nào; Admin thì sửa/xóa tự do.
+      // Sub-admin (GĐ): KHÔNG được sửa/giải trình gì cả — chỉ Duyệt/Từ chối (isOrderApprovalDecision, role-agnostic theo email).
       // Chỉ đúng email GĐ đã được gán (resource.data.approverEmail) mới được DUYỆT/TỪ CHỐI.
-      allow update: if isAdmin() || isOrderApprovalSubmit() || isOrderApprovalDecision()
-        || (isSignedIn() && changedKeys().hasOnly(['explanation','explainAllocations','explainedAt','explainedBy','explainStatus','attachment','attachmentName']))
-        || (isSignedIn() && (!('approvalStatus' in resource.data) || resource.data.approvalStatus == 'none' || resource.data.approvalStatus == '')
+      allow update: if isAdmin() || (isNotSubAdmin() && isOrderApprovalSubmit()) || isOrderApprovalDecision()
+        || (isNotSubAdmin() && changedKeys().hasOnly(['explanation','explainAllocations','explainedAt','explainedBy','explainStatus','attachment','attachmentName']))
+        || (isNotSubAdmin() && (!('approvalStatus' in resource.data) || resource.data.approvalStatus == 'none' || resource.data.approvalStatus == '')
           && changedKeys().hasOnly(['date','projectId','projectName','code','orderType','payer','payee','payeeBank','payeeTaxCode','reason','amount','requester','note','explanation','attachment','attachmentName']));
-      // Kế toán (bất kỳ ai đăng nhập) được quyền xóa Lệnh chi/Lệnh tạm ứng — theo đúng yêu cầu công ty.
-      allow delete: if isSignedIn();
+      // Kế toán (User)/Admin được quyền xóa Lệnh chi/Lệnh tạm ứng — Sub-admin (GĐ) thì KHÔNG.
+      allow delete: if isSignedIn() && isNotSubAdmin();
     }
 
     match /employees/{id} {
