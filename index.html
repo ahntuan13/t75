@@ -58,7 +58,7 @@
       <div class="nav-label">Dòng tiền</div>
       <div class="nav-group">
         <div class="nav-item" data-view="fixedcosts"><span class="ic">🏢</span> Chi phí gián tiếp</div>
-        <div class="nav-item" data-view="transactions"><span class="ic">⇄</span> Thu Chi</div>
+        <div class="nav-item" data-view="transactions"><span class="ic">⇄</span> Thu chi dự án</div>
       </div>
 
       <div class="nav-label">Chứng từ</div>
@@ -75,7 +75,7 @@
 
       <div class="nav-label">Chi & lương</div>
       <div class="nav-group">
-        <div class="nav-item" data-view="orders"><span class="ic">📝</span> Lệnh chi</div>
+        <div class="nav-item" data-view="orders"><span class="ic">📝</span> Lệnh thu / chi</div>
         <div class="nav-item" data-view="advance"><span class="ic">💳</span> Lệnh tạm ứng</div>
         <div class="nav-item" data-view="payroll"><span class="ic">💵</span> Bảng lương</div>
         <div class="nav-item" data-view="timesheet"><span class="ic">🗓</span> Chấm công</div>
@@ -213,7 +213,7 @@
       <!-- TRANSACTIONS -->
       <div class="view" id="view-transactions">
         <div class="topbar">
-          <div><h2>Thu chi</h2><div class="sub">Ghi nhận dòng tiền vào/ra theo dự án</div></div>
+          <div><h2>Thu chi dự án</h2><div class="sub">Ghi nhận dòng tiền vào/ra theo dự án</div></div>
           <div class="topbar-actions">
             <button class="btn btn-ghost" id="btn-export-tx" style="display:none;">⬇ Xuất Excel (theo bộ lọc)</button>
             <button class="btn btn-ghost" id="btn-upload-thu" style="display:none;">⬆ Upload Thu (Excel)</button>
@@ -324,7 +324,7 @@
       <!-- PAYMENT ORDERS -->
       <div class="view" id="view-orders">
         <div class="topbar">
-          <div><h2>Lệnh chi</h2><div class="sub">Đề nghị & duyệt chi tiền</div></div>
+          <div><h2>Lệnh thu / chi</h2><div class="sub">Đề nghị & duyệt chi tiền</div></div>
           <div class="topbar-actions">
             <button class="btn btn-ghost" id="btn-print-orders-selected">🖨 In các lệnh đã chọn</button>
             <button class="btn btn-primary" id="btn-add-order">+ Tạo lệnh chi</button>
@@ -839,8 +839,8 @@
           </select>
           <div class="helper-text" id="order-approval-current-status" style="margin-top:8px;"></div>
         </div>
-        <div class="field full">
-          <label>📎 Đính kèm tập tin (mọi loại file)</label>
+        <div class="field full" id="order-attachment-field">
+          <label>📎 Đính kèm báo giá (nếu có)</label>
           <div class="helper-text" style="margin-bottom:6px;">Chọn tối đa 1 file (ảnh, PDF, Word, Excel...), tối đa ~2MB.</div>
           <input type="file" id="order-attachment-input">
           <div id="order-attachment-status" style="margin-top:8px;"></div>
