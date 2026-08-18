@@ -68,7 +68,7 @@ function renderProjectsTable(){
       <td class="num"><strong>${fmtVND(revenue-spend)}</strong></td>
       <td>
         <div class="row-actions">
-          <button class="icon-btn" data-edit-project="${p.id}" title="Sửa">✎</button>
+          ${isAdmin() ? `<button class="icon-btn" data-edit-project="${p.id}" title="Sửa">✎</button>` : ''}
           ${isAdmin() ? `<button class="icon-btn" data-del-project="${p.id}" title="Xóa">🗑</button>` : ''}
         </div>
       </td>
