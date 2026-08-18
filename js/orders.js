@@ -255,7 +255,10 @@ async function decideOrderApproval(id, decision){
         txData.advanceExplainStatus = 'pending';
       }
       if(o.transactionId){
-        await db.collection(targetCollection).doc(o.transactionId).update(txData);
+        // QUAN TRỌNG: cập nhật đúng NƠI giao dịch liên kết ĐANG THỰC SỰ NẰM (o.transactionCollection),
+        // không phải nơi tính toán lại theo trạng thái Dự án hiện tại — tránh việc ghi nhầm vào 1 collection
+        // khác nơi ID đó thực ra không tồn tại (VD: lệnh cũ tạo trước khi có Chi phí gián tiếp).
+        await db.collection(o.transactionCollection || 'transactions').doc(o.transactionId).update(txData);
       } else {
         txData.createdAt = firebase.firestore.FieldValue.serverTimestamp();
         txData.createdBy = auth.currentUser.email;
@@ -471,7 +474,7 @@ function orderRowHtml(o){
   if((o.approvalStatus||'none')==='pending' && myEmail && o.approverEmail && myEmail===o.approverEmail.toLowerCase()){
     approveActions = `<button class="icon-btn" data-approve-order="${o.id}" title="Duyệt">✅</button><button class="icon-btn" data-reject-order="${o.id}" title="Từ chối">❌</button>`;
   }
-  return `<tr>
+  return `<tr${o.transactionId ? ' class="tx-row-explained"' : ''}>
       <td><input type="checkbox" class="order-select-cb" data-order-id="${o.id}"></td>
       <td>${fmtDate(o.date)}</td>
       <td>${escapeHtml(ORDER_TYPE_LABELS[o.orderType] || 'Thanh toán chi phí')}</td>
