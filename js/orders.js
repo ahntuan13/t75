@@ -46,7 +46,7 @@ function openOrderModal(id, context, presetType){
     typeSelect.innerHTML = `<option value="payment">Thanh toán chi phí</option>`;
   }
   // Lệnh chi (Thanh toán chi phí) không cần chọn Loại lệnh chi (chỉ 1 lựa chọn); Đính kèm chỉ dành cho Lệnh chi;
-  // Giải trình + đính kèm không cần nữa ở Lệnh tạm ứng vì đã có luồng "🧾 Giải trình" riêng (5 khung, đầy đủ hơn).
+  // Giải chi + đính kèm không cần nữa ở Lệnh tạm ứng vì đã có luồng "🧾 Giải chi" riêng (5 khung, đầy đủ hơn).
   document.getElementById('order-type-field').style.display = effectiveContext === 'advance' ? '' : 'none';
   document.getElementById('order-explanation-field').style.display = 'none';
   document.getElementById('order-attachment-field').style.display = effectiveContext === 'advance' ? 'none' : '';
@@ -282,7 +282,7 @@ function statusTag(o){
 
 // ---------------- IN PHIẾU "ĐỀ XUẤT CHI PHÍ" (theo đúng mẫu công ty) ----------------
 // Dùng chung cho in 1 lệnh (nút 🖨 từng dòng) hoặc in gộp nhiều lệnh cùng lúc (đã chọn checkbox).
-// Nếu 1 lệnh đã có "Giải trình" (nhiều dự án), mỗi khoản phân bổ sẽ tách thành 1 dòng riêng trong phiếu.
+// Nếu 1 lệnh đã có "Giải chi" (nhiều dự án), mỗi khoản phân bổ sẽ tách thành 1 dòng riêng trong phiếu.
 const COMPANY_HEADER = {
   name: 'TUAN 75 INSULATION TECHNICAL SERVICES CO.,LTD',
   address: 'Add: Group 9, Thanh Phu Quarter, Tan Trieu Ward, Dong Nai City, Vietnam',
@@ -471,25 +471,21 @@ function orderRowHtml(o){
   if((o.approvalStatus||'none')==='pending' && myEmail && o.approverEmail && myEmail===o.approverEmail.toLowerCase()){
     approveActions = `<button class="icon-btn" data-approve-order="${o.id}" title="Duyệt">✅</button><button class="icon-btn" data-reject-order="${o.id}" title="Từ chối">❌</button>`;
   }
-  const explainTag = isAdvanceOrder(o)
-    ? (o.explanation && o.explanation.trim()
-        ? ' <span class="tag tag-gold" title="Đã có nội dung giải trình">📝 Đã giải trình</span>'
-        : ' <span class="tag tag-gray">⏳ Chưa giải trình</span>')
-    : '';
   return `<tr>
       <td><input type="checkbox" class="order-select-cb" data-order-id="${o.id}"></td>
       <td>${fmtDate(o.date)}</td>
       <td>${escapeHtml(ORDER_TYPE_LABELS[o.orderType] || 'Thanh toán chi phí')}</td>
       <td><strong>${escapeHtml(o.payee)}</strong></td>
-      <td>${escapeHtml(o.reason)}${explainTag}</td>
+      <td>${escapeHtml(o.reason)}</td>
       <td>${escapeHtml(o.projectName||'—')}</td>
       <td class="num"><strong>${fmtVND(o.amount)}</strong></td>
       <td>${statusTag(o)} ${approveActions}</td>
       <td>
         <div class="row-actions">
+          <button class="icon-btn" data-view-order="${o.id}" title="Xem chi tiết">👁</button>
           <button class="icon-btn" data-print-order="${o.id}" title="In">🖨</button>
           <button class="icon-btn" data-edit-order="${o.id}" title="Sửa">✎</button>
-          ${(isAdvanceOrder(o) && !isSubAdmin()) ? `<button class="icon-btn" data-explain-order="${o.id}" title="Giải trình (chỉ Kế toán)">🧾</button>` : ''}
+          ${(isAdvanceOrder(o) && !isSubAdmin()) ? `<button class="icon-btn" data-explain-order="${o.id}" title="Giải chi (chỉ Kế toán)">🧾</button>` : ''}
           <button class="icon-btn" data-del-order="${o.id}" title="Xóa">🗑</button>
         </div>
       </td>
@@ -545,12 +541,17 @@ document.getElementById('advance-table')?.addEventListener('click', handleOrderT
 
 // Click handler dùng chung cho cả 2 bảng
 function handleOrderTableClick(e){
+  const viewId = e.target.closest('[data-view-order]')?.dataset.viewOrder;
   const editId = e.target.closest('[data-edit-order]')?.dataset.editOrder;
   const delId = e.target.closest('[data-del-order]')?.dataset.delOrder;
   const printId = e.target.closest('[data-print-order]')?.dataset.printOrder;
   const approveId = e.target.closest('[data-approve-order]')?.dataset.approveOrder;
   const rejectId = e.target.closest('[data-reject-order]')?.dataset.rejectOrder;
   const explainId = e.target.closest('[data-explain-order]')?.dataset.explainOrder;
+  if(viewId){
+    const o = ORDERS.find(x=>x.id===viewId);
+    openOrderModal(viewId, o && isAdvanceOrder(o) ? 'advance' : 'payment');
+  }
   if(editId){
     const o = ORDERS.find(x=>x.id===editId);
     openOrderModal(editId, o && isAdvanceOrder(o) ? 'advance' : 'payment');
@@ -575,7 +576,7 @@ function handleOrderTableClick(e){
 
 // =============================================================
 // GIẢI TRÌNH LỆNH TẠM ỨNG — chia 1 lệnh tạm ứng cho tối đa 5 dự án khác nhau.
-// Mỗi khung "Giải trình N" có Dự án riêng -> khi lưu, tự tạo 1 khoản Chi (Thu Chi)
+// Mỗi khung "Giải chi N" có Dự án riêng -> khi lưu, tự tạo 1 khoản Chi (Thu Chi)
 // cho đúng dự án đó, cộng dồn đúng vào chi phí dự án tương ứng.
 // =============================================================
 
@@ -659,11 +660,12 @@ document.getElementById('save-explain-btn')?.addEventListener('click', async ()=
   for(let i=1;i<=5;i++){
     const projectId = document.getElementById(`exp${i}-project`).value;
     const amount = parseMoneyInput(document.getElementById(`exp${i}-amount`));
-    if(!projectId || !amount) continue; // khung để trống -> bỏ qua
-    const proj = projectById(projectId);
+    if(!amount) continue; // khung hoàn toàn trống (không nhập số tiền) -> bỏ qua
+    // KHÔNG chọn dự án vẫn phải tính — sẽ tự động rơi vào Chi phí gián tiếp (mã INDIRECT), y hệt Lệnh chi thường.
+    const proj = projectId ? projectById(projectId) : null;
     blocks.push({
-      projectId, projectName: proj ? proj.name : '',
-      code: document.getElementById(`exp${i}-code`).value,
+      projectId: projectId || '', projectName: proj ? proj.name : '',
+      code: document.getElementById(`exp${i}-code`).value || (projectId ? '' : 'INDIRECT'),
       content: document.getElementById(`exp${i}-content`).value.trim() || o.reason,
       description: document.getElementById(`exp${i}-desc`).value.trim(),
       unit: document.getElementById(`exp${i}-unit`).value.trim(),
@@ -672,7 +674,7 @@ document.getElementById('save-explain-btn')?.addEventListener('click', async ()=
       amount,
     });
   }
-  if(blocks.length === 0){ toast('Vui lòng điền ít nhất 1 khung Giải trình (chọn Dự án + Số tiền)'); return; }
+  if(blocks.length === 0){ toast('Vui lòng điền ít nhất 1 khung Giải chi (nhập Số tiền)'); return; }
 
   const approvalTarget = document.getElementById('exp-approval-target').value;
   let approverEmail = '';
@@ -685,13 +687,15 @@ document.getElementById('save-explain-btn')?.addEventListener('click', async ()=
     const CHUNK = 400;
     const batch = db.batch();
     blocks.forEach(b=>{
-      const ref = db.collection('transactions').doc();
+      const hasProject = !!b.projectId;
+      const targetCollection = hasProject ? 'transactions' : 'fixedCosts';
+      const ref = db.collection(targetCollection).doc();
       const txData = {
         type:'OUT', projectId: b.projectId, projectName: b.projectName,
         date, code: b.code, content: b.content, description: b.description,
         unit: b.unit, qty: b.qty, unitPrice: b.unitPrice, amount: b.amount,
         invoiceNumber:'', invoiceDate:'', bankName:'', bankAccount:'', bankHolder:'', transferDate:'',
-        note: `Giải trình từ Lệnh tạm ứng (${o.payee}) — ${o.reason}`,
+        note: `Giải chi từ Lệnh tạm ứng (${o.payee}) — ${o.reason}`,
         invoiceImage:'', transferImage:'', invoiceStatus:'pending', transferStatus:'pending',
         createdAt: firebase.firestore.FieldValue.serverTimestamp(),
         createdBy: auth.currentUser.email,
@@ -729,7 +733,7 @@ document.getElementById('save-explain-btn')?.addEventListener('click', async ()=
     }
 
     toast(`✅ Đã giải trình xong — tạo ${blocks.length} khoản Chi phân bổ theo dự án`);
-    logActivity('update', {projectName:'Giải trình tạm ứng', content: o.reason, amount: blocks.reduce((s,b)=>s+b.amount,0), type:'OUT'});
+    logActivity('update', {projectName:'Giải chi tạm ứng', content: o.reason, amount: blocks.reduce((s,b)=>s+b.amount,0), type:'OUT'});
     closeModal('modal-order-explain');
   }catch(err){ toast('Lỗi: '+err.message); }
 });
