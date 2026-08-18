@@ -104,9 +104,9 @@ service cloud.firestore {
       // được GỬI DUYỆT (chuyển sang 'pending'), tự do ghi Giải trình bất kỳ lúc nào; Admin thì sửa/xóa tự do.
       // Chỉ đúng email GĐ đã được gán (resource.data.approverEmail) mới được DUYỆT/TỪ CHỐI.
       allow update: if isAdmin() || isOrderApprovalSubmit() || isOrderApprovalDecision()
-        || (isSignedIn() && changedKeys().hasOnly(['explanation','explainAllocations','explainedAt','explainedBy','explainStatus']))
+        || (isSignedIn() && changedKeys().hasOnly(['explanation','explainAllocations','explainedAt','explainedBy','explainStatus','attachment','attachmentName']))
         || (isSignedIn() && (!('approvalStatus' in resource.data) || resource.data.approvalStatus == 'none' || resource.data.approvalStatus == '')
-          && changedKeys().hasOnly(['date','projectId','projectName','code','orderType','payer','payee','payeeBank','payeeTaxCode','reason','amount','requester','note','explanation']));
+          && changedKeys().hasOnly(['date','projectId','projectName','code','orderType','payer','payee','payeeBank','payeeTaxCode','reason','amount','requester','note','explanation','attachment','attachmentName']));
       // Kế toán (bất kỳ ai đăng nhập) được quyền xóa Lệnh chi/Lệnh tạm ứng — theo đúng yêu cầu công ty.
       allow delete: if isSignedIn();
     }
