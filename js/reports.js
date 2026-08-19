@@ -53,7 +53,7 @@ function renderDashboard(){
   }
 
   // Gộp cả Thu Chi (theo dự án) và Chi phí gián tiếp (không gắn dự án) vào toàn bộ dòng tiền công ty
-  const ALL_CASHFLOW = TRANSACTIONS.concat(typeof activeFixedCosts!=='undefined' ? activeFixedCosts() : []);
+  const ALL_CASHFLOW = (typeof activeTransactions==='function' ? activeTransactions() : TRANSACTIONS).concat(typeof activeFixedCosts!=='undefined' ? activeFixedCosts() : []);
 
   const totalIn = ALL_CASHFLOW.filter(t=>t.type==='IN').reduce((s,t)=>s+Number(t.amount||0),0);
   const totalOut = ALL_CASHFLOW.filter(t=>t.type==='OUT').reduce((s,t)=>s+Number(t.amount||0),0);
@@ -99,7 +99,7 @@ function renderDashboard(){
   // (trước đây 3 biểu đồ riêng lấy top-8 khác nhau theo từng chỉ số → nhìn vào dễ hiểu lầm là số bị lệch,
   // trong khi thực ra chỉ là đang so sánh các dự án khác nhau. Gộp lại để so sánh đúng cùng 1 dự án.)
   const projActualMap = {};
-  TRANSACTIONS.forEach(t=>{
+  activeTransactions().forEach(t=>{
     if(!t.projectId) return;
     if(!projActualMap[t.projectId]){
       const proj = projectById(t.projectId);
@@ -259,7 +259,7 @@ function renderReports(){
 
   // Gộp cả Chi phí gián tiếp (không gắn dự án) vào báo cáo toàn công ty.
   // Khi lọc theo 1 dự án cụ thể, Chi phí gián tiếp tự động không xuất hiện (vì không có projectId khớp).
-  let rows = TRANSACTIONS.concat(typeof activeFixedCosts!=='undefined' ? activeFixedCosts() : []);
+  let rows = (typeof activeTransactions==='function' ? activeTransactions() : TRANSACTIONS).concat(typeof activeFixedCosts!=='undefined' ? activeFixedCosts() : []);
   if(project) rows = rows.filter(t=>t.projectId===project);
   if(year) rows = rows.filter(t=> yearKey(t.date)===String(year));
 
@@ -316,7 +316,7 @@ function renderPnl(){
 
   // Gộp cả Chi phí gián tiếp (không gắn dự án) vào báo cáo toàn công ty.
   // Khi lọc theo 1 dự án cụ thể, Chi phí gián tiếp tự động không xuất hiện (vì không có projectId khớp).
-  let rows = TRANSACTIONS.concat(typeof activeFixedCosts!=='undefined' ? activeFixedCosts() : []);
+  let rows = (typeof activeTransactions==='function' ? activeTransactions() : TRANSACTIONS).concat(typeof activeFixedCosts!=='undefined' ? activeFixedCosts() : []);
   if(project) rows = rows.filter(t=>t.projectId===project);
   if(year) rows = rows.filter(t=> yearKey(t.date)===String(year));
 
