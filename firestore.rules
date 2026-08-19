@@ -89,7 +89,7 @@ service cloud.firestore {
       // hệ thống tự sinh ra do chính GĐ vừa Duyệt 1 lệnh (không được tự tay tạo/giải trình).
       allow create: if isSignedIn() && (isNotSubAdmin() || isSystemGeneratedFromApproval());
       // riêng đổi trạng thái Hóa đơn/Chuyển khoản và luồng Gửi duyệt/Duyệt/Từ chối Chi: KHÔNG áp dụng cho Sub-admin (GĐ chỉ xem).
-      allow update: if isAdmin() || (isNotSubAdmin() && isSimpleStatusUpdate()) || (isNotSubAdmin() && isApprovalSubmit()) || isApprovalDecision();
+      allow update: if isAdmin() || (isNotSubAdmin() && isSimpleStatusUpdate()) || (isNotSubAdmin() && isApprovalSubmit()) || isApprovalDecision() || (isNotSubAdmin() && isExplainUpdate());
       allow delete: if isAdmin();
     }
 
