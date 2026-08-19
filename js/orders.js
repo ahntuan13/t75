@@ -274,6 +274,59 @@ async function decideOrderApproval(id, decision){
   }catch(err){ toast('Lỗi: '+err.message); }
 }
 
+// Kiểm tra + sửa liên kết cho ĐÚNG 1 lệnh cụ thể — dùng khi nghi ngờ 1 lệnh bị "lạc" (đã duyệt nhưng
+// giao dịch liên kết không nằm đúng chỗ). KHÔNG đoán mò — tự đi kiểm tra thật cả 2 collection.
+async function repairOrderLink(orderId){
+  const o = ORDERS.find(x=>x.id===orderId);
+  if(!o || !o.transactionId) return;
+  toast('Đang kiểm tra...');
+  try{
+    const txSnap = await db.collection('transactions').doc(o.transactionId).get();
+    const fcSnap = await db.collection('fixedCosts').doc(o.transactionId).get();
+    let report = `Lệnh: "${o.reason}" — ${fmtVND(o.amount)}\n`
+      + `transactionId lưu trong lệnh: ${o.transactionId}\n`
+      + `transactionCollection lưu trong lệnh: ${o.transactionCollection || '(chưa có — lệnh cũ)'}\n\n`
+      + `Kiểm tra thật trong Firestore:\n`
+      + `- Có tồn tại trong "transactions"? ${txSnap.exists ? '✅ CÓ' : '❌ Không'}\n`
+      + `- Có tồn tại trong "fixedCosts"? ${fcSnap.exists ? '✅ CÓ' : '❌ Không'}\n`;
+
+    if(!o.projectId && txSnap.exists && !fcSnap.exists){
+      // Đúng là đang bị lạc trong Thu Chi -> chuyển sang Chi phí gián tiếp ngay
+      if(!isAdmin()){
+        alert(report + '\n⚠️ Lệnh này ĐANG NẰM SAI trong Thu Chi (Chi phí gián tiếp), cần chuyển — nhưng chỉ Admin mới xóa được khỏi Thu Chi. Vui lòng đăng nhập Admin rồi bấm 🔧 lại.');
+        return;
+      }
+      if(!confirm(report + '\n➡️ Lệnh này ĐANG NẰM SAI trong Thu Chi. Bấm OK để CHUYỂN ngay sang Chi phí gián tiếp và sửa lại liên kết.')) return;
+      const txData = txSnap.data();
+      const newRef = db.collection('fixedCosts').doc();
+      await newRef.set({ ...txData, projectId:'', projectName:'', code: txData.code || 'INDIRECT' });
+      await db.collection('transactions').doc(o.transactionId).delete();
+      await db.collection('paymentOrders').doc(orderId).update({ transactionId: newRef.id, transactionCollection: 'fixedCosts' });
+      toast('✅ Đã sửa xong — giờ đã đúng nằm trong Chi phí gián tiếp');
+    } else if(!txSnap.exists && !fcSnap.exists){
+      // Không tìm thấy ở đâu cả -> tạo lại mới hoàn toàn từ dữ liệu lệnh gốc
+      if(!confirm(report + '\n⚠️ KHÔNG tìm thấy giao dịch liên kết ở bất kỳ đâu (có thể đã bị xóa nhầm trước đó). Bấm OK để TẠO LẠI mới trong Chi phí gián tiếp từ đúng thông tin lệnh gốc.')) return;
+      const targetCollection = o.projectId ? 'transactions' : 'fixedCosts';
+      const newRef = db.collection(targetCollection).doc();
+      await newRef.set({
+        type:'OUT', projectId: o.projectId||'', projectName: o.projectName||'',
+        date: o.date, code: o.code || (o.projectId?'':'INDIRECT'),
+        content: o.reason, description: `Chi cho ${o.payee}`,
+        unit:'', qty:0, unitPrice:0, amount: o.amount,
+        invoiceNumber:'', invoiceDate:'', bankName:'', bankAccount: o.payeeBank||'', bankHolder: o.payee||'', transferDate:'',
+        note:`Tạo lại từ Lệnh chi (${o.payee}) — sửa liên kết bị lạc`,
+        createdAt: firebase.firestore.FieldValue.serverTimestamp(), createdBy: auth.currentUser.email,
+      });
+      await db.collection('paymentOrders').doc(orderId).update({ transactionId: newRef.id, transactionCollection: targetCollection });
+      toast('✅ Đã tạo lại giao dịch mới đúng chỗ');
+    } else {
+      alert(report + '\n✅ Dữ liệu đang ở đúng chỗ hợp lý, không cần sửa gì thêm. Nếu vẫn không thấy trên giao diện, thử Ctrl+Shift+R để tải lại trang.');
+    }
+  }catch(err){
+    alert('Lỗi khi kiểm tra: ' + err.message);
+  }
+}
+
 function statusTag(o){
   const status = o.approvalStatus || 'none';
   if(status==='approved'){
@@ -494,6 +547,7 @@ function orderRowHtml(o){
           <button class="icon-btn" data-print-order="${o.id}" title="In">🖨</button>
           <button class="icon-btn" data-edit-order="${o.id}" title="Sửa">✎</button>
           ${(isAdvanceOrder(o) && !isSubAdmin()) ? `<button class="icon-btn" data-explain-order="${o.id}" title="Giải chi (chỉ Kế toán)">🧾</button>` : ''}
+          ${(o.transactionId && !o.projectId && isAdmin()) ? `<button class="icon-btn" data-repair-order="${o.id}" title="Kiểm tra/Sửa liên kết Chi phí gián tiếp">🔧</button>` : ''}
           <button class="icon-btn" data-del-order="${o.id}" title="Xóa">🗑</button>
         </div>
       </td>
@@ -556,6 +610,8 @@ function handleOrderTableClick(e){
   const approveId = e.target.closest('[data-approve-order]')?.dataset.approveOrder;
   const rejectId = e.target.closest('[data-reject-order]')?.dataset.rejectOrder;
   const explainId = e.target.closest('[data-explain-order]')?.dataset.explainOrder;
+  const repairId = e.target.closest('[data-repair-order]')?.dataset.repairOrder;
+  if(repairId) repairOrderLink(repairId);
   if(viewId){
     const o = ORDERS.find(x=>x.id===viewId);
     openOrderModal(viewId, o && isAdvanceOrder(o) ? 'advance' : 'payment');
