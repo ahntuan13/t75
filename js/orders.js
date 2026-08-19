@@ -226,13 +226,11 @@ async function decideOrderApproval(id, decision){
   const label = decision==='approved' ? 'DUYỆT' : 'TỪ CHỐI';
   if(!confirm(`Xác nhận ${label} "${o.reason}" — ${fmtVND(o.amount)}?`)) return;
   try{
-    await db.collection('paymentOrders').doc(id).update({
+    const orderUpdate = {
       approvalStatus: decision,
       approvedBy: auth.currentUser.email,
       approvedAt: firebase.firestore.FieldValue.serverTimestamp(),
-    });
-    toast(decision==='approved' ? 'Đã duyệt' : 'Đã từ chối');
-    logActivity('approval_decide', {projectName: isAdvanceOrder(o)?'Lệnh tạm ứng':'Lệnh chi', content: o.reason, amount: o.amount, type:'OUT', note: decision==='approved'?'Đã duyệt':'Đã từ chối'});
+    };
 
     if(decision === 'approved'){
       const hasProject = !!o.projectId;
@@ -263,9 +261,16 @@ async function decideOrderApproval(id, decision){
         txData.createdAt = firebase.firestore.FieldValue.serverTimestamp();
         txData.createdBy = auth.currentUser.email;
         const txRef = await db.collection(targetCollection).add(txData);
-        await db.collection('paymentOrders').doc(id).update({transactionId: txRef.id, transactionCollection: targetCollection});
+        // Ghi CHUNG 1 LẦN với approvalStatus (không tách 2 lần update như trước) — tránh trường hợp
+        // lần ghi thứ 2 bị luật Firestore từ chối do không đúng bộ trường cho phép.
+        orderUpdate.transactionId = txRef.id;
+        orderUpdate.transactionCollection = targetCollection;
       }
     }
+
+    await db.collection('paymentOrders').doc(id).update(orderUpdate);
+    toast(decision==='approved' ? 'Đã duyệt' : 'Đã từ chối');
+    logActivity('approval_decide', {projectName: isAdvanceOrder(o)?'Lệnh tạm ứng':'Lệnh chi', content: o.reason, amount: o.amount, type:'OUT', note: decision==='approved'?'Đã duyệt':'Đã từ chối'});
   }catch(err){ toast('Lỗi: '+err.message); }
 }
 
