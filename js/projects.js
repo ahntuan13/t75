@@ -94,26 +94,22 @@ function renderProjectsTable(){
   </tr></thead><tbody>${totalsRow}${rows}</tbody>`;
 }
 
-let currentContractFiles = []; // [{url, name, uploadedAt, category, label}] — category: 'contract'|'payment'|'settlement'
+let currentContractFiles = []; // [{url, name, uploadedAt}]
 
 function renderContractFileStatus(){
-  ['contract','payment','settlement'].forEach(cat=>{
-    const el = document.getElementById(`project-files-${cat}`);
-    if(!el) return;
-    const files = currentContractFiles.filter(f=> (f.category||'contract')===cat);
-    if(files.length === 0){
-      el.innerHTML = `<span class="helper-text">Chưa có file nào.</span>`;
-      return;
-    }
-    el.innerHTML = files.map((f)=>{
-      const idx = currentContractFiles.indexOf(f);
-      return `<div style="display:flex;align-items:center;gap:8px;margin-bottom:6px;">
-        <a href="${f.url}" target="_blank" class="tag tag-blue">📎 ${escapeHtml(f.label ? f.label+': ' : '')}${escapeHtml(f.name || 'Xem file trên OneDrive')}</a>
-        <button type="button" class="btn btn-ghost btn-sm" data-remove-contract-file="${idx}">Xóa</button>
-      </div>`;
-    }).join('');
-  });
-  document.querySelectorAll('[data-remove-contract-file]').forEach(btn=>{
+  const el = document.getElementById('project-files-list');
+  if(!el) return;
+  if(currentContractFiles.length === 0){
+    el.innerHTML = `<span class="helper-text">Chưa có file đính kèm nào.</span>`;
+    return;
+  }
+  el.innerHTML = currentContractFiles.map((f, idx)=>
+    `<div style="display:flex;align-items:center;gap:8px;margin-bottom:6px;">
+      <a href="${f.url}" target="_blank" class="tag tag-blue">📎 Đính kèm ${idx+1}: ${escapeHtml(f.name || 'Xem file')}</a>
+      <button type="button" class="btn btn-ghost btn-sm" data-remove-contract-file="${idx}">Xóa</button>
+    </div>`
+  ).join('');
+  el.querySelectorAll('[data-remove-contract-file]').forEach(btn=>{
     btn.addEventListener('click', ()=>{
       currentContractFiles.splice(Number(btn.dataset.removeContractFile), 1);
       renderContractFileStatus();
@@ -121,35 +117,22 @@ function renderContractFileStatus(){
   });
 }
 
-async function handleProjectFileUpload(file, category, statusElId){
-  const el = document.getElementById(statusElId);
-  if(el) el.innerHTML = `<span class="helper-text">⏳ Đang tải "${escapeHtml(file.name)}" lên OneDrive công ty... (có thể hiện popup đăng nhập Microsoft 365 lần đầu)</span>`;
+document.getElementById('project-add-attachment-btn')?.addEventListener('click', ()=> document.getElementById('project-file-input').click());
+document.getElementById('project-file-input')?.addEventListener('change', async (e)=>{
+  const file = e.target.files[0];
+  e.target.value = '';
+  if(!file) return;
+  toast(`⏳ Đang tải "${file.name}" lên OneDrive công ty... (có thể hiện popup đăng nhập Microsoft 365 lần đầu)`);
   try{
     const projName = document.getElementById('project-name').value.trim() || 'KhongTenDuAn';
-    const folder = 'Projects/' + projName.replace(/[^\w\-]+/g, '_') + '/' + category;
+    const folder = 'Projects/' + projName.replace(/[^\w\-]+/g, '_');
     const result = await msUploadFile(file, folder);
-    let label = '';
-    if(category === 'payment'){
-      const countSoFar = currentContractFiles.filter(f=>f.category==='payment').length;
-      label = `Lần ${countSoFar+1}`;
-    }
-    currentContractFiles.push({ url: result.webUrl, name: result.name, uploadedAt: new Date().toISOString(), category, label });
-    toast('Đã thêm file');
+    currentContractFiles.push({ url: result.webUrl, name: result.name, uploadedAt: new Date().toISOString() });
+    toast('Đã thêm file đính kèm — bấm vào tên file để xem lại');
   }catch(err){
     toast('Lỗi tải lên OneDrive: ' + err.message);
   }
   renderContractFileStatus();
-}
-
-[['project-file-contract','contract','project-files-contract'],
- ['project-file-payment','payment','project-files-payment'],
- ['project-file-settlement','settlement','project-files-settlement']].forEach(([inputId, category, statusId])=>{
-  document.getElementById(inputId)?.addEventListener('change', async (e)=>{
-    const file = e.target.files[0];
-    if(!file) return;
-    await handleProjectFileUpload(file, category, statusId);
-    e.target.value = '';
-  });
 });
 
 function openProjectModal(id){
@@ -171,18 +154,15 @@ function openProjectModal(id){
   document.getElementById('project-warranty-years').value = p.warrantyYears || '';
   document.getElementById('project-warranty-start').value = p.warrantyStartDate || '';
   document.getElementById('project-note').value = p.note || '';
-  // ưu tiên mảng nhiều file mới (contractFiles); nếu dự án cũ chỉ có 1 file (contractFileUrl/contractFile) thì tự chuyển thành mảng 1 phần tử,
-  // gắn category='contract' để hiện đúng vào khung "Scan hợp đồng"
+  // ưu tiên mảng nhiều file mới (contractFiles); nếu dự án cũ chỉ có 1 file (contractFileUrl/contractFile) thì tự chuyển thành mảng 1 phần tử
   if(Array.isArray(p.contractFiles) && p.contractFiles.length){
-    currentContractFiles = p.contractFiles.map(f=> ({category:'contract', ...f}));
+    currentContractFiles = p.contractFiles.slice();
   } else if(p.contractFileUrl || p.contractFile){
-    currentContractFiles = [{ url: p.contractFileUrl || p.contractFile, name: p.contractFileName || 'Hợp đồng', category:'contract' }];
+    currentContractFiles = [{ url: p.contractFileUrl || p.contractFile, name: p.contractFileName || 'Hợp đồng' }];
   } else {
     currentContractFiles = [];
   }
-  document.getElementById('project-file-contract').value = '';
-  document.getElementById('project-file-payment').value = '';
-  document.getElementById('project-file-settlement').value = '';
+  document.getElementById('project-file-input').value = '';
   renderContractFileStatus();
   openModal('modal-project');
 }
