@@ -60,7 +60,9 @@ service cloud.firestore {
     }
     function isOrderApprovalDecision() {
       return isSignedIn()
-        && changedKeys().hasOnly(['approvalStatus','approvedBy','approvedAt'])
+        // Cho phép ghi kèm transactionId/transactionCollection CÙNG LÚC với quyết định duyệt —
+        // vì đây là 1 hành động DUY NHẤT (Duyệt lệnh -> tự động liên kết giao dịch vừa tạo ra).
+        && changedKeys().hasOnly(['approvalStatus','approvedBy','approvedAt','transactionId','transactionCollection'])
         && (request.resource.data.approvalStatus == 'approved' || request.resource.data.approvalStatus == 'rejected')
         && resource.data.approverEmail == request.auth.token.email;
     }
@@ -77,7 +79,7 @@ service cloud.firestore {
 
     match /projects/{id} {
       allow read: if isSignedIn();
-      allow create, update: if isSignedIn();
+      allow create, update: if isSignedIn() && isNotSubAdmin();
       allow delete: if isAdmin();
     }
 
