@@ -3,6 +3,12 @@
 // =============================================================
 
 let TRANSACTIONS = []; // cache
+
+// Thu Chi "đang thực tính" — loại bỏ các khoản tạm ứng ĐÃ GIẢI CHI (số liệu chính thức nằm ở nơi khác,
+// tránh tính trùng). Dùng hàm này ở MỌI nơi cần tính tổng Thu Chi (Dashboard/Báo cáo/chính trang Thu Chi).
+function activeTransactions(){
+  return TRANSACTIONS.filter(t => t.advanceExplainStatus !== 'explained');
+}
 let currentTxType = ''; // '' = chưa chọn Thu/Chi (bắt buộc chọn trước khi hiện các trường)
 let currentInvoiceImage = '';
 let currentTransferImage = '';
@@ -451,8 +457,11 @@ function renderTxTable(){
 
   // Không còn nhóm theo dự án nữa — luôn hiển thị 1 bảng phẳng, sắp theo ngày mới nhất, có thêm cột Dự án riêng.
   const flatRows = rows.slice().sort((a,b)=> (b.date||'').localeCompare(a.date||''));
-  const sumIn = flatRows.filter(t=>t.type==='IN').reduce((s,t)=>s+Number(t.amount||0),0);
-  const sumOut = flatRows.filter(t=>t.type==='OUT').reduce((s,t)=>s+Number(t.amount||0),0);
+  // Tổng chỉ tính các khoản CHƯA/không phải "đã giải chi" (khoản tạm ứng đã giải chi thì số liệu chính thức
+  // đã nằm ở nơi khác, hiện vẫn thấy dòng cũ trong bảng cho dễ đối chiếu nhưng KHÔNG cộng vào tổng).
+  const activeRows = flatRows.filter(t => t.advanceExplainStatus !== 'explained');
+  const sumIn = activeRows.filter(t=>t.type==='IN').reduce((s,t)=>s+Number(t.amount||0),0);
+  const sumOut = activeRows.filter(t=>t.type==='OUT').reduce((s,t)=>s+Number(t.amount||0),0);
   wrap.innerHTML = `
     <div class="card tx-project-block">
       <div class="tx-project-head">
