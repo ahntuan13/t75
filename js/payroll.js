@@ -112,6 +112,17 @@ document.getElementById('save-emp-btn').addEventListener('click', async ()=>{
   }catch(err){ toast('Lỗi: '+err.message); }
 });
 
+// Thứ tự cấp bậc (cao -> thấp) trong nhóm Quản lý — khớp đúng thứ tự trong file Bảng lương gốc.
+// Chức vụ không nằm trong danh sách này sẽ xếp cuối, giữ nguyên thứ tự tương đối.
+const POSITION_RANK = [
+  'Giám Đốc', 'Phó Giám Đốc', 'Giám Đốc Dự Án', 'Quản Lý Dự Án',
+  'Giám Sát', 'Kế Toán', 'Nhân Viên An Toàn',
+];
+function positionRank(position){
+  const idx = POSITION_RANK.findIndex(p=> p.toLowerCase() === (position||'').trim().toLowerCase());
+  return idx === -1 ? 999 : idx;
+}
+
 function renderEmployeesTable(){
   const table = document.getElementById('employees-table');
   if(!table) return;
@@ -119,13 +130,10 @@ function renderEmployeesTable(){
     table.innerHTML = `<tr><td><div class="empty-state"><div class="big">👥</div>Chưa có nhân viên nào. Bấm "+ Tạo mới" hoặc Upload Excel để thêm.</div></td></tr>`;
     return;
   }
-  table.innerHTML = `<thead><tr>
-    <th>Họ tên</th><th>Chức vụ</th><th>Nhóm lương</th><th>Lương HĐLĐ/BHXH</th><th>Lương hiệu quả</th><th></th>
-  </tr></thead><tbody>${EMPLOYEES.map(e=>`
+  const empRow = (e)=>`
     <tr>
       <td><strong>${escapeHtml(e.name)}</strong></td>
       <td>${escapeHtml(e.position||'—')}</td>
-      <td>${e.payType==='daily' ? '<span class="tag tag-gold">Công nhân</span>' : '<span class="tag tag-blue">Quản lý</span>'}</td>
       <td class="num">${fmtVND(e.contractSalary)}</td>
       <td class="num">${fmtVND(e.effectiveRate)}${e.payType==='daily'?'/ngày':'/tháng'}</td>
       <td>
@@ -134,7 +142,18 @@ function renderEmployeesTable(){
           ${isAdmin() ? `<button class="icon-btn" data-del-emp="${e.id}" title="Xóa">🗑</button>` : ''}
         </div>
       </td>
-    </tr>`).join('')}</tbody>`;
+    </tr>`;
+  const groupHeaderRow = (label, count)=> `<tr class="tx-subhead"><td colspan="5"><strong>${label}</strong> <span class="helper-text">(${count} người)</span></td></tr>`;
+
+  const managers = EMPLOYEES.filter(e=>e.payType!=='daily').sort((a,b)=> positionRank(a.position)-positionRank(b.position) || a.name.localeCompare(b.name,'vi'));
+  const workers = EMPLOYEES.filter(e=>e.payType==='daily').sort((a,b)=> a.name.localeCompare(b.name,'vi'));
+
+  table.innerHTML = `<thead><tr>
+    <th>Họ tên</th><th>Chức vụ</th><th>Lương HĐLĐ/BHXH</th><th>Lương hiệu quả</th><th></th>
+  </tr></thead><tbody>
+    ${managers.length ? groupHeaderRow('🔷 QUẢN LÝ', managers.length) + managers.map(empRow).join('') : ''}
+    ${workers.length ? groupHeaderRow('🔶 CÔNG NHÂN', workers.length) + workers.map(empRow).join('') : ''}
+  </tbody>`;
 }
 document.getElementById('employees-table')?.addEventListener('click', (e)=>{
   const editId = e.target.closest('[data-edit-emp]')?.dataset.editEmp;
