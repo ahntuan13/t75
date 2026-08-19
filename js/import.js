@@ -194,40 +194,47 @@ async function runImport(file, type){
   const unmatchedProjects = new Set(parsedList.filter(x=>!x.proj && x.row.projectRaw).map(x=>x.row.projectRaw));
 
   // Dữ liệu Excel đã upload trước đó (cùng loại Thu/Chi) sẽ bị XÓA và thay bằng dữ liệu mới lần này.
-  const oldImported = TRANSACTIONS.filter(t => t.type===type && t.importedFromExcel===true);
+  // Xóa ở CẢ 2 nơi vì dòng không khớp dự án có thể đã từng vào Thu Chi (bug cũ) hoặc Chi phí gián tiếp (đúng).
+  const oldImportedTx = TRANSACTIONS.filter(t => t.type===type && t.importedFromExcel===true);
+  const oldImportedFc = (typeof FIXEDCOSTS!=='undefined'?FIXEDCOSTS:[]).filter(t => t.type===type && t.importedFromExcel===true);
 
   const typeLabel = type === 'IN' ? 'THU' : 'CHI';
   let summary = `Đọc được ${rows.length} dòng trong file "${file.name}".\n\n`
-    + `⚠️ Toàn bộ ${oldImported.length} giao dịch loại ${typeLabel} đã nhập từ Excel TRƯỚC ĐÓ sẽ bị XÓA.\n`
-    + `✅ Sau đó sẽ nhập mới toàn bộ ${rows.length} dòng từ file này (kể cả dòng thiếu ngày/số tiền/dự án — phần thiếu để trống).\n`;
-  if(unmatchedProjects.size) summary += `⚠️ Có ${unmatchedProjects.size} tên dự án không khớp được với dự án đã có, các dòng đó vẫn được nhập nhưng để trống mục Dự án:\n   - ${[...unmatchedProjects].slice(0,10).join('\n   - ')}${unmatchedProjects.size>10?'\n   ... và nhiều hơn nữa':''}\n`;
+    + `⚠️ Toàn bộ ${oldImportedTx.length + oldImportedFc.length} giao dịch loại ${typeLabel} đã nhập từ Excel TRƯỚC ĐÓ (cả Thu Chi lẫn Chi phí gián tiếp) sẽ bị XÓA.\n`
+    + `✅ Sau đó sẽ nhập mới toàn bộ ${rows.length} dòng — dòng nào KHỚP được dự án sẽ vào Thu Chi, dòng nào KHÔNG khớp/không có dự án sẽ tự động vào Chi phí gián tiếp (mã INDIRECT).\n`;
+  if(unmatchedProjects.size) summary += `⚠️ Có ${unmatchedProjects.size} tên dự án không khớp được với dự án đã có, các dòng đó sẽ vào mục Chi phí gián tiếp:\n   - ${[...unmatchedProjects].slice(0,10).join('\n   - ')}${unmatchedProjects.size>10?'\n   ... và nhiều hơn nữa':''}\n`;
   summary += `\nGiao dịch bạn tự tay nhập thủ công (không qua Upload Excel) sẽ KHÔNG bị ảnh hưởng.\n\nBạn có chắc chắn muốn tiếp tục?`;
 
   if(!confirm(summary)) return;
 
   try{
     const CHUNK = 400;
-    // Bước 1: xóa toàn bộ dữ liệu Excel cũ (cùng loại)
-    if(oldImported.length){
-      toast(`Đang xóa ${oldImported.length} giao dịch cũ...`);
-      for(let i = 0; i < oldImported.length; i += CHUNK){
+    // Bước 1: xóa toàn bộ dữ liệu Excel cũ (cùng loại), cả 2 nơi
+    const toDelete = [
+      ...oldImportedTx.map(t=>({coll:'transactions', id:t.id})),
+      ...oldImportedFc.map(t=>({coll:'fixedCosts', id:t.id})),
+    ];
+    if(toDelete.length){
+      toast(`Đang xóa ${toDelete.length} giao dịch cũ...`);
+      for(let i = 0; i < toDelete.length; i += CHUNK){
         const batch = db.batch();
-        oldImported.slice(i, i+CHUNK).forEach(t=> batch.delete(db.collection('transactions').doc(t.id)));
+        toDelete.slice(i, i+CHUNK).forEach(x=> batch.delete(db.collection(x.coll).doc(x.id)));
         await batch.commit();
       }
     }
-    // Bước 2: nhập toàn bộ dữ liệu mới
+    // Bước 2: nhập toàn bộ dữ liệu mới — dòng có dự án khớp -> Thu Chi; dòng KHÔNG có dự án -> Chi phí gián tiếp
     toast(`Đang nhập ${rows.length} giao dịch mới...`);
     for(let i = 0; i < parsedList.length; i += CHUNK){
       const batch = db.batch();
       parsedList.slice(i, i+CHUNK).forEach(({row, proj})=>{
-        const ref = db.collection('transactions').doc();
+        const targetCollection = proj ? 'transactions' : 'fixedCosts';
+        const ref = db.collection(targetCollection).doc();
         batch.set(ref, {
           type,
           projectId: proj ? proj.id : '',
-          projectName: proj ? proj.name : (row.projectRaw || ''),
+          projectName: proj ? proj.name : '',
           date: row.date,
-          code: row.code,
+          code: row.code || (proj ? '' : 'INDIRECT'),
           content: row.content || '(Không có nội dung)',
           description: row.description,
           unit: row.unit,
