@@ -247,9 +247,10 @@ async function decideOrderApproval(id, decision){
         bankName:'', bankAccount: o.payeeBank||'', bankHolder: o.payee||'', transferDate:'',
         note:`Tự động tạo từ ${isAdvance ? 'Lệnh tạm ứng' : 'Lệnh chi'} (${o.payee})${o.payeeTaxCode ? ' — MST: '+o.payeeTaxCode : ''}`,
       };
-      // Tạm ứng không gắn dự án -> vào Chi phí gián tiếp và gắn tag "Chờ giải trình"
-      // (vẫn tính vào tổng Chi phí gián tiếp cho tới khi KT giải trình xong, chuyển hẳn qua Thu Chi).
-      if(isAdvance && !hasProject){
+      // Tạm ứng (dù CÓ hay KHÔNG có dự án lúc duyệt) đều gắn tag "Chờ giải chi" — số tiền ban đầu chỉ là
+      // TẠM (dự kiến), phải chờ KT bấm Giải chi ghi rõ dự án/số tiền chính thức mới coi là số liệu cuối cùng.
+      // Không gắn dự án -> vào Chi phí gián tiếp. Có gắn dự án -> vào thẳng Thu Chi dự án nhưng vẫn "Chờ giải chi".
+      if(isAdvance){
         txData.advanceExplainStatus = 'pending';
       }
       if(o.transactionId){
@@ -783,17 +784,19 @@ document.getElementById('save-explain-btn')?.addEventListener('click', async ()=
     };
     await db.collection('paymentOrders').doc(orderId).update(orderUpdate);
 
-    // Nếu lệnh này trước đó đã tự động vào Chi phí gián tiếp (do chưa gắn dự án) -> đánh dấu đã giải trình,
-    // loại khỏi tổng Chi phí gián tiếp (số liệu chính thức giờ nằm trong Thu Chi, tránh tính trùng).
-    if(o.transactionCollection === 'fixedCosts' && o.transactionId){
+    // Đánh dấu bản ghi TẠM (dự kiến) ban đầu là "đã giải chi" — bất kể nó đang nằm ở Thu Chi hay Chi phí
+    // gián tiếp — để loại khỏi mọi tổng tính toán (số liệu chính thức giờ nằm ở các khoản Giải chi vừa tạo,
+    // tránh tính trùng tiền 2 lần).
+    if(o.transactionId){
+      const originalCollection = o.transactionCollection || 'transactions';
       try{
-        await db.collection('fixedCosts').doc(o.transactionId).update({
+        await db.collection(originalCollection).doc(o.transactionId).update({
           advanceExplainStatus: 'explained',
           movedToTransactionId: orderId,
           explainedAt: firebase.firestore.FieldValue.serverTimestamp(),
           explainedBy: auth.currentUser.email,
         });
-      }catch(err){ console.error('mark fixedCosts explained error', err); }
+      }catch(err){ console.error('mark explained error', err); }
     }
 
     toast(`✅ Đã giải trình xong — tạo ${blocks.length} khoản Chi phân bổ theo dự án`);
