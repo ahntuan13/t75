@@ -227,34 +227,53 @@ document.getElementById('upload-fc-chi-input')?.addEventListener('change', (e)=>
 // Bắt TẤT CẢ giao dịch Thu Chi KHÔNG CÓ DỰ ÁN, không phân biệt cũ/mới hay nguồn gốc tạo ra
 // (Lệnh chi tự sinh, Upload Excel, hay dữ liệu cũ từ trước khi có mục Chi phí gián tiếp) —
 // đúng nguyên tắc: Thu Chi CHỈ chứa giao dịch có gán Dự án, còn lại đều thuộc Chi phí gián tiếp.
+// Bắt TẤT CẢ giao dịch Thu Chi KHÔNG CÓ DỰ ÁN, không phân biệt cũ/mới hay nguồn gốc tạo ra
+// (Lệnh chi tự sinh, Upload Excel, hay dữ liệu cũ từ trước khi có mục Chi phí gián tiếp) —
+// đúng nguyên tắc: Thu Chi CHỈ chứa giao dịch có gán Dự án, còn lại đều thuộc Chi phí gián tiếp.
+// Xử lý TỪNG DÒNG RIÊNG LẺ (không gộp batch) để 1 dòng lỗi không chặn các dòng còn lại,
+// và báo lỗi CHI TIẾT từng dòng nếu có — để dễ tìm nguyên nhân thật khi có vấn đề.
 async function migrateIndirectToFixedCosts(){
   const indirectTx = TRANSACTIONS.filter(t => !t.projectId);
   if(indirectTx.length === 0){ alert('Không tìm thấy giao dịch nào không có dự án trong Thu Chi — dữ liệu đã sạch.'); return; }
-  if(!confirm(`Tìm thấy ${indirectTx.length} giao dịch KHÔNG CÓ DỰ ÁN đang nằm lạc trong Thu Chi.\n\nBấm OK để CHUYỂN toàn bộ sang mục Chi phí gián tiếp, sau đó XÓA khỏi Thu Chi (tránh trùng lặp).\n\nThao tác này không hoàn tác được, hãy chắc chắn trước khi tiếp tục.`)) return;
 
-  try{
-    const CHUNK = 400;
-    for(let i = 0; i < indirectTx.length; i += CHUNK){
-      const batch = db.batch();
-      indirectTx.slice(i, i+CHUNK).forEach(t=>{
-        const { id, ...rest } = t;
-        const newRef = db.collection('fixedCosts').doc();
-        batch.set(newRef, { ...rest, projectId:'', projectName:'', code: rest.code || 'INDIRECT' });
-        batch.delete(db.collection('transactions').doc(id));
-        // Nếu giao dịch này gắn với 1 Lệnh chi/Tạm ứng (paymentOrders.transactionId trỏ về đây),
-        // cập nhật lại đúng địa chỉ mới để lần sau không bị lạc nữa.
-        const linkedOrder = (typeof ORDERS!=='undefined'?ORDERS:[]).find(o=>o.transactionId===id);
-        if(linkedOrder){
-          batch.update(db.collection('paymentOrders').doc(linkedOrder.id), {
+  const preview = indirectTx.slice(0,5).map(t=>`- ${t.content||'(không tên)'} — ${fmtVND(t.amount)} — ngày ${t.date||'?'}`).join('\n');
+  if(!confirm(`Tìm thấy ${indirectTx.length} giao dịch KHÔNG CÓ DỰ ÁN đang nằm lạc trong Thu Chi. Ví dụ:\n${preview}${indirectTx.length>5?'\n... và nhiều hơn nữa':''}\n\nBấm OK để CHUYỂN toàn bộ sang mục Chi phí gián tiếp, sau đó XÓA khỏi Thu Chi.\n\n⚠️ Bạn PHẢI đăng nhập bằng tài khoản Admin thì bước xóa mới thực hiện được (chỉ Admin được xóa Thu Chi).\n\nTiếp tục?`)) return;
+
+  if(!isAdmin()){
+    alert('⚠️ Tài khoản hiện tại KHÔNG phải Admin — bước xóa khỏi Thu Chi sẽ bị từ chối theo luật bảo mật. Vui lòng đăng nhập bằng tài khoản Admin rồi thử lại.');
+    return;
+  }
+
+  let okCount = 0;
+  const errors = [];
+  for(const t of indirectTx){
+    try{
+      const { id, ...rest } = t;
+      const newRef = db.collection('fixedCosts').doc();
+      await newRef.set({ ...rest, projectId:'', projectName:'', code: rest.code || 'INDIRECT' });
+      await db.collection('transactions').doc(id).delete();
+      // Nếu giao dịch này gắn với 1 Lệnh chi/Tạm ứng (paymentOrders.transactionId trỏ về đây),
+      // cập nhật lại đúng địa chỉ mới để lần sau không bị lạc nữa.
+      const linkedOrder = (typeof ORDERS!=='undefined'?ORDERS:[]).find(o=>o.transactionId===id);
+      if(linkedOrder){
+        try{
+          await db.collection('paymentOrders').doc(linkedOrder.id).update({
             transactionId: newRef.id, transactionCollection: 'fixedCosts',
           });
+        }catch(linkErr){
+          errors.push(`"${t.content}": chuyển OK nhưng không cập nhật lại được liên kết Lệnh chi — ${linkErr.message}`);
         }
-      });
-      await batch.commit();
+      }
+      okCount++;
+    }catch(err){
+      errors.push(`"${t.content || t.id}": ${err.message}`);
     }
-    toast(`✅ Đã chuyển ${indirectTx.length} giao dịch sang Chi phí gián tiếp`);
-  }catch(err){
-    alert('Lỗi khi chuyển dữ liệu: ' + err.message);
+  }
+
+  if(errors.length === 0){
+    toast(`✅ Đã chuyển thành công ${okCount}/${indirectTx.length} giao dịch sang Chi phí gián tiếp`);
+  } else {
+    alert(`Đã chuyển thành công ${okCount}/${indirectTx.length} giao dịch.\n\n⚠️ ${errors.length} dòng bị lỗi:\n${errors.slice(0,10).join('\n')}${errors.length>10?'\n... và nhiều hơn nữa':''}`);
   }
 }
 document.getElementById('btn-migrate-indirect')?.addEventListener('click', migrateIndirectToFixedCosts);
