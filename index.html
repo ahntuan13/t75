@@ -411,6 +411,11 @@
           <select id="ts-filter-employee"><option value="">Tất cả nhân viên</option></select>
         </div>
         <div class="card">
+          <div class="card-head"><h3>🗓 Bảng chấm công (dạng lưới, giống Excel)</h3></div>
+          <p class="helper-text" style="margin:-6px 0 10px;">Bấm vào ô ngày của từng nhân viên để nhập giờ + chọn dự án cho đúng ca. Cột "Tổng giờ" tự cộng dồn cả tháng.</p>
+          <div class="table-wrap" style="max-height:600px;overflow:auto;"><table class="data" id="ts-grid-table"></table></div>
+        </div>
+        <div class="card">
           <div class="card-head"><h3>Tổng hợp công theo tháng</h3></div>
           <div class="table-wrap"><table class="data" id="ts-summary-table"></table></div>
         </div>
@@ -571,22 +576,12 @@
           <div class="helper-text">Tự ghi lại ngày khi bạn chuyển Trạng thái sang "Còn giữ 5% bảo hành".</div>
         </div>
         <div class="field full">
-          <label>📄 Scan hợp đồng (upload thẳng lên OneDrive công ty — có thể nhiều file)</label>
-          <input type="file" id="project-file-contract" accept="image/*,.pdf,application/pdf">
-          <div id="project-files-contract" style="margin-top:8px;"></div>
+          <label>📎 Đính kèm hồ sơ dự án (hợp đồng, hồ sơ thanh toán, quyết toán... — mọi loại file)</label>
+          <div id="project-files-list" style="margin-bottom:8px;"></div>
+          <button type="button" class="btn btn-ghost btn-sm" id="project-add-attachment-btn">+ Thêm file đính kèm</button>
+          <input type="file" id="project-file-input" style="display:none;">
+          <div class="helper-text" style="margin-top:6px;">File tối đa 4MB/file. Lần đầu upload sẽ hiện popup đăng nhập Microsoft 365 công ty — nếu trình duyệt chặn popup, bấm cho phép popup của trang này. Upload xong bấm thẳng vào tên file để xem lại.</div>
         </div>
-        <div class="field full">
-          <label>💰 Scan hồ sơ thanh toán (lần 1, 2, 3...)</label>
-          <div class="helper-text" style="margin-bottom:6px;">Mỗi lần upload tự đánh số "Lần N" theo thứ tự — kế toán (User) cũng upload được mục này.</div>
-          <input type="file" id="project-file-payment" accept="image/*,.pdf,application/pdf">
-          <div id="project-files-payment" style="margin-top:8px;"></div>
-        </div>
-        <div class="field full">
-          <label>📊 Hồ sơ quyết toán</label>
-          <input type="file" id="project-file-settlement" accept="image/*,.pdf,application/pdf">
-          <div id="project-files-settlement" style="margin-top:8px;"></div>
-        </div>
-        <div class="helper-text field full">File tối đa 4MB/file. Lần đầu upload sẽ hiện popup đăng nhập Microsoft 365 công ty — nếu trình duyệt chặn popup, bấm cho phép popup của trang này.</div>
         <div class="field full"><label>Link hợp đồng khác (Google Drive, dùng khi file lớn)</label><input id="project-contract-link" placeholder="https://drive.google.com/..."></div>
         <div class="field"><label>Trạng thái</label>
           <select id="project-status"><option value="active">Đang thực hiện</option><option value="warranty">Còn giữ 5% bảo hành</option><option value="done">Hoàn thành</option><option value="paused">Tạm dừng</option></select>
