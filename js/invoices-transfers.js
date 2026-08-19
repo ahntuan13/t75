@@ -11,7 +11,7 @@ function renderInvoices(){
   const search = document.getElementById('inv-search').value.trim().toLowerCase();
 
   // Lấy toàn bộ giao dịch (mọi giao dịch đều có trạng thái hóa đơn), không chỉ giao dịch đã điền số HĐ
-  let rows = TRANSACTIONS.slice();
+  let rows = (typeof activeTransactions==='function' ? activeTransactions() : TRANSACTIONS).slice();
   if(project) rows = rows.filter(t=>t.projectId===project);
   if(status) rows = rows.filter(t=> (t.invoiceStatus||'pending')===status);
   if(search) rows = rows.filter(t=> `${t.invoiceNumber||''} ${t.content||''}`.toLowerCase().includes(search));
@@ -85,7 +85,7 @@ function renderTransfers(){
   const search = document.getElementById('tr-search').value.trim().toLowerCase();
 
   // Lấy toàn bộ giao dịch (mọi giao dịch đều có trạng thái chuyển khoản), không chỉ giao dịch đã điền số TK
-  let rows = TRANSACTIONS.slice();
+  let rows = (typeof activeTransactions==='function' ? activeTransactions() : TRANSACTIONS).slice();
   if(project) rows = rows.filter(t=>t.projectId===project);
   if(status) rows = rows.filter(t=> (t.transferStatus||'pending')===status);
   if(search) rows = rows.filter(t=> `${t.bankName||''} ${t.bankAccount||''} ${t.bankHolder||''} ${t.content||''}`.toLowerCase().includes(search));
