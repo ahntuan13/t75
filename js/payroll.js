@@ -26,12 +26,14 @@ function listenPayroll(){
     fillEmployeeSelects();
     renderEmployeesTable();
     renderPayrollSummary();
+    renderTimesheetGrid();
   }, (err)=> console.error('employees listen error', err));
 
   db.collection('timesheets').orderBy('date','desc').onSnapshot((snap)=>{
     TIMESHEETS = snap.docs.map(d=> ({id:d.id, ...d.data()}));
     renderTimesheetTable();
     renderTimesheetSummary();
+    renderTimesheetGrid();
     renderPayrollSummary();
   }, (err)=> console.error('timesheets listen error', err));
 
@@ -465,6 +467,68 @@ document.getElementById('timesheet-table')?.addEventListener('click', (e)=>{
 });
 
 // Tổng hợp công theo tháng (mỗi nhân viên 1 dòng)
+// Khung chấm công dạng LƯỚI giống Excel: hàng = nhân viên (chia nhóm QL/CN), cột = từng ngày trong tháng,
+// mỗi ô hiện tổng giờ ngày đó (bấm vào để mở đúng modal 3 ca nhập/sửa giờ + chọn dự án), cột cuối tự cộng Tổng giờ tháng.
+function renderTimesheetGrid(){
+  const table = document.getElementById('ts-grid-table');
+  if(!table) return;
+  const month = document.getElementById('ts-filter-month').value || todayISO().slice(0,7);
+  const [y, m] = month.split('-').map(Number);
+  const daysInMonth = new Date(y, m, 0).getDate();
+  const days = Array.from({length: daysInMonth}, (_, i) => i+1);
+
+  const empFilter = document.getElementById('ts-filter-employee').value;
+  const emps = empFilter ? EMPLOYEES.filter(e=>e.id===empFilter) : EMPLOYEES;
+  if(emps.length === 0){
+    table.innerHTML = `<tr><td><div class="empty-state"><div class="big">🗓</div>Chưa có nhân viên nào.</div></td></tr>`;
+    return;
+  }
+
+  // Gom timesheet của tháng theo employeeId + ngày để tra cứu nhanh
+  const byEmpDay = {};
+  TIMESHEETS.filter(t=> monthKey(t.date)===month).forEach(t=>{
+    byEmpDay[`${t.employeeId}_${t.date}`] = t;
+  });
+
+  const dayHeaderCells = days.map(d=> `<th style="min-width:46px;">${d}</th>`).join('');
+  const empRow = (e)=>{
+    let monthTotal = 0;
+    const cells = days.map(d=>{
+      const dateStr = `${y}-${String(m).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
+      const t = byEmpDay[`${e.id}_${dateStr}`];
+      const h = t ? tsHours(t) : {regular:0, ot:0, total:0};
+      monthTotal += h.total;
+      const label = h.total > 0 ? h.total : '';
+      const otMark = h.ot > 0 ? `<div style="font-size:9.5px;color:var(--gold);">+${h.ot} TC</div>` : '';
+      return `<td class="num" style="cursor:pointer;padding:4px;${h.total>0?'':'color:var(--ink-faint);'}" data-grid-cell="${e.id}|${dateStr}">${label}${otMark}</td>`;
+    }).join('');
+    return `<tr><td style="position:sticky;left:0;background:var(--card);white-space:nowrap;"><strong>${escapeHtml(e.name)}</strong></td>${cells}<td class="num" style="font-weight:800;">${monthTotal}h</td></tr>`;
+  };
+  const groupHeaderRow = (label)=> `<tr class="tx-subhead"><td colspan="${days.length+2}"><strong>${label}</strong></td></tr>`;
+  const managers = emps.filter(e=>e.payType!=='daily').sort((a,b)=> positionRank(a.position)-positionRank(b.position) || a.name.localeCompare(b.name,'vi'));
+  const workers = emps.filter(e=>e.payType==='daily').sort((a,b)=> a.name.localeCompare(b.name,'vi'));
+
+  table.innerHTML = `<thead><tr>
+    <th style="position:sticky;left:0;background:var(--bg-soft);">Nhân viên</th>${dayHeaderCells}<th>Tổng giờ</th>
+  </tr></thead><tbody>
+    ${managers.length ? groupHeaderRow('🔷 QUẢN LÝ') + managers.map(empRow).join('') : ''}
+    ${workers.length ? groupHeaderRow('🔶 CÔNG NHÂN') + workers.map(empRow).join('') : ''}
+  </tbody>`;
+}
+document.getElementById('ts-grid-table')?.addEventListener('click', (e)=>{
+  const cell = e.target.closest('[data-grid-cell]');
+  if(!cell) return;
+  const [employeeId, date] = cell.dataset.gridCell.split('|');
+  const existing = TIMESHEETS.find(t=> t.employeeId===employeeId && t.date===date);
+  if(existing){
+    openTimesheetEditModal(existing.id);
+  } else {
+    openTimesheetModal();
+    document.getElementById('ts-employee').value = employeeId;
+    document.getElementById('ts-date').value = date;
+  }
+});
+
 function renderTimesheetSummary(){
   const table = document.getElementById('ts-summary-table');
   if(!table) return;
@@ -494,7 +558,7 @@ function renderTimesheetSummary(){
     </tr>`).join('')}</tbody>`;
 }
 ['ts-filter-month','ts-filter-employee'].forEach(id=>{
-  document.getElementById(id)?.addEventListener('change', ()=>{ renderTimesheetTable(); renderTimesheetSummary(); });
+  document.getElementById(id)?.addEventListener('change', ()=>{ renderTimesheetTable(); renderTimesheetSummary(); renderTimesheetGrid(); });
 });
 document.getElementById('ts-filter-month').value = todayISO().slice(0,7);
 
@@ -545,14 +609,10 @@ function renderPayrollSummary(){
     return;
   }
   const results = EMPLOYEES.map(e=> computeEmployeeSalary(e, month));
-
-  table.innerHTML = `<thead><tr>
-    <th>Nhân viên</th><th>Nhóm</th><th>Tổng thu nhập</th><th>BHXH</th><th>Tạm ứng/Khấu trừ</th><th>Thực nhận</th><th></th>
-  </tr></thead><tbody>${results.map(r=>{
+  const rowHtml = (r)=>{
     const otherDeduct = r.tamUng + r.ungTuan + r.thuong + r.khacTamUng + r.khauNghi;
     return `<tr>
       <td><a href="#" class="tag tag-blue" data-open-adjust="${r.emp.id}" style="text-decoration:none;"><strong>${escapeHtml(r.emp.name)}</strong></a><div class="helper-text">${escapeHtml(r.emp.position||'')}</div></td>
-      <td>${r.emp.payType==='daily' ? '<span class="tag tag-gold">Công nhân</span>' : '<span class="tag tag-blue">Quản lý</span>'}</td>
       <td class="num">${fmtVND(r.totalIncome)}</td>
       <td class="num" style="color:var(--red);">${fmtVND(r.bhxh)}</td>
       <td class="num" style="color:var(--red);">${fmtVND(otherDeduct)}</td>
@@ -564,7 +624,17 @@ function renderPayrollSummary(){
         </div>
       </td>
     </tr>`;
-  }).join('')}</tbody>`;
+  };
+  const groupHeaderRow = (label, count)=> `<tr class="tx-subhead"><td colspan="6"><strong>${label}</strong> <span class="helper-text">(${count} người)</span></td></tr>`;
+  const managers = results.filter(r=>r.emp.payType!=='daily').sort((a,b)=> positionRank(a.emp.position)-positionRank(b.emp.position) || a.emp.name.localeCompare(b.emp.name,'vi'));
+  const workers = results.filter(r=>r.emp.payType==='daily').sort((a,b)=> a.emp.name.localeCompare(b.emp.name,'vi'));
+
+  table.innerHTML = `<thead><tr>
+    <th>Nhân viên</th><th>Tổng thu nhập</th><th>BHXH</th><th>Tạm ứng/Khấu trừ</th><th>Thực nhận</th><th></th>
+  </tr></thead><tbody>
+    ${managers.length ? groupHeaderRow('🔷 QUẢN LÝ', managers.length) + managers.map(rowHtml).join('') : ''}
+    ${workers.length ? groupHeaderRow('🔶 CÔNG NHÂN', workers.length) + workers.map(rowHtml).join('') : ''}
+  </tbody>`;
 
   renderPayrollProjectCost(month, results);
 }
