@@ -252,6 +252,17 @@ tr td.tx-subhead-empty{color:var(--ink-faint);font-style:italic;font-size:12.5px
 .chart-total-box.revenue .val{background:#C0392B;}
 .chart-total-box.profit .val{background:#7A9A3B;}
 .exp-block{border-top:1px solid var(--line);padding-top:12px;margin-top:8px;}
+#ts-grid-table{border-collapse:separate;border-spacing:3px;}
+#ts-grid-table td[data-grid-cell]{
+  border:1.5px solid var(--line); border-radius:8px; text-align:center;
+  font-weight:700; font-size:13px; transition:all .12s; background:var(--card);
+  padding:6px 4px;
+}
+#ts-grid-table td[data-grid-cell]:hover{
+  border-color:var(--primary); background:var(--primary-dim); transform:scale(1.05); box-shadow:0 2px 8px rgba(79,110,247,.25);
+}
+#ts-grid-table th{white-space:nowrap;text-align:center;}
+#ts-grid-table td:first-child, #ts-grid-table th:first-child{text-align:left;}
 .exp-block-title{font-size:13px;font-weight:700;color:var(--ink);margin-bottom:8px;display:block;}
 .exp-row{display:flex;gap:10px;flex-wrap:wrap;margin-bottom:8px;}
 .exp-row .field{flex:1;min-width:120px;margin-bottom:0;}
