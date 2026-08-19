@@ -224,18 +224,13 @@ document.getElementById('upload-fc-chi-input')?.addEventListener('change', (e)=>
 
 // ---------------- Chuyển dữ liệu cũ: các giao dịch project = INDIRECT trong Thu Chi -> Chi phí gián tiếp ----------------
 // Chạy 1 LẦN DUY NHẤT (thủ công, Admin bấm) để dọn dữ liệu cũ đã lỡ nằm trong Thu Chi trước khi có mục này.
-// Bắt cả 2 trường hợp cần chuyển:
-// 1) projectName literal = "INDIRECT" (dữ liệu cũ từ thời Excel gốc).
-// 2) Giao dịch KHÔNG CÓ dự án (blank) nhưng được HỆ THỐNG tự tạo ra từ 1 Lệnh chi/Tạm ứng
-//    (nhận diện qua ghi chú "Tự động tạo từ...") — đây chính là các lệnh chi cũ tạo ra TRƯỚC KHI
-//    mục Chi phí gián tiếp tồn tại, nên vẫn còn nằm lạc trong Thu Chi.
+// Bắt TẤT CẢ giao dịch Thu Chi KHÔNG CÓ DỰ ÁN, không phân biệt cũ/mới hay nguồn gốc tạo ra
+// (Lệnh chi tự sinh, Upload Excel, hay dữ liệu cũ từ trước khi có mục Chi phí gián tiếp) —
+// đúng nguyên tắc: Thu Chi CHỈ chứa giao dịch có gán Dự án, còn lại đều thuộc Chi phí gián tiếp.
 async function migrateIndirectToFixedCosts(){
-  const indirectTx = TRANSACTIONS.filter(t =>
-    (t.projectName||'').trim().toUpperCase() === 'INDIRECT' ||
-    (!t.projectId && !t.projectName && t.note && t.note.startsWith('Tự động tạo từ'))
-  );
-  if(indirectTx.length === 0){ alert('Không tìm thấy giao dịch nào cần chuyển sang Chi phí gián tiếp.'); return; }
-  if(!confirm(`Tìm thấy ${indirectTx.length} giao dịch không thuộc dự án nào (INDIRECT hoặc do Lệnh chi cũ tự tạo) đang nằm lạc trong Thu Chi.\n\nBấm OK để CHUYỂN toàn bộ sang mục Chi phí gián tiếp, sau đó XÓA khỏi Thu Chi (tránh trùng lặp).\n\nThao tác này không hoàn tác được, hãy chắc chắn trước khi tiếp tục.`)) return;
+  const indirectTx = TRANSACTIONS.filter(t => !t.projectId);
+  if(indirectTx.length === 0){ alert('Không tìm thấy giao dịch nào không có dự án trong Thu Chi — dữ liệu đã sạch.'); return; }
+  if(!confirm(`Tìm thấy ${indirectTx.length} giao dịch KHÔNG CÓ DỰ ÁN đang nằm lạc trong Thu Chi.\n\nBấm OK để CHUYỂN toàn bộ sang mục Chi phí gián tiếp, sau đó XÓA khỏi Thu Chi (tránh trùng lặp).\n\nThao tác này không hoàn tác được, hãy chắc chắn trước khi tiếp tục.`)) return;
 
   try{
     const CHUNK = 400;
