@@ -443,14 +443,14 @@
           </p>
         </div>
         <div class="card">
-          <div class="card-head"><h3>Người duyệt chi (Giám đốc)</h3></div>
+          <div class="card-head"><h3>Người duyệt chi (Giám đốc + người duyệt phụ)</h3></div>
           <p class="helper-text" style="margin-bottom:14px;">
-            Nhập đúng email đăng nhập app của Giám đốc. Khi một khoản Chi được gửi duyệt, đúng người này (đăng nhập bằng email dưới) mới thấy nút Duyệt/Từ chối.
+            Nhập email đăng nhập app của TẤT CẢ người có quyền Duyệt/Từ chối — cách nhau bằng dấu phẩy. Bất kỳ ai trong danh sách đăng nhập cũng đều thấy và bấm được nút Duyệt/Từ chối cho mọi yêu cầu.
           </p>
           <div class="form-grid">
-            <div class="field"><label>Email Giám đốc (GĐ)</label><input id="approver-gd-email" placeholder="gd@congty.com"></div>
+            <div class="field full"><label>Email người duyệt (cách nhau bằng dấu phẩy)</label><textarea id="approver-emails" rows="2" placeholder="gd@congty.com, ph.phuloc@gmail.com"></textarea></div>
           </div>
-          <button class="btn btn-primary btn-sm" id="save-approvers-btn">Lưu email duyệt chi</button>
+          <button class="btn btn-primary btn-sm" id="save-approvers-btn">Lưu danh sách người duyệt</button>
         </div>
         <div class="card">
           <div class="card-head"><h3>🏢 Chuyển dữ liệu INDIRECT → Chi phí gián tiếp</h3></div>
