@@ -775,56 +775,114 @@ document.getElementById('save-pa-btn')?.addEventListener('click', async ()=>{
 });
 
 // ---------------- XUẤT PHIẾU LƯƠNG PDF (in qua trình duyệt — Lưu dưới dạng PDF) ----------------
+// Ánh xạ email đăng nhập -> {tên hiển thị, ảnh chữ ký} — "Người lập phiếu" trên phiếu lương LUÔN là
+// đúng người đang đăng nhập bấm in, không cố định 1 tên như trước.
+// ⚠️ Email của Diễm My mình tạm đoán theo mẫu email công ty — báo lại email chính xác nếu chưa đúng nhé,
+// mình sẽ sửa lại trong 1 dòng.
+function currentPreparerInfo(){
+  const email = (auth.currentUser && auth.currentUser.email || '').toLowerCase();
+  const sigMap = {
+    'hoaithuong@tuan75insulation.com': { name: 'Hoài Thương', sig: (typeof SIGNATURES!=='undefined' ? SIGNATURES.accountant.img : '') },
+    'diemmy@tuan75insulation.com':     { name: 'Diễm My',     sig: (typeof SIGNATURES!=='undefined' ? SIGNATURES.preparer.img : '') },
+  };
+  if(sigMap[email]) return sigMap[email];
+  return { name: (typeof CURRENT_USER_NAME!=='undefined' && CURRENT_USER_NAME) || email.split('@')[0] || 'Kế toán', sig: '' };
+}
+
 function printPayslip(employeeId){
   const emp = EMPLOYEES.find(x=>x.id===employeeId);
   if(!emp) return;
   const month = currentPayrollMonth();
   const r = computeEmployeeSalary(emp, month);
   const [y,m] = month.split('-');
-  const w = window.open('', '_blank');
-  w.document.write(`
+  const empIndex = EMPLOYEES.findIndex(x=>x.id===employeeId) + 1;
+  const preparer = currentPreparerInfo();
+  const days = Math.round((r.totalHours/8)*1000)/1000;
+  const dayRate = emp.payType==='daily' ? emp.effectiveRate : Math.round(r.totalIncome/30);
+
+  // Đúng 15 dòng khoản mục theo mẫu Excel gốc công ty (STT | KHOẢN MỤC | SỐ TIỀN)
+  const rows = [
+    [1, 'TỔNG CÔNG [2]=[1]/8', `${days} công`],
+    [2, 'NGÀY CÔNG', fmtVND(dayRate)],
+    [3, 'THÀNH TIỀN [4]=[2]×[3]', fmtVND(r.totalIncome)],
+    [4, 'TIỀN TẠM ỨNG CUỐI THÁNG', fmtVND(r.tamUng)],
+    [5, 'TIỀN ỨNG MR/MS TUẤN', fmtVND(r.ungTuan)],
+    [6, 'TẠM ỨNG CÁ NHÂN (TẠM ỨNG TẾT)', fmtVND(r.thuong)],
+    [7, 'KHẤU TRỪ TIỀN NGHỈ', fmtVND(r.khauNghi)],
+    [8, 'KHẤU TRỪ TIỀN TẠM ỨNG KHÁC', fmtVND(r.khacTamUng)],
+    [9, 'THÁNG ĐÃ THANH TOÁN', fmtVND(0)],
+    [10, 'KHẤU TRỪ BHXH (THÁNG)', fmtVND(r.bhxh)],
+    [11, 'TIỀN LƯƠNG ĐẾN THÁNG CÒN DƯƠNG', fmtVND(0)],
+    [12, 'TIỀN LƯƠNG ĐẾN THÁNG CÒN ÂM', fmtVND(0)],
+    [13, 'PHỤ CẤP', fmtVND(0)],
+    [14, 'HỖ TRỢ', fmtVND(0)],
+    [15, 'THỰC LĨNH', fmtVND(r.thucNhan)],
+  ];
+
+  const html = `
     <html><head><title>Phiếu lương - ${escapeHtml(emp.name)}</title>
     <style>
-      body{font-family:'Times New Roman',serif;padding:36px;color:#111;max-width:650px;margin:0 auto;}
-      h2{text-align:center;text-transform:uppercase;margin-bottom:2px;letter-spacing:1px;}
-      .sub-center{text-align:center;color:#555;margin-bottom:24px;}
-      .info-row{display:flex;gap:30px;margin-bottom:6px;font-size:14px;}
-      .info-row b{min-width:110px;display:inline-block;}
-      table{width:100%;border-collapse:collapse;margin-top:20px;font-size:13.5px;}
-      th,td{border:1px solid #999;padding:8px 10px;text-align:left;}
-      th{background:#f0f0f0;text-align:center;}
+      @page{size:A5 portrait;margin:12mm;}
+      body{font-family:Arial,Helvetica,sans-serif;color:#111;font-size:12.5px;margin:0;}
+      .top{display:flex;justify-content:space-between;font-size:12px;margin-bottom:4px;}
+      h2{text-align:center;text-transform:uppercase;margin:6px 0 2px;letter-spacing:1px;font-size:17px;}
+      .sub-center{text-align:center;color:#555;margin-bottom:14px;font-size:12px;}
+      .info-row{margin-bottom:4px;font-size:13px;}
+      .info-row b{display:inline-block;min-width:95px;}
+      table{width:100%;border-collapse:collapse;margin-top:8px;}
+      th,td{border:1px solid #999;padding:5px 8px;text-align:left;font-size:12px;}
+      th{background:#fff6cc;text-align:center;font-weight:700;}
+      td.stt{text-align:center;width:24px;}
       td.num{text-align:right;font-variant-numeric:tabular-nums;}
-      tr.total td{font-weight:bold;background:#fafafa;font-size:15px;}
+      tr.total td{font-weight:800;background:#fafafa;font-size:13.5px;}
       tr.total td.num{color:#0a6b47;}
-      .sig{display:flex;justify-content:space-between;margin-top:70px;text-align:center;font-size:13.5px;}
-      .sig div{width:40%;}
-      .sig .line{margin-top:60px;border-top:1px solid #333;padding-top:6px;}
+      .sig{display:flex;justify-content:space-between;margin-top:26px;text-align:center;font-size:12px;}
+      .sig .col{width:31%;}
+      .sig .space{height:52px;display:flex;align-items:center;justify-content:center;}
+      .sig .space img{max-height:52px;max-width:100%;}
     </style></head><body>
+    <div class="top"><span>Mã nhân viên: <b>${empIndex}</b></span><span>Tháng ${Number(m)}/${y}</span></div>
     <h2>Phiếu lương</h2>
-    <div class="sub-center">Tháng ${Number(m)} / ${y}</div>
     <div class="info-row"><b>Họ và tên:</b> ${escapeHtml(emp.name)}</div>
     <div class="info-row"><b>Chức vụ:</b> ${escapeHtml(emp.position||'—')}</div>
-    <div class="info-row"><b>Nhóm lương:</b> ${emp.payType==='daily' ? 'Công nhân (theo ngày công)' : 'Quản lý (lương tháng)'}</div>
     <table>
-      <tr><th style="width:40px;">STT</th><th>Khoản mục</th><th style="width:150px;">Số tiền</th></tr>
-      <tr><td>1</td><td>Tổng giờ công trong tháng</td><td class="num">${r.totalHours} giờ</td></tr>
-      ${(emp.payType==='daily' && r.weightedHours !== r.totalHours) ? `<tr><td></td><td style="font-style:italic;color:#666;">Giờ quy đổi (đã tính hệ số Lễ x3 / Chủ nhật x1.5)</td><td class="num" style="font-style:italic;color:#666;">${r.weightedHours} giờ</td></tr>` : ''}
-      <tr><td>2</td><td>${emp.payType==='daily' ? 'Lương hiệu quả (VNĐ/ngày)' : 'Lương HĐLĐ + Lương hiệu quả (VNĐ/tháng)'}</td><td class="num">${fmtVND(emp.effectiveRate)}</td></tr>
-      <tr><td>3</td><td><strong>Tổng thu nhập</strong></td><td class="num"><strong>${fmtVND(r.totalIncome)}</strong></td></tr>
-      <tr><td>4</td><td>Khấu trừ BHXH</td><td class="num">- ${fmtVND(r.bhxh)}</td></tr>
-      <tr><td>5</td><td>Tiền tạm ứng cuối tháng</td><td class="num">- ${fmtVND(r.tamUng)}</td></tr>
-      <tr><td>6</td><td>Tiền ứng Mr.Tuấn</td><td class="num">- ${fmtVND(r.ungTuan)}</td></tr>
-      <tr><td>7</td><td>Thưởng chuyên cần / Điều chỉnh khác</td><td class="num">- ${fmtVND(r.thuong)}</td></tr>
-      <tr><td>8</td><td>Khấu trừ tạm ứng khác</td><td class="num">- ${fmtVND(r.khacTamUng)}</td></tr>
-      <tr><td>9</td><td>Khấu trừ ngày nghỉ</td><td class="num">- ${fmtVND(r.khauNghi)}</td></tr>
-      <tr class="total"><td colspan="2">THỰC LĨNH</td><td class="num">${fmtVND(r.thucNhan)}</td></tr>
+      <thead><tr><th>STT</th><th>Khoản mục</th><th style="width:120px;">Số tiền</th></tr></thead>
+      <tbody>
+        ${rows.map(([stt,label,val], idx)=> idx===rows.length-1
+          ? `<tr class="total"><td class="stt">${stt}</td><td>${label}</td><td class="num">${val}</td></tr>`
+          : `<tr><td class="stt">${stt}</td><td>${label}</td><td class="num">${val}</td></tr>`
+        ).join('')}
+      </tbody>
     </table>
-    ${r.adj.note ? `<p style="margin-top:14px;font-size:13px;color:#555;"><i>Ghi chú: ${escapeHtml(r.adj.note)}</i></p>` : ''}
+    ${r.adj.note ? `<p style="margin-top:10px;font-size:11.5px;color:#555;"><i>Ghi chú: ${escapeHtml(r.adj.note)}</i></p>` : ''}
     <div class="sig">
-      <div>Người lập phiếu<div class="line">&nbsp;</div></div>
-      <div>Người nhận lương<div class="line">${escapeHtml(emp.name)}</div></div>
+      <div class="col">
+        <div><strong>Người lập phiếu</strong></div>
+        <div class="space">${preparer.sig ? `<img src="${preparer.sig}">` : ''}</div>
+        <div>${escapeHtml(preparer.name)}</div>
+      </div>
+      <div class="col">
+        <div><strong>Kế toán trưởng</strong></div>
+        <div class="space"></div>
+        <div>&nbsp;</div>
+      </div>
+      <div class="col">
+        <div><strong>Người nhận lương</strong></div>
+        <div class="space"></div>
+        <div>${escapeHtml(emp.name)}</div>
+      </div>
     </div>
-    </body></html>`);
-  w.document.close();
-  setTimeout(()=> w.print(), 300);
+    </body></html>`;
+
+  // In ngay trong khung hiện tại (iframe ẩn) — giống hệt cách in Lệnh chi/Lệnh tạm ứng, không mở tab mới.
+  let frame = document.getElementById('print-order-frame');
+  if(!frame){
+    frame = document.createElement('iframe');
+    frame.id = 'print-order-frame';
+    frame.style.cssText = 'position:fixed;right:0;bottom:0;width:0;height:0;border:0;visibility:hidden;';
+    document.body.appendChild(frame);
+  }
+  const doc = frame.contentWindow.document;
+  doc.open(); doc.write(html); doc.close();
+  setTimeout(()=>{ frame.contentWindow.focus(); frame.contentWindow.print(); }, 250);
 }
