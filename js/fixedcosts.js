@@ -25,7 +25,11 @@ document.getElementById('btn-add-fc')?.addEventListener('click', ()=> openTxModa
 // Chi phí gián tiếp "đang thực tính" — loại bỏ các khoản tạm ứng ĐÃ GIẢI TRÌNH (đã chuyển hẳn sang Thu Chi)
 // để không bị tính trùng. Dùng hàm này ở MỌI nơi cần tính tổng Chi phí gián tiếp (kể cả Dashboard/Báo cáo).
 function activeFixedCosts(){
-  return FIXEDCOSTS.filter(t => t.advanceExplainStatus !== 'explained');
+  return FIXEDCOSTS.filter(t =>
+    t.advanceExplainStatus !== 'explained' &&
+    // Khoản Chi đang "Chờ duyệt" hoặc "Từ chối" thì CHƯA được tính — phải Duyệt xong mới cộng vào tổng.
+    !(t.type==='OUT' && (t.approvalStatus==='pending' || t.approvalStatus==='rejected'))
+  );
 }
 
 function getFilteredFixedCosts(){
