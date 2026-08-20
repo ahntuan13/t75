@@ -40,11 +40,17 @@ service cloud.firestore {
         && request.resource.data.approvalStatus == 'pending';
     }
     // Chỉ đúng email GĐ đã được gán (resource.data.approverEmail) mới được DUYỆT/TỪ CHỐI
+    // Danh sách người được phép Duyệt/Từ chối (Giám đốc + người duyệt phụ) — tra động từ settings,
+    // KHÔNG còn phụ thuộc đúng 1 email cố định ghi sẵn trên từng bản ghi như trước.
+    function isAuthorizedApprover() {
+      return request.auth.token.email in
+        get(/databases/$(database)/documents/settings/approvers).data.approverEmails;
+    }
     function isApprovalDecision() {
       return isSignedIn()
         && changedKeys().hasOnly(['approvalStatus','approvedBy','approvedAt'])
         && (request.resource.data.approvalStatus == 'approved' || request.resource.data.approvalStatus == 'rejected')
-        && resource.data.approverEmail == request.auth.token.email;
+        && isAuthorizedApprover();
     }
     // Đánh dấu 1 khoản Chi phí gián tiếp là "đã giải trình" (sau khi tạo xong giao dịch chính thức bên Thu Chi)
     function isExplainUpdate() {
@@ -64,7 +70,7 @@ service cloud.firestore {
         // vì đây là 1 hành động DUY NHẤT (Duyệt lệnh -> tự động liên kết giao dịch vừa tạo ra).
         && changedKeys().hasOnly(['approvalStatus','approvedBy','approvedAt','transactionId','transactionCollection'])
         && (request.resource.data.approvalStatus == 'approved' || request.resource.data.approvalStatus == 'rejected')
-        && resource.data.approverEmail == request.auth.token.email;
+        && isAuthorizedApprover();
     }
 
     // Hồ sơ vai trò của từng người dùng (admin / user)
