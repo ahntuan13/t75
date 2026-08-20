@@ -137,7 +137,7 @@ function renderOrderApprovalCurrentStatus(o){
   if(!el) return;
   const roleLabel = 'Giám đốc';
   const myEmail = (auth.currentUser && auth.currentUser.email || '').toLowerCase();
-  const canDecide = o.approvalStatus==='pending' && o.approverEmail && myEmail === o.approverEmail.toLowerCase();
+  const canDecide = o.approvalStatus==='pending' && isAuthorizedApprover(myEmail);
 
   if(!o.approvalStatus || o.approvalStatus==='none'){ el.textContent = 'Chưa gửi duyệt.'; return; }
 
@@ -530,7 +530,7 @@ function getFilteredOrders(){
 function orderRowHtml(o){
   const myEmail = (auth.currentUser && auth.currentUser.email || '').toLowerCase();
   let approveActions = '';
-  if((o.approvalStatus||'none')==='pending' && myEmail && o.approverEmail && myEmail===o.approverEmail.toLowerCase()){
+  if((o.approvalStatus||'none')==='pending' && myEmail && isAuthorizedApprover(myEmail)){
     approveActions = `<button class="icon-btn" data-approve-order="${o.id}" title="Duyệt">✅</button><button class="icon-btn" data-reject-order="${o.id}" title="Từ chối">❌</button>`;
   }
   return `<tr${o.transactionId ? ' class="tx-row-explained"' : ''}>
