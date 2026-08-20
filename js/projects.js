@@ -52,8 +52,8 @@ function renderProjectsTable(){
     return;
   }
   const rows = PROJECTS.map(p=>{
-    const spend = (TRANSACTIONS||[]).filter(t=>t.projectId===p.id && t.type==='OUT').reduce((s,t)=>s+Number(t.amount||0),0);
-    const revenue = (TRANSACTIONS||[]).filter(t=>t.projectId===p.id && t.type==='IN').reduce((s,t)=>s+Number(t.amount||0),0);
+    const spend = (typeof activeTransactions==='function' ? activeTransactions() : (TRANSACTIONS||[])).filter(t=>t.projectId===p.id && t.type==='OUT').reduce((s,t)=>s+Number(t.amount||0),0);
+    const revenue = (typeof activeTransactions==='function' ? activeTransactions() : (TRANSACTIONS||[])).filter(t=>t.projectId===p.id && t.type==='IN').reduce((s,t)=>s+Number(t.amount||0),0);
     const statusTag = p.status==='done' ? '<span class="tag tag-blue">Hoàn thành</span>'
       : p.status==='paused' ? '<span class="tag tag-gray">Tạm dừng</span>'
       : p.status==='warranty' ? '<span class="tag tag-gold">Còn 5% bảo hành</span>'
@@ -77,8 +77,8 @@ function renderProjectsTable(){
     </tr>`;
   }).join('');
   const totalContractValue = PROJECTS.reduce((s,p)=>s+Number(p.contractValue||0),0);
-  const totalRevenue = (TRANSACTIONS||[]).filter(t=>t.type==='IN' && t.projectId).reduce((s,t)=>s+Number(t.amount||0),0);
-  const totalSpend = (TRANSACTIONS||[]).filter(t=>t.type==='OUT' && t.projectId).reduce((s,t)=>s+Number(t.amount||0),0);
+  const totalRevenue = (typeof activeTransactions==='function' ? activeTransactions() : (TRANSACTIONS||[])).filter(t=>t.type==='IN' && t.projectId).reduce((s,t)=>s+Number(t.amount||0),0);
+  const totalSpend = (typeof activeTransactions==='function' ? activeTransactions() : (TRANSACTIONS||[])).filter(t=>t.type==='OUT' && t.projectId).reduce((s,t)=>s+Number(t.amount||0),0);
   const totalsRow = `<tr class="project-totals-row">
       <td colspan="3"><strong>TỔNG CỘNG (${PROJECTS.length} dự án)</strong></td>
       <td class="num">${fmtVND(totalContractValue)}</td>
