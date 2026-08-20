@@ -75,6 +75,7 @@ document.getElementById('tx-transfer-image-remove').addEventListener('click', ()
 });
 
 function listenTransactions(){
+  let autoBackupChecked = false;
   db.collection('transactions').orderBy('date','desc').onSnapshot((snap)=>{
     TRANSACTIONS = snap.docs.map(d=> ({id:d.id, ...d.data()}));
     renderTxTable();
@@ -86,6 +87,11 @@ function listenTransactions(){
     if(window.renderPnl) renderPnl();
     renderApprovalBanner();
     if(window.renderNotifications) renderNotifications();
+    // Chỉ kiểm tra sao lưu tự động 1 LẦN mỗi phiên, ngay khi dữ liệu Thu Chi vừa tải xong lần đầu.
+    if(!autoBackupChecked){
+      autoBackupChecked = true;
+      if(typeof checkAutoBackup==='function') checkAutoBackup();
+    }
   }, (err)=> console.error('tx listen error', err));
 }
 
@@ -456,7 +462,7 @@ function renderTxTable(){
   }
 
   const theadHtml = `<thead><tr>
-    <th>Ngày</th><th>Loại</th><th>Dự án</th><th>Nội dung</th><th>Diễn giải</th><th>Thành tiền</th><th>Trạng thái hóa đơn</th><th>Trạng thái CK/Nhận tiền</th><th>Trạng thái duyệt</th><th></th>
+    <th>Ngày</th><th>Loại</th><th>Dự án</th><th>Nội dung</th><th>Diễn giải</th><th>Thành tiền</th><th>Hóa đơn</th><th>CK/Nhận tiền</th><th>Duyệt</th><th></th>
   </tr></thead>`;
 
   // Không còn nhóm theo dự án nữa — luôn hiển thị 1 bảng phẳng, sắp theo ngày mới nhất, có thêm cột Dự án riêng.
