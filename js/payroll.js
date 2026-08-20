@@ -472,10 +472,34 @@ document.getElementById('timesheet-table')?.addEventListener('click', (e)=>{
 // Ngày lễ VN cố định theo dương lịch (Tết Dương lịch, Giỗ Tổ*, 30/4, 1/5, Quốc khánh).
 // *Giỗ Tổ Hùng Vương và Tết Nguyên Đán tính theo âm lịch nên KHÔNG tính tự động được ở đây —
 // nếu tháng đang xem có 2 dịp này, bạn tự đối chiếu thêm nhé.
-const VN_FIXED_HOLIDAYS = new Set(['01-01', '04-30', '05-01', '09-02']);
+// Lịch nghỉ lễ VN 2026 — đã tra cứu chính xác cả ngày ÂM LỊCH quy đổi ra dương lịch cho năm 2026
+// (Tết Nguyên Đán, Giỗ Tổ Hùng Vương), không cần tự tính âm lịch. Ghi rõ tên từng ngày lễ để hiển thị.
+// LƯU Ý: danh sách này CHỈ ĐÚNG CHO NĂM 2026 — Tết/Giỗ Tổ đổi ngày dương lịch mỗi năm, cần cập nhật lại nếu dùng cho năm khác.
+const VN_HOLIDAYS_2026 = {
+  '2026-01-01': 'Tết Dương lịch',
+  '2026-02-16': 'Tết Nguyên Đán (29 Tết)',
+  '2026-02-17': 'Tết Nguyên Đán (Mùng 1)',
+  '2026-02-18': 'Tết Nguyên Đán (Mùng 2)',
+  '2026-02-19': 'Tết Nguyên Đán (Mùng 3)',
+  '2026-02-20': 'Tết Nguyên Đán (Mùng 4)',
+  '2026-04-26': 'Giỗ Tổ Hùng Vương (10/3 âm)',
+  '2026-04-30': 'Ngày Giải phóng 30/4',
+  '2026-05-01': 'Quốc tế Lao động 1/5',
+  '2026-09-02': 'Quốc khánh 2/9',
+};
+function vnHolidayName(dateStr){
+  return VN_HOLIDAYS_2026[dateStr] || '';
+}
 function isVnHoliday(y, m, d){
-  const key = `${String(m).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
-  return VN_FIXED_HOLIDAYS.has(key);
+  const dateStr = `${y}-${String(m).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
+  return !!VN_HOLIDAYS_2026[dateStr];
+}
+// Hệ số lương theo ngày: đi làm trúng NGÀY LỄ = x3, trúng CHỦ NHẬT = x1.5, ngày thường (kể cả Thứ 7) = x1.
+function dayPayMultiplier(dateStr){
+  if(VN_HOLIDAYS_2026[dateStr]) return 3;
+  const dow = new Date(dateStr+'T00:00:00').getDay();
+  if(dow === 0) return 1.5; // Chủ nhật
+  return 1;
 }
 
 function renderTimesheetGrid(){
@@ -487,7 +511,13 @@ function renderTimesheetGrid(){
   const days = Array.from({length: daysInMonth}, (_, i) => i+1);
   const dayMeta = days.map(d=>{
     const dow = new Date(y, m-1, d).getDay(); // 0=CN, 6=T7
-    return { d, isWeekend: dow===0 || dow===6, isHoliday: isVnHoliday(y,m,d), dowLabel: ['CN','T2','T3','T4','T5','T6','T7'][dow] };
+    const dateStr = `${y}-${String(m).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
+    return {
+      d, dateStr, isWeekend: dow===0 || dow===6, isSunday: dow===0,
+      isHoliday: isVnHoliday(y,m,d), holidayName: vnHolidayName(dateStr),
+      dowLabel: ['CN','T2','T3','T4','T5','T6','T7'][dow],
+      multiplier: dayPayMultiplier(dateStr),
+    };
   });
 
   const empFilter = document.getElementById('ts-filter-employee').value;
@@ -504,9 +534,12 @@ function renderTimesheetGrid(){
   });
 
   const dayHeaderCells = dayMeta.map(dm=> {
-    const bg = dm.isHoliday ? 'var(--red-dim)' : dm.isWeekend ? 'var(--gold-dim)' : 'var(--bg-soft)';
-    const color = dm.isHoliday ? 'var(--red)' : dm.isWeekend ? '#9a6b00' : 'var(--ink-dim)';
-    return `<th style="min-width:46px;background:${bg};color:${color};" title="${dm.dowLabel}${dm.isHoliday?' — Ngày lễ':''}">${dm.d}<div style="font-size:9px;font-weight:600;opacity:.75;">${dm.dowLabel}</div></th>`;
+    const isSat = dm.isWeekend && !dm.isSunday;
+    const bg = dm.isHoliday ? 'var(--red-dim)' : dm.isSunday ? 'var(--gold-dim)' : isSat ? 'var(--blue-dim)' : 'var(--bg-soft)';
+    const color = dm.isHoliday ? 'var(--red)' : dm.isSunday ? '#9a6b00' : isSat ? 'var(--blue)' : 'var(--ink-dim)';
+    const tip = dm.isHoliday ? dm.holidayName : (dm.isSunday ? 'Chủ nhật — hệ số x1.5' : isSat ? 'Thứ 7' : dm.dowLabel);
+    const mult = dm.multiplier > 1 ? `<div style="font-size:8.5px;font-weight:800;">x${dm.multiplier}</div>` : '';
+    return `<th style="min-width:52px;background:${bg};color:${color};" title="${escapeHtml(tip)}">${dm.d}<div style="font-size:9px;font-weight:600;opacity:.8;">${dm.isHoliday ? '🎌' : dm.dowLabel}</div>${mult}</th>`;
   }).join('');
   const empRow = (e)=>{
     let monthTotal = 0;
@@ -518,7 +551,7 @@ function renderTimesheetGrid(){
       monthTotal += h.total;
       const label = h.total > 0 ? h.total : '';
       const otMark = h.ot > 0 ? `<div style="font-size:9.5px;color:var(--gold);">+${h.ot} TC</div>` : '';
-      const cellBg = dm.isHoliday ? 'background:var(--red-dim);' : dm.isWeekend ? 'background:var(--gold-dim);' : '';
+      const cellBg = dm.isHoliday ? 'background:var(--red-dim);' : dm.isSunday ? 'background:var(--gold-dim);' : (dm.isWeekend && !dm.isSunday) ? 'background:var(--blue-dim);' : '';
       return `<td class="num" style="cursor:pointer;padding:4px;${cellBg}${h.total>0?'':'color:var(--ink-faint);'}" data-grid-cell="${e.id}|${dateStr}">${label}${otMark}</td>`;
     }).join('');
     return `<tr><td style="position:sticky;left:0;background:var(--card);white-space:nowrap;"><strong>${escapeHtml(e.name)}</strong></td>${cells}<td class="num" style="font-weight:800;">${monthTotal}h</td></tr>`;
@@ -585,10 +618,13 @@ document.getElementById('ts-filter-month').value = todayISO().slice(0,7);
 function computeEmployeeSalary(emp, month){
   const empTimesheets = TIMESHEETS.filter(t=> t.employeeId===emp.id && monthKey(t.date)===month);
   let totalHours = 0;
+  let weightedHours = 0; // Giờ QUY ĐỔI theo hệ số ngày công (Lễ x3, Chủ nhật x1.5, ngày thường x1) — dùng để tính lương Công nhân
   const projectHours = {}; // projectName -> hours (để phân bổ chi phí theo dự án)
   empTimesheets.forEach(t=>{
     const h = tsHours(t);
     totalHours += h.total;
+    const mult = (typeof dayPayMultiplier==='function') ? dayPayMultiplier(t.date) : 1;
+    weightedHours += h.total * mult;
     Object.values(t.shifts||{}).forEach(s=>{
       if(s && s.hours){
         const key = s.projectName || 'Không thuộc dự án';
@@ -598,7 +634,7 @@ function computeEmployeeSalary(emp, month){
   });
 
   const totalIncome = emp.payType === 'daily'
-    ? Math.round((totalHours/8) * Number(emp.effectiveRate||0))
+    ? Math.round((weightedHours/8) * Number(emp.effectiveRate||0))
     : Math.round(Number(emp.contractSalary||0) + Number(emp.effectiveRate||0));
 
   const adj = PAYROLL_ADJUSTMENTS.find(a=> a.employeeId===emp.id && a.month===month) || {};
@@ -611,7 +647,7 @@ function computeEmployeeSalary(emp, month){
   const khauNghi = Number(adj.khauTruNgayNghi||0);
   const thucNhan = totalIncome - bhxh - tamUng - ungTuan - thuong - khacTamUng - khauNghi;
 
-  return { emp, month, totalHours, projectHours, totalIncome, bhxh, tamUng, ungTuan, thuong, khacTamUng, khauNghi, thucNhan, adj };
+  return { emp, month, totalHours, weightedHours, projectHours, totalIncome, bhxh, tamUng, ungTuan, thuong, khacTamUng, khauNghi, thucNhan, adj };
 }
 
 function currentPayrollMonth(){
@@ -772,6 +808,7 @@ function printPayslip(employeeId){
     <table>
       <tr><th style="width:40px;">STT</th><th>Khoản mục</th><th style="width:150px;">Số tiền</th></tr>
       <tr><td>1</td><td>Tổng giờ công trong tháng</td><td class="num">${r.totalHours} giờ</td></tr>
+      ${(emp.payType==='daily' && r.weightedHours !== r.totalHours) ? `<tr><td></td><td style="font-style:italic;color:#666;">Giờ quy đổi (đã tính hệ số Lễ x3 / Chủ nhật x1.5)</td><td class="num" style="font-style:italic;color:#666;">${r.weightedHours} giờ</td></tr>` : ''}
       <tr><td>2</td><td>${emp.payType==='daily' ? 'Lương hiệu quả (VNĐ/ngày)' : 'Lương HĐLĐ + Lương hiệu quả (VNĐ/tháng)'}</td><td class="num">${fmtVND(emp.effectiveRate)}</td></tr>
       <tr><td>3</td><td><strong>Tổng thu nhập</strong></td><td class="num"><strong>${fmtVND(r.totalIncome)}</strong></td></tr>
       <tr><td>4</td><td>Khấu trừ BHXH</td><td class="num">- ${fmtVND(r.bhxh)}</td></tr>
