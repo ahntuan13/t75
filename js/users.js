@@ -47,7 +47,9 @@ async function ensureUserRole(){
     CURRENT_USER_NAME = email.split('@')[0];
   }
   applyRolePermissions();
-  if(isAdmin()) listenAppUsers();
+  if(isAdmin()){
+    listenAppUsers();
+  }
 }
 
 const ROLE_LABELS = {
