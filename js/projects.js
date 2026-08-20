@@ -79,8 +79,8 @@ function renderProjectsTable(){
   const totalContractValue = PROJECTS.reduce((s,p)=>s+Number(p.contractValue||0),0);
   const totalRevenue = (TRANSACTIONS||[]).filter(t=>t.type==='IN' && t.projectId).reduce((s,t)=>s+Number(t.amount||0),0);
   const totalSpend = (TRANSACTIONS||[]).filter(t=>t.type==='OUT' && t.projectId).reduce((s,t)=>s+Number(t.amount||0),0);
-  const totalsRow = `<tr style="background:var(--bg-soft);font-weight:700;">
-      <td colspan="3">TỔNG CỘNG (${PROJECTS.length} dự án)</td>
+  const totalsRow = `<tr class="project-totals-row">
+      <td colspan="3"><strong>TỔNG CỘNG (${PROJECTS.length} dự án)</strong></td>
       <td class="num">${fmtVND(totalContractValue)}</td>
       <td class="num">${fmtVND(PROJECTS.reduce((s,p)=>s+Number(p.costBudget||0),0))}</td>
       <td class="num">${fmtVND(PROJECTS.reduce((s,p)=>s+Number(p.revenueBudget||0),0))}</td>
