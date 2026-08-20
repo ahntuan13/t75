@@ -99,14 +99,24 @@ function applyRolePermissions(){
   if(window.renderNotifications) renderNotifications();
 }
 
-// ---------------- Người duyệt chi (Giám đốc) ----------------
-let APPROVERS = { gdEmail: '' };
+// ---------------- Người duyệt chi (Giám đốc + có thể thêm người duyệt phụ) ----------------
+// APPROVERS.approverEmails: mảng TẤT CẢ email được phép Duyệt/Từ chối — bất kỳ ai trong danh sách
+// đều duyệt được, không chỉ 1 người duy nhất như trước. gdEmail giữ lại để tương thích ngược
+// (vẫn dùng làm email hiển thị mặc định khi gửi duyệt).
+let APPROVERS = { gdEmail: '', approverEmails: [] };
+
+function isAuthorizedApprover(email){
+  const e = (email||'').toLowerCase();
+  if(!e) return false;
+  return (APPROVERS.approverEmails||[]).map(x=>x.toLowerCase()).includes(e);
+}
 
 function listenApprovers(){
   db.collection('settings').doc('approvers').onSnapshot((snap)=>{
-    APPROVERS = snap.exists ? (snap.data()||{}) : { gdEmail:'' };
-    const gdEl = document.getElementById('approver-gd-email');
-    if(gdEl) gdEl.value = APPROVERS.gdEmail || '';
+    const data = snap.exists ? (snap.data()||{}) : {};
+    APPROVERS = { gdEmail: data.gdEmail || '', approverEmails: Array.isArray(data.approverEmails) ? data.approverEmails : (data.gdEmail ? [data.gdEmail] : []) };
+    const el = document.getElementById('approver-emails');
+    if(el) el.value = (APPROVERS.approverEmails||[]).join(', ');
     if(window.renderTxTable) renderTxTable();
     if(window.renderApprovalBanner) renderApprovalBanner();
     if(window.renderNotifications) renderNotifications();
@@ -114,10 +124,12 @@ function listenApprovers(){
 }
 
 document.getElementById('save-approvers-btn')?.addEventListener('click', async ()=>{
-  const gdEmail = document.getElementById('approver-gd-email').value.trim().toLowerCase();
+  const raw = document.getElementById('approver-emails').value.trim();
+  const emails = raw.split(/[,;\n]+/).map(s=>s.trim().toLowerCase()).filter(Boolean);
+  if(emails.length === 0){ toast('Vui lòng nhập ít nhất 1 email'); return; }
   try{
-    await db.collection('settings').doc('approvers').set({ gdEmail }, {merge:true});
-    toast('Đã lưu email duyệt chi');
+    await db.collection('settings').doc('approvers').set({ gdEmail: emails[0], approverEmails: emails }, {merge:true});
+    toast(`Đã lưu ${emails.length} người có quyền duyệt chi`);
   }catch(err){ toast('Lỗi: '+err.message); }
 });
 function listenAppUsers(){
