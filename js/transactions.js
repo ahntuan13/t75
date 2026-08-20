@@ -90,8 +90,8 @@ function renderApprovalBanner(){
   const box = document.getElementById('approval-banner');
   if(!box || !auth.currentUser) return;
   const myEmail = (auth.currentUser.email || '').toLowerCase();
-  const pendingTx = TRANSACTIONS.filter(t=> t.type==='OUT' && t.approvalStatus==='pending' && t.approverEmail && t.approverEmail.toLowerCase()===myEmail);
-  const allPendingOrders = (typeof ORDERS!=='undefined' ? ORDERS : []).filter(o=> o.approvalStatus==='pending' && o.approverEmail && o.approverEmail.toLowerCase()===myEmail);
+  const pendingTx = TRANSACTIONS.filter(t=> t.type==='OUT' && t.approvalStatus==='pending' && isAuthorizedApprover(myEmail));
+  const allPendingOrders = (typeof ORDERS!=='undefined' ? ORDERS : []).filter(o=> o.approvalStatus==='pending' && isAuthorizedApprover(myEmail));
   const isAdv = (typeof isAdvanceOrder==='function') ? isAdvanceOrder : ()=>false;
   const pendingPaymentOrders = allPendingOrders.filter(o=> !isAdv(o));
   const pendingAdvanceOrders = allPendingOrders.filter(o=> isAdv(o));
@@ -361,7 +361,7 @@ function txRowHtml(t){
     const status = t.approvalStatus || 'none';
     if(status === 'pending'){
       approvalCell = `<span class="tag tag-gray">🟡 Chờ GĐ</span>`;
-      if(myEmail && t.approverEmail && myEmail === t.approverEmail.toLowerCase()){
+      if(myEmail && isAuthorizedApprover(myEmail)){
         approvalCell += ` <button class="icon-btn" data-approve-tx="${t.id}" title="Duyệt">✅</button><button class="icon-btn" data-reject-tx="${t.id}" title="Từ chối">❌</button>`;
       }
     } else if(status === 'approved'){
@@ -556,7 +556,7 @@ function renderApprovalSectionHtml(t){
   else statusHtml = `<span class="tag tag-gray">Chưa gửi duyệt</span>`;
 
   let actions = '';
-  if(status==='pending' && myEmail && t.approverEmail && myEmail===t.approverEmail.toLowerCase()){
+  if(status==='pending' && myEmail && isAuthorizedApprover(myEmail)){
     actions = `<div style="margin-top:10px;display:flex;gap:8px;">
       <button class="btn btn-primary btn-sm" data-approve-tx="${t.id}">✅ Duyệt</button>
       <button class="btn btn-ghost btn-sm" data-reject-tx="${t.id}">❌ Từ chối</button>
