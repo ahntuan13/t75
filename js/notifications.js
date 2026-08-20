@@ -25,22 +25,16 @@ function computeNotifications(){
   if(!myEmail) return { pendingForMe: [], decidedForMe: [], invoiceOverdue: [] };
 
   const amAdmin = typeof isAdmin==='function' && isAdmin();
-  const isGD = typeof APPROVERS !== 'undefined' && APPROVERS.gdEmail && APPROVERS.gdEmail.toLowerCase() === myEmail;
+  const isGD = typeof isAuthorizedApprover==='function' && isAuthorizedApprover(myEmail);
   const isAdv = (typeof isAdvanceOrder==='function') ? isAdvanceOrder : ()=>false;
 
-  // 1) Đang chờ duyệt: Admin thấy TOÀN BỘ (mọi yêu cầu, dù gửi cho ai); GĐ chỉ thấy đúng cái gửi cho mình.
-  // Mỗi mục ghi rõ "section" (Thu Chi / Lệnh chi / Lệnh tạm ứng) để GĐ biết chính xác cần vào đâu duyệt.
+  // 1) Đang chờ duyệt: Admin thấy TOÀN BỘ (mọi yêu cầu, dù gửi cho ai); người duyệt (GĐ/phụ) thấy TẤT CẢ
+  // yêu cầu đang chờ (vì bất kỳ ai trong danh sách người duyệt đều duyệt được, không riêng ai).
   const pendingForMe = [];
-  if(amAdmin){
+  if(amAdmin || isGD){
     TRANSACTIONS.filter(t=> t.type==='OUT' && t.approvalStatus==='pending')
       .forEach(t=> pendingForMe.push({ label: t.content, amount: t.amount, view: 'transactions', section: 'Thu Chi' }));
     (typeof ORDERS!=='undefined' ? ORDERS : []).filter(o=> o.approvalStatus==='pending')
-      .forEach(o=> pendingForMe.push({ label: o.reason, amount: o.amount,
-        view: isAdv(o) ? 'advance' : 'orders', section: isAdv(o) ? 'Lệnh tạm ứng' : 'Lệnh chi' }));
-  } else if(isGD){
-    TRANSACTIONS.filter(t=> t.type==='OUT' && t.approvalStatus==='pending' && (t.approverEmail||'').toLowerCase()===myEmail)
-      .forEach(t=> pendingForMe.push({ label: t.content, amount: t.amount, view: 'transactions', section: 'Thu Chi' }));
-    (typeof ORDERS!=='undefined' ? ORDERS : []).filter(o=> o.approvalStatus==='pending' && (o.approverEmail||'').toLowerCase()===myEmail)
       .forEach(o=> pendingForMe.push({ label: o.reason, amount: o.amount,
         view: isAdv(o) ? 'advance' : 'orders', section: isAdv(o) ? 'Lệnh tạm ứng' : 'Lệnh chi' }));
   }
