@@ -481,12 +481,23 @@
         <div class="card">
           <div class="card-head"><h3>💾 Sao lưu dữ liệu Thu Chi lên OneDrive</h3></div>
           <p class="helper-text" style="margin-bottom:14px;">
-            Xuất toàn bộ dữ liệu Thu Chi hiện tại thành file Excel và lưu vào thư mục <code>Backups/</code> trên OneDrive công ty.
-            Lưu ý: app tĩnh (GitHub Pages) không tự chạy được theo lịch tự động (VD: mỗi tuần 1 lần) — bạn cần chủ động bấm nút này định kỳ
-            (gợi ý: đầu mỗi tuần). Nếu muốn tự động hoàn toàn, cần nâng cấp thêm Cloud Functions (gói trả phí Blaze), báo mình nếu bạn muốn làm thêm.
+            Xuất toàn bộ dữ liệu Thu Chi hiện tại thành file Excel và lưu vào thư mục <code>Backups/</code> trên OneDrive công ty.<br><br>
+            <strong>Về việc tự động 20h hằng ngày:</strong> app tĩnh (GitHub Pages) không có server chạy nền nên không thể tự sao lưu đúng giờ dù không ai mở app
+            (muốn làm được thật sự cần nâng cấp Firebase Cloud Functions — gói trả phí Blaze, báo mình nếu bạn muốn triển khai thêm phần đó).
+            Giải pháp hiện tại: <strong>mỗi khi Admin mở app sau 20h mà hôm đó CHƯA sao lưu lần nào, hệ thống sẽ tự động sao lưu ngay lúc đó</strong> (không cần bấm nút) —
+            miễn có Admin mở app ít nhất 1 lần mỗi ngày sau 20h là dữ liệu vẫn được sao lưu đều đặn. Bạn vẫn có thể bấm nút dưới để sao lưu thủ công bất cứ lúc nào.
           </p>
           <button class="btn btn-primary btn-sm" id="btn-backup-onedrive">💾 Sao lưu ngay lên OneDrive</button>
           <div class="helper-text" id="backup-status" style="margin-top:10px;"></div>
+        </div>
+        <div class="card">
+          <div class="card-head"><h3>📥 Khôi phục dữ liệu Thu Chi từ file sao lưu</h3></div>
+          <p class="helper-text" style="margin-bottom:14px;">
+            Dùng khi lỡ mất/hỏng dữ liệu Thu Chi. Tải file sao lưu (.xlsx) đúng định dạng từ thư mục <code>Backups/</code> trên OneDrive về máy, rồi chọn lại ở đây.
+            <strong style="color:var(--red);">⚠️ Khôi phục sẽ XÓA TOÀN BỘ dữ liệu Thu Chi hiện tại và thay bằng đúng nội dung trong file sao lưu — không hoàn tác được.</strong>
+          </p>
+          <button class="btn btn-danger btn-sm" id="btn-restore-backup">📥 Chọn file sao lưu để khôi phục</button>
+          <input type="file" id="restore-backup-input" accept=".xlsx,.xls" style="display:none">
         </div>
         <div class="card">
           <div class="card-head"><h3>🕘 Lịch sử chỉnh sửa Thu Chi</h3></div>
