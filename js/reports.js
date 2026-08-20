@@ -113,15 +113,18 @@ function renderDashboard(){
     .filter(p=> p.revenue>0 || p.cost>0)
     .sort((a,b)=> (b.revenue+b.cost) - (a.revenue+a.cost));
 
-  // Chi phí gián tiếp (INDIRECT) KHÔNG hiện thành 1 cột riêng trong biểu đồ theo dự án nữa (theo yêu cầu),
-  // nhưng vẫn được CỘNG vào 3 ô tổng phía trên cho đúng bức tranh chi phí toàn công ty.
+  // Chèn "INDIRECT" (Chi phí gián tiếp — không gắn dự án cụ thể) làm dòng CUỐI CÙNG của biểu đồ,
+  // tô màu nâu riêng để phân biệt với dự án thật, đồng thời cộng vào 3 ô tổng phía trên.
   const activeFc = (typeof activeFixedCosts==='function') ? activeFixedCosts() : [];
   const indirectRevenue = activeFc.filter(t=>t.type==='IN').reduce((s,t)=>s+Number(t.amount||0),0);
   const indirectCost = activeFc.filter(t=>t.type==='OUT').reduce((s,t)=>s+Number(t.amount||0),0);
+  if(indirectRevenue>0 || indirectCost>0){
+    projActual.push({name:'INDIRECT (Chi phí gián tiếp)', revenue:indirectRevenue, cost:indirectCost, profit:indirectRevenue-indirectCost, isIndirect:true});
+  }
 
   const ctx2 = document.getElementById('chart-project-actual');
-  const totalRevenueActual = projActual.reduce((s,p)=>s+p.revenue,0) + indirectRevenue;
-  const totalCostActual = projActual.reduce((s,p)=>s+p.cost,0) + indirectCost;
+  const totalRevenueActual = projActual.reduce((s,p)=>s+p.revenue,0);
+  const totalCostActual = projActual.reduce((s,p)=>s+p.cost,0);
   document.getElementById('chart-project-actual-summary').innerHTML = `
     <div class="chart-total-panel">
       <div class="chart-total-box revenue"><div class="lbl">Tổng doanh thu thực tế</div><div class="val">${fmtVND(totalRevenueActual)}</div></div>
