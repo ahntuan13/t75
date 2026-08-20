@@ -469,6 +469,15 @@ document.getElementById('timesheet-table')?.addEventListener('click', (e)=>{
 // Tổng hợp công theo tháng (mỗi nhân viên 1 dòng)
 // Khung chấm công dạng LƯỚI giống Excel: hàng = nhân viên (chia nhóm QL/CN), cột = từng ngày trong tháng,
 // mỗi ô hiện tổng giờ ngày đó (bấm vào để mở đúng modal 3 ca nhập/sửa giờ + chọn dự án), cột cuối tự cộng Tổng giờ tháng.
+// Ngày lễ VN cố định theo dương lịch (Tết Dương lịch, Giỗ Tổ*, 30/4, 1/5, Quốc khánh).
+// *Giỗ Tổ Hùng Vương và Tết Nguyên Đán tính theo âm lịch nên KHÔNG tính tự động được ở đây —
+// nếu tháng đang xem có 2 dịp này, bạn tự đối chiếu thêm nhé.
+const VN_FIXED_HOLIDAYS = new Set(['01-01', '04-30', '05-01', '09-02']);
+function isVnHoliday(y, m, d){
+  const key = `${String(m).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
+  return VN_FIXED_HOLIDAYS.has(key);
+}
+
 function renderTimesheetGrid(){
   const table = document.getElementById('ts-grid-table');
   if(!table) return;
@@ -476,6 +485,10 @@ function renderTimesheetGrid(){
   const [y, m] = month.split('-').map(Number);
   const daysInMonth = new Date(y, m, 0).getDate();
   const days = Array.from({length: daysInMonth}, (_, i) => i+1);
+  const dayMeta = days.map(d=>{
+    const dow = new Date(y, m-1, d).getDay(); // 0=CN, 6=T7
+    return { d, isWeekend: dow===0 || dow===6, isHoliday: isVnHoliday(y,m,d), dowLabel: ['CN','T2','T3','T4','T5','T6','T7'][dow] };
+  });
 
   const empFilter = document.getElementById('ts-filter-employee').value;
   const emps = empFilter ? EMPLOYEES.filter(e=>e.id===empFilter) : EMPLOYEES;
@@ -490,17 +503,23 @@ function renderTimesheetGrid(){
     byEmpDay[`${t.employeeId}_${t.date}`] = t;
   });
 
-  const dayHeaderCells = days.map(d=> `<th style="min-width:46px;">${d}</th>`).join('');
+  const dayHeaderCells = dayMeta.map(dm=> {
+    const bg = dm.isHoliday ? 'var(--red-dim)' : dm.isWeekend ? 'var(--gold-dim)' : 'var(--bg-soft)';
+    const color = dm.isHoliday ? 'var(--red)' : dm.isWeekend ? '#9a6b00' : 'var(--ink-dim)';
+    return `<th style="min-width:46px;background:${bg};color:${color};" title="${dm.dowLabel}${dm.isHoliday?' — Ngày lễ':''}">${dm.d}<div style="font-size:9px;font-weight:600;opacity:.75;">${dm.dowLabel}</div></th>`;
+  }).join('');
   const empRow = (e)=>{
     let monthTotal = 0;
-    const cells = days.map(d=>{
+    const cells = dayMeta.map(dm=>{
+      const d = dm.d;
       const dateStr = `${y}-${String(m).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
       const t = byEmpDay[`${e.id}_${dateStr}`];
       const h = t ? tsHours(t) : {regular:0, ot:0, total:0};
       monthTotal += h.total;
       const label = h.total > 0 ? h.total : '';
       const otMark = h.ot > 0 ? `<div style="font-size:9.5px;color:var(--gold);">+${h.ot} TC</div>` : '';
-      return `<td class="num" style="cursor:pointer;padding:4px;${h.total>0?'':'color:var(--ink-faint);'}" data-grid-cell="${e.id}|${dateStr}">${label}${otMark}</td>`;
+      const cellBg = dm.isHoliday ? 'background:var(--red-dim);' : dm.isWeekend ? 'background:var(--gold-dim);' : '';
+      return `<td class="num" style="cursor:pointer;padding:4px;${cellBg}${h.total>0?'':'color:var(--ink-faint);'}" data-grid-cell="${e.id}|${dateStr}">${label}${otMark}</td>`;
     }).join('');
     return `<tr><td style="position:sticky;left:0;background:var(--card);white-space:nowrap;"><strong>${escapeHtml(e.name)}</strong></td>${cells}<td class="num" style="font-weight:800;">${monthTotal}h</td></tr>`;
   };
