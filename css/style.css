@@ -28,7 +28,7 @@
 
   --sidebar-bg:#FFFFFF;
   --radius:14px;
-  --shadow: 0 1px 2px rgba(31,41,64,.04), 0 8px 24px rgba(31,41,64,.06);
+  --shadow: 0 2px 4px rgba(31,41,64,.08), 0 12px 32px rgba(31,41,64,.12);
 }
 
 /* ---------- Dark mode ---------- */
@@ -48,7 +48,7 @@ html.dark{
   --purple-dim:#241E3D;
   --blue-dim:#16233D;
   --pink-dim:#2E1830;
-  --shadow: 0 1px 2px rgba(0,0,0,.2), 0 8px 24px rgba(0,0,0,.28);
+  --shadow: 0 2px 6px rgba(0,0,0,.3), 0 12px 32px rgba(0,0,0,.4);
 }
 html.dark #login-screen{
   background:
@@ -170,7 +170,7 @@ input,select,textarea{font-family:inherit;}
 .logout-btn:hover{color:var(--red);}
 
 .main{padding:26px 32px 60px;max-width:1440px;}
-.topbar{display:flex;align-items:center;justify-content:space-between;margin-bottom:22px;flex-wrap:wrap;gap:12px;}
+.topbar{display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;flex-wrap:wrap;gap:12px;}
 .topbar h2{font-size:22px;font-weight:800;margin:0;letter-spacing:-.3px;color:var(--ink);}
 .topbar .sub{color:var(--ink-dim);font-size:13px;margin-top:3px;}
 .topbar-actions{display:flex;gap:10px;align-items:center;}
@@ -212,14 +212,15 @@ input,select,textarea{font-family:inherit;}
 .neg{color:var(--red);}
 .kpi-card .delta{font-size:12px;color:var(--ink-faint);}
 
-.card{background:var(--card);border-radius:var(--radius);padding:20px;box-shadow:var(--shadow);border:1px solid var(--line);margin-bottom:18px;}
+.card{background:var(--card);border-radius:calc(var(--radius) + 2px);padding:20px;box-shadow:var(--shadow);border:1px solid var(--line);margin-bottom:18px;}
 .card-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;flex-wrap:wrap;gap:10px;}
 .card-head h3{font-size:15px;font-weight:800;margin:0;color:var(--ink);}
 .card-head .actions{display:flex;gap:8px;}
 
 /* ---------- Table ---------- */
 .table-wrap{overflow-x:auto;}
-table.data{width:100%;border-collapse:collapse;font-size:13px;}
+table.data{width:100%;border-collapse:collapse;font-size:12.5px;}
+table.data td:not(.num){max-width:220px;word-wrap:break-word;}
 .table-wrap{overflow-x:auto;overflow-y:auto;max-height:72vh;}
 table.data th{
   text-align:center;padding:10px 12px;background:var(--bg-soft);color:var(--ink-dim);
