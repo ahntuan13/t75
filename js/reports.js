@@ -2,7 +2,53 @@
 // DASHBOARD + REPORTS (cashflow by period, P&L by quarter/year)
 // =============================================================
 
-let chartCashflowTrend, chartProjectActual, chartProjectBudget, chartReport, chartPnl;
+let chartCashflowTrend, chartProjectActual, chartProjectBudget, chartReport, chartPnl, chartLaborHours;
+
+// Vị trí KHÔNG tính vào biểu đồ nhân lực (Giám đốc, Phó Giám đốc, Kế toán) — chỉ tính Công nhân +
+// các vị trí Quản lý dự án khác (Giám sát, Quản lý dự án, Giám đốc dự án, Nhân viên an toàn...).
+const LABOR_EXCLUDED_POSITIONS = ['giám đốc','phó giám đốc','kế toán'];
+function isLaborCountedEmployee(emp){
+  const pos = (emp.position||'').trim().toLowerCase();
+  return !LABOR_EXCLUDED_POSITIONS.includes(pos);
+}
+
+function renderLaborChart(){
+  const canvas = document.getElementById('chart-labor-hours');
+  if(!canvas) return;
+  const monthFilter = document.getElementById('labor-chart-month')?.value || '';
+  const emps = (typeof EMPLOYEES!=='undefined' ? EMPLOYEES : []);
+  const countedEmpIds = new Set(emps.filter(isLaborCountedEmployee).map(e=>e.id));
+  const totals = {}; // projectName -> giờ công
+  (typeof TIMESHEETS!=='undefined' ? TIMESHEETS : []).forEach(t=>{
+    if(!countedEmpIds.has(t.employeeId)) return;
+    if(monthFilter && monthKey(t.date)!==monthFilter) return;
+    Object.values(t.shifts||{}).forEach(s=>{
+      if(s && s.hours && s.projectName){
+        totals[s.projectName] = (totals[s.projectName]||0) + Number(s.hours);
+      }
+    });
+  });
+  const list = Object.entries(totals).map(([name,hours])=>({name,hours})).sort((a,b)=>b.hours-a.hours);
+
+  canvas.parentElement.style.height = Math.max(320, list.length*30+60) + 'px';
+  if(chartLaborHours) chartLaborHours.destroy();
+  chartLaborHours = new Chart(canvas, {
+    type:'bar',
+    data:{ labels: list.map(x=>x.name), datasets:[
+      {label:'Giờ công', data:list.map(x=>x.hours), backgroundColor:CHART_COLORS.purple, borderRadius:4}
+    ]},
+    options:{indexAxis:'y', responsive:true, maintainAspectRatio:false,
+      scales:{ x:{grid:{color:CHART_COLORS.grid}, ticks:{callback:v=>v+'h'}}, y:{grid:{display:false}} },
+      plugins:{legend:{display:false}, tooltip:{callbacks:{label:(ctx)=> `${fmtNum(ctx.parsed.x)} giờ`}}}}
+  });
+}
+document.getElementById('labor-chart-month')?.addEventListener('change', renderLaborChart);
+document.getElementById('labor-chart-alltime')?.addEventListener('click', ()=>{
+  const el = document.getElementById('labor-chart-month');
+  if(el) el.value = '';
+  renderLaborChart();
+});
+document.getElementById('labor-chart-month')?.setAttribute('value', todayISO().slice(0,7));
 
 // ---------- WELCOME CARD (lời chào real-time + thông tin người dùng) ----------
 function greetingByHour(){
@@ -43,14 +89,19 @@ function renderDashboard(){
 
   const adminSections = document.getElementById('dash-admin-sections');
   const userSections = document.getElementById('dash-user-sections');
-  if(adminSections) adminSections.style.display = isAdmin() ? '' : 'none';
-  if(userSections) userSections.style.display = isAdmin() ? 'none' : '';
+  // Sub-admin (GĐ/PGĐ) cũng được xem đầy đủ Dashboard như Admin (chỉ khác ở quyền sửa/xóa) — chỉ riêng
+  // Kế toán (User thường) mới thấy bản rút gọn.
+  const seeFull = isAdmin() || (typeof isSubAdmin==='function' && isSubAdmin());
+  if(adminSections) adminSections.style.display = seeFull ? '' : 'none';
+  if(userSections) userSections.style.display = seeFull ? 'none' : '';
 
   renderRecentTxTable();
-  if(!isAdmin()){
+  if(!seeFull){
     renderDashUserWidgets();
     return;
   }
+
+  renderLaborChart();
 
   // Gộp cả Thu Chi (theo dự án) và Chi phí gián tiếp (không gắn dự án) vào toàn bộ dòng tiền công ty
   const ALL_CASHFLOW = (typeof activeTransactions==='function' ? activeTransactions() : TRANSACTIONS).concat(typeof activeFixedCosts!=='undefined' ? activeFixedCosts() : []);
