@@ -224,7 +224,7 @@ function renderApprovalCurrentStatus(t){
   if(!el) return;
   const roleLabel = 'Giám đốc';
   if(!t.approvalStatus || t.approvalStatus==='none'){ el.textContent = 'Chưa gửi duyệt.'; return; }
-  if(t.approvalStatus==='pending') el.innerHTML = `🟡 Đang chờ ${roleLabel} (${escapeHtml(t.approverEmail||'')}) duyệt.`;
+  if(t.approvalStatus==='pending') el.innerHTML = `🟡 Đang chờ 1 trong ${(APPROVERS.approverEmails||[]).length} người duyệt (${escapeHtml((APPROVERS.approverEmails||[]).join(', '))}) xử lý.`;
   else if(t.approvalStatus==='approved') el.innerHTML = `✅ Đã được ${roleLabel} duyệt (${escapeHtml(t.approvedBy||'')}).`;
   else if(t.approvalStatus==='rejected') el.innerHTML = `❌ Đã bị ${roleLabel} từ chối (${escapeHtml(t.approvedBy||'')}).`;
 }
