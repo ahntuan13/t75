@@ -413,23 +413,56 @@ tr.tx-row-explained td:not(:last-child){text-decoration:line-through;}
 @media (max-width:980px){.two-col{grid-template-columns:1fr;}}
 
 /* ---------- Responsive ---------- */
+/* Tablet (điện thoại ngang lớn / máy tính bảng đứng, vd iPad Mini/Air, Galaxy Tab): giữ sidebar
+   nhưng thu hẹp lại + giảm padding để bảng dữ liệu có nhiều chỗ hơn, chưa cần chuyển sang menu ẩn. */
+@media (max-width:1100px) and (min-width:841px){
+  .shell{grid-template-columns:200px 1fr;}
+  .sidebar{padding:16px 10px;}
+  .main{padding:20px 20px 60px;}
+  .kpi-grid{grid-template-columns:repeat(auto-fit,minmax(160px,1fr));}
+}
+/* Điện thoại + tablet nhỏ (đứng): chuyển sidebar thành menu trượt (drawer), bảng full width. */
 @media (max-width:840px){
+  .sidebar-backdrop{display:none;position:fixed;inset:0;background:rgba(15,23,42,.45);z-index:85;}
+  .sidebar-backdrop.open{display:block;}
   .shell{grid-template-columns:1fr;}
   .sidebar{position:fixed;left:-260px;width:240px;z-index:90;transition:left .2s;box-shadow:10px 0 30px rgba(31,41,64,.15);}
   .sidebar.open{left:0;}
-  .main{padding:18px 16px 60px;}
+  .main{padding:16px 14px 60px;}
   .form-grid{grid-template-columns:1fr;}
-  #menu-toggle{display:inline-flex !important;}
+  #menu-toggle{display:inline-flex !important;margin-bottom:14px;width:40px;height:40px;}
   .modal-backdrop{padding:0;align-items:stretch;}
   .modal{max-width:100%;width:100%;border-radius:0;min-height:100vh;}
+  .modal-body{padding:16px;}
+  .modal-head{padding:14px 16px;}
+  .modal-foot{padding:12px 16px;}
   .exp-row{flex-direction:column;}
   .exp-row .field{width:100%;}
-  .kpi-grid{grid-template-columns:1fr 1fr;}
+  .kpi-grid{grid-template-columns:1fr 1fr;gap:10px;}
   table.data{font-size:12px;}
+  table.data th,table.data td{padding:8px 8px;}
+  .topbar h2{font-size:19px;}
+  .card{padding:16px;}
+  .tx-project-block{padding:14px 16px;}
+  .tx-project-head{flex-direction:column;align-items:flex-start;}
+  .tx-project-summary{gap:10px;font-size:12px;}
+  .row-actions{flex-wrap:wrap;}
+  .icon-btn{padding:8px 9px;font-size:14px;}
+  .filters-bar{gap:8px;}
+  .filters-bar select,.filters-bar input{flex:1 1 140px;min-width:0;}
+  .notif-panel{width:min(320px, calc(100vw - 32px));left:0;}
+  .fab-btn{bottom:18px;right:18px;width:52px;height:52px;font-size:26px;}
+  .two-col{gap:12px;}
+  .chart-wrap{height:260px;}
 }
 @media (max-width:420px){
   .kpi-grid{grid-template-columns:1fr;}
   .welcome-pills{flex-direction:column;align-items:stretch;}
+  .card{padding:14px;}
+  .login-card{padding:28px 20px 24px;}
+  table.data{font-size:11.5px;}
+  table.data th,table.data td{padding:7px 6px;}
+  .topbar{flex-direction:column;align-items:flex-start;}
 }
 #menu-toggle{display:none;background:var(--card);border:1px solid var(--line);border-radius:10px;width:36px;height:36px;align-items:center;justify-content:center;font-size:15px;color:var(--ink-dim);}
 
