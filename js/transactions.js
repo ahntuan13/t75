@@ -452,6 +452,35 @@ async function submitForApproval(id, role, source){
   }catch(err){ toast('Lỗi: '+err.message); }
 }
 
+// Dùng chung để dựng 1 khối bảng (card) — tránh lặp code giữa khối "Chờ duyệt" và khối danh sách chính.
+function txTableBlockHtml(title, rows, theadHtml, opts={}){
+  let summaryHtml = '';
+  if(opts.showSummary !== false){
+    const activeRows = rows.filter(t =>
+      t.advanceExplainStatus !== 'explained' &&
+      !(t.type==='OUT' && (t.approvalStatus==='pending' || t.approvalStatus==='rejected'))
+    );
+    const sumIn = activeRows.filter(t=>t.type==='IN').reduce((s,t)=>s+Number(t.amount||0),0);
+    const sumOut = activeRows.filter(t=>t.type==='OUT').reduce((s,t)=>s+Number(t.amount||0),0);
+    summaryHtml = `<div class="tx-project-summary">
+        <span style="color:var(--teal)">Thu: <strong>${fmtVND(sumIn)}</strong></span>
+        <span style="color:var(--red)">Chi: <strong>${fmtVND(sumOut)}</strong></span>
+        <span>Chênh lệch: <strong>${fmtVND(sumIn-sumOut)}</strong></span>
+      </div>`;
+  }
+  const bodyHtml = rows.length
+    ? `<div class="table-wrap"><table class="data">${theadHtml}<tbody>${rows.map(txRowHtml).join('')}</tbody></table></div>`
+    : `<div class="empty-state" style="padding:18px 0;">${opts.emptyText || 'Không có dòng nào.'}</div>`;
+  return `
+    <div class="card tx-project-block${opts.pendingBlock ? ' tx-pending-block' : ''}">
+      <div class="tx-project-head">
+        <h4>${title}</h4>
+        ${summaryHtml}
+      </div>
+      ${bodyHtml}
+    </div>`;
+}
+
 function renderTxTable(){
   const wrap = document.getElementById('tx-table');
   if(!wrap) return;
@@ -467,31 +496,19 @@ function renderTxTable(){
 
   // Không còn nhóm theo dự án nữa — luôn hiển thị 1 bảng phẳng, sắp theo ngày mới nhất, có thêm cột Dự án riêng.
   const flatRows = rows.slice().sort((a,b)=> (b.date||'').localeCompare(a.date||''));
-  // Tổng chỉ tính các khoản CHƯA/không phải "đã giải chi" (khoản tạm ứng đã giải chi thì số liệu chính thức
-  // đã nằm ở nơi khác, hiện vẫn thấy dòng cũ trong bảng cho dễ đối chiếu nhưng KHÔNG cộng vào tổng).
-  const activeRows = flatRows.filter(t =>
-    t.advanceExplainStatus !== 'explained' &&
-    !(t.type==='OUT' && (t.approvalStatus==='pending' || t.approvalStatus==='rejected'))
-  );
-  const sumIn = activeRows.filter(t=>t.type==='IN').reduce((s,t)=>s+Number(t.amount||0),0);
-  const sumOut = activeRows.filter(t=>t.type==='OUT').reduce((s,t)=>s+Number(t.amount||0),0);
-  wrap.innerHTML = `
-    <div class="card tx-project-block">
-      <div class="tx-project-head">
-        <h4>Thu Chi (${flatRows.length} giao dịch)</h4>
-        <div class="tx-project-summary">
-          <span style="color:var(--teal)">Thu: <strong>${fmtVND(sumIn)}</strong></span>
-          <span style="color:var(--red)">Chi: <strong>${fmtVND(sumOut)}</strong></span>
-          <span>Chênh lệch: <strong>${fmtVND(sumIn-sumOut)}</strong></span>
-        </div>
-      </div>
-      <div class="table-wrap">
-        <table class="data">
-          ${theadHtml}
-          <tbody>${flatRows.map(txRowHtml).join('')}</tbody>
-        </table>
-      </div>
-    </div>`;
+
+  // Tách riêng các khoản "Chờ duyệt" ra 1 khung riêng ở TRÊN CÙNG để dễ nhận biết và xử lý ngay.
+  // Sau khi Duyệt/Từ chối, approvalStatus không còn là 'pending' nữa -> dòng đó tự động
+  // "rơi" xuống khung "Thu Chi" bên dưới ở lần render kế tiếp (không cần code di chuyển thủ công).
+  const pendingRows = flatRows.filter(t=> t.type==='OUT' && t.approvalStatus==='pending');
+  const otherRows = flatRows.filter(t=> !(t.type==='OUT' && t.approvalStatus==='pending'));
+
+  let html = '';
+  if(pendingRows.length){
+    html += txTableBlockHtml(`🟡 Khung chờ duyệt (${pendingRows.length})`, pendingRows, theadHtml, {pendingBlock:true, showSummary:false});
+  }
+  html += txTableBlockHtml(`Thu Chi (${otherRows.length} giao dịch)`, otherRows, theadHtml, {emptyText:'Chưa có giao dịch nào khác ngoài các khoản đang chờ duyệt ở trên.'});
+  wrap.innerHTML = html;
 }
 
 let currentViewSource = 'tx'; // 'tx' | 'fc'
