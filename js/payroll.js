@@ -28,6 +28,7 @@ function listenPayroll(){
     renderEmployeesTable();
     renderPayrollSummary();
     renderTimesheetGrid();
+    if(window.renderLaborChart) renderLaborChart();
     maybeCheckPayrollAllocation();
   }, (err)=> console.error('employees listen error', err));
 
@@ -37,6 +38,7 @@ function listenPayroll(){
     renderTimesheetSummary();
     renderTimesheetGrid();
     renderPayrollSummary();
+    if(window.renderLaborChart) renderLaborChart();
     maybeCheckPayrollAllocation();
   }, (err)=> console.error('timesheets listen error', err));
 
@@ -800,6 +802,47 @@ async function checkMonthlyPayrollAllocation(){
   }catch(err){ console.error('checkMonthlyPayrollAllocation error', err); }
 }
 
+// Nút bấm chủ động — cho phép Admin tự tay phân bổ lương bất cứ lúc nào (không cần đợi ngày 15),
+// luôn hỏi xác nhận rõ ràng, và CẢNH BÁO nếu tháng đó đã từng phân bổ để tránh tạo trùng.
+document.getElementById('btn-run-payroll-allocation')?.addEventListener('click', async ()=>{
+  const month = currentPayrollMonth();
+  const [y,m] = month.split('-');
+  try{
+    const snap = await db.collection('settings').doc('payrollAllocationMeta').get();
+    const lastMonth = snap.exists ? snap.data().lastAllocatedMonth : null;
+    if(lastMonth === month){
+      if(!confirm(`⚠️ Tháng ${Number(m)}/${y} ĐÃ được phân bổ trước đó rồi. Nếu bấm tiếp, hệ thống sẽ TẠO THÊM 1 lượt phân bổ MỚI (có thể bị TÍNH TRÙNG tiền lương vào Thu Chi 2 lần).\n\nBạn có chắc chắn muốn tạo thêm không? (Nên kiểm tra và xóa lượt cũ trước nếu là do nhầm lẫn.)`)) return;
+    } else {
+      if(!confirm(`Xác nhận phân bổ lương tháng ${Number(m)}/${y} vào Thu Chi theo đúng tỉ lệ giờ công từng dự án?`)) return;
+    }
+    const ok = await runMonthlyPayrollAllocation(month);
+    if(!ok) alert('Chưa có dữ liệu chấm công theo dự án nào trong tháng này để phân bổ.');
+  }catch(err){ toast('Lỗi: '+err.message); }
+});
+
+// Dọn dẹp: xóa các khoản Thu Chi TỰ ĐỘNG TẠO RA từ phân bổ lương của ĐÚNG tháng đang chọn
+// (nhận diện qua ghi chú "Tự động tạo từ phân bổ lương tháng X-XX") — dùng khi lỡ bấm phân bổ nhầm/trùng.
+document.getElementById('btn-undo-payroll-allocation')?.addEventListener('click', async ()=>{
+  const month = currentPayrollMonth();
+  const marker = `Tự động tạo từ phân bổ lương tháng ${month}`;
+  const inTx = TRANSACTIONS.filter(t=> (t.note||'').startsWith(marker));
+  const inFc = (typeof FIXEDCOSTS!=='undefined'?FIXEDCOSTS:[]).filter(t=> (t.note||'').startsWith(marker));
+  const total = inTx.length + inFc.length;
+  if(total === 0){ alert(`Không tìm thấy khoản phân bổ lương tự động nào cho tháng ${month}.`); return; }
+  const preview = [...inTx, ...inFc].slice(0,8).map(t=>`- ${t.projectName||'(Chi phí gián tiếp)'}: ${fmtVND(t.amount)}`).join('\n');
+  if(!confirm(`Tìm thấy ${total} khoản đã phân bổ lương tháng ${month}:\n${preview}${total>8?'\n...':''}\n\nBấm OK để XÓA TOÀN BỘ ${total} khoản này khỏi Thu Chi/Chi phí gián tiếp. Không hoàn tác được. Tiếp tục?`)) return;
+  try{
+    const batch1 = db.batch();
+    inTx.forEach(t=> batch1.delete(db.collection('transactions').doc(t.id)));
+    if(inTx.length) await batch1.commit();
+    const batch2 = db.batch();
+    inFc.forEach(t=> batch2.delete(db.collection('fixedCosts').doc(t.id)));
+    if(inFc.length) await batch2.commit();
+    await db.collection('settings').doc('payrollAllocationMeta').set({ lastAllocatedMonth: firebase.firestore.FieldValue.delete() }, {merge:true});
+    toast(`✅ Đã xóa ${total} khoản phân bổ lương tháng ${month}`);
+    logActivity('delete', {projectName:'Phân bổ lương tự động', content:`Xóa ${total} khoản tháng ${month}`, type:'OUT'});
+  }catch(err){ toast('Lỗi: '+err.message); }
+});
 document.getElementById('payroll-summary-table')?.addEventListener('click', (e)=>{
   const adjId = e.target.closest('[data-open-adjust]')?.dataset.openAdjust;
   const printId = e.target.closest('[data-print-payslip]')?.dataset.printPayslip;
