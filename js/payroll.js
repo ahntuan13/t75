@@ -896,28 +896,26 @@ document.getElementById('save-pa-btn')?.addEventListener('click', async ()=>{
 });
 
 // ---------------- XUẤT PHIẾU LƯƠNG PDF (in qua trình duyệt — Lưu dưới dạng PDF) ----------------
-// Ánh xạ email đăng nhập -> {tên hiển thị, ảnh chữ ký} — "Người lập phiếu" trên phiếu lương LUÔN là
-// đúng người đang đăng nhập bấm in, không cố định 1 tên như trước.
-// ⚠️ Email của Diễm My mình tạm đoán theo mẫu email công ty — báo lại email chính xác nếu chưa đúng nhé,
-// mình sẽ sửa lại trong 1 dòng.
-function currentPreparerInfo(){
-  const email = (auth.currentUser && auth.currentUser.email || '').toLowerCase();
-  const sigMap = {
-    'hoaithuong@tuan75insulation.com': { name: 'Hoài Thương', sig: (typeof SIGNATURES!=='undefined' ? SIGNATURES.accountant.img : '') },
-    'diemmy@tuan75insulation.com':     { name: 'Diễm My',     sig: (typeof SIGNATURES!=='undefined' ? SIGNATURES.preparer.img : '') },
-  };
-  if(sigMap[email]) return sigMap[email];
-  return { name: (typeof CURRENT_USER_NAME!=='undefined' && CURRENT_USER_NAME) || email.split('@')[0] || 'Kế toán', sig: '' };
+// "Người lập phiếu" và "Kế toán trưởng" trên phiếu lương LUÔN CỐ ĐỊNH là Diễm My và Hoài Thương
+// (dùng chung ảnh chữ ký đã có sẵn trong SIGNATURES ở orders.js), không phụ thuộc ai đang đăng nhập bấm in.
+function payslipPreparerInfo(){
+  return { name: 'Diễm My', sig: (typeof SIGNATURES!=='undefined' ? SIGNATURES.preparer.img : '') };
+}
+function payslipAccountantInfo(){
+  return { name: 'Hoài Thương', sig: (typeof SIGNATURES!=='undefined' ? SIGNATURES.accountant.img : '') };
 }
 
-function printPayslip(employeeId){
+// Trả về nội dung HTML đầy đủ (kèm <html>/<head>/<style>) cho 1 phiếu lương — dùng chung cho In (iframe)
+// và Xuất ZIP nhiều phiếu (html2pdf).
+function buildPayslipHtml(employeeId){
   const emp = EMPLOYEES.find(x=>x.id===employeeId);
-  if(!emp) return;
+  if(!emp) return '';
   const month = currentPayrollMonth();
   const r = computeEmployeeSalary(emp, month);
   const [y,m] = month.split('-');
   const empIndex = EMPLOYEES.findIndex(x=>x.id===employeeId) + 1;
-  const preparer = currentPreparerInfo();
+  const preparer = payslipPreparerInfo();
+  const accountant = payslipAccountantInfo();
   const days = Math.round((r.totalHours/8)*1000)/1000;
   const dayRate = emp.payType==='daily' ? emp.effectiveRate : Math.round(r.totalIncome/30);
 
@@ -940,7 +938,7 @@ function printPayslip(employeeId){
     [15, 'THỰC LĨNH', fmtVND(r.thucNhan)],
   ];
 
-  const html = `
+  return `
     <html><head><title>Phiếu lương - ${escapeHtml(emp.name)}</title>
     <style>
       @page{size:A5 portrait;margin:10mm;}
@@ -995,8 +993,8 @@ function printPayslip(employeeId){
       </div>
       <div class="col">
         <div><strong>Kế toán trưởng</strong></div>
-        <div class="space"></div>
-        <div>&nbsp;</div>
+        <div class="space">${accountant.sig ? `<img src="${accountant.sig}">` : ''}</div>
+        <div>${escapeHtml(accountant.name)}</div>
       </div>
       <div class="col">
         <div><strong>Người nhận lương</strong></div>
@@ -1005,7 +1003,11 @@ function printPayslip(employeeId){
       </div>
     </div>
     </body></html>`;
+}
 
+function printPayslip(employeeId){
+  const html = buildPayslipHtml(employeeId);
+  if(!html) return;
   // In ngay trong khung hiện tại (iframe ẩn) — giống hệt cách in Lệnh chi/Lệnh tạm ứng, không mở tab mới.
   let frame = document.getElementById('print-order-frame');
   if(!frame){
@@ -1018,3 +1020,63 @@ function printPayslip(employeeId){
   doc.open(); doc.write(html); doc.close();
   setTimeout(()=>{ frame.contentWindow.focus(); frame.contentWindow.print(); }, 250);
 }
+
+// ---------------- XUẤT TẤT CẢ PHIẾU LƯƠNG THÁNG NÀY -> 1 FILE NÉN .ZIP ----------------
+// Lưu ý: trình duyệt không có thư viện nén .RAR (định dạng RAR là mã nguồn đóng, không có bản JS
+// chạy trong trình duyệt) — nên mình xuất ra file .ZIP (WinRAR/7-Zip đều mở được bình thường),
+// bên trong là từng file PDF riêng cho mỗi nhân viên, y hệt nội dung phiếu lương bấm in từng người.
+async function exportAllPayslipsZip(){
+  if(typeof JSZip === 'undefined'){ toast('Chưa tải được thư viện nén file (JSZip) — kiểm tra lại kết nối mạng.'); return; }
+  if(typeof html2pdf === 'undefined'){ toast('Chưa tải được thư viện xuất PDF (html2pdf) — kiểm tra lại kết nối mạng.'); return; }
+  if(EMPLOYEES.length===0){ toast('Chưa có nhân viên nào để xuất phiếu lương'); return; }
+
+  const month = currentPayrollMonth();
+  const [y,m] = month.split('-');
+  const btn = document.getElementById('btn-export-all-payslips');
+  if(btn){ btn.disabled = true; btn.textContent = '⏳ Đang xuất phiếu lương...'; }
+
+  try{
+    const zip = new JSZip();
+    const container = document.createElement('div');
+    container.style.cssText = 'position:fixed;left:-9999px;top:0;width:420px;';
+    document.body.appendChild(container);
+
+    let done = 0;
+    for(const emp of EMPLOYEES){
+      const html = buildPayslipHtml(emp.id);
+      if(!html) continue;
+      // Chỉ lấy phần trong <body>...</body> để nhét vào 1 div render tạm (html2pdf cần 1 phần tử DOM thật).
+      const bodyMatch = html.match(/<body>([\s\S]*)<\/body>/);
+      container.innerHTML = bodyMatch ? bodyMatch[1] : html;
+      const pdfBlob = await html2pdf().set({
+        margin: 5,
+        filename: `${emp.name}.pdf`,
+        image: { type:'jpeg', quality:0.98 },
+        html2canvas: { scale: 2, useCORS: true },
+        jsPDF: { unit:'mm', format:'a5', orientation:'portrait' },
+      }).from(container).outputPdf('blob');
+      const safeName = emp.name.replace(/[\\/:*?"<>|]+/g, '_');
+      zip.file(`${safeName}.pdf`, pdfBlob);
+      done++;
+      if(btn) btn.textContent = `⏳ Đang xuất... (${done}/${EMPLOYEES.length})`;
+    }
+    document.body.removeChild(container);
+
+    if(done === 0){ toast('Không có phiếu lương nào để xuất'); return; }
+
+    const zipBlob = await zip.generateAsync({type:'blob'});
+    const fileName = `Phieu luong Thang ${Number(m)}-${y}.zip`;
+    const url = URL.createObjectURL(zipBlob);
+    const a = document.createElement('a');
+    a.href = url; a.download = fileName;
+    document.body.appendChild(a); a.click(); document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+    toast(`✅ Đã xuất ${done} phiếu lương — file "${fileName}"`);
+    logActivity('create', {projectName:'Xuất phiếu lương', content:`Xuất ${done} phiếu lương tháng ${month} (.zip)`, type:'OUT'});
+  }catch(err){
+    toast('Lỗi khi xuất file nén: ' + err.message);
+  }finally{
+    if(btn){ btn.disabled = false; btn.textContent = '🗜 In tất cả phiếu lương (.zip)'; }
+  }
+}
+document.getElementById('btn-export-all-payslips')?.addEventListener('click', exportAllPayslipsZip);
