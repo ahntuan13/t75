@@ -89,12 +89,49 @@ function renderProjectsTable(){
       <td class="num">${fmtVND(totalRevenue-totalSpend)}</td>
       <td></td>
     </tr>`;
-  table.innerHTML = `<thead><tr>
-    <th>Dự án</th><th>Mã</th><th>Trạng thái</th><th>Giá trị HĐ</th><th>Chi phí dự toán</th><th>Doanh thu dự toán</th><th>Đã thu (thực tế)</th><th>Đã chi (thực tế)</th><th>Chênh lệch</th><th></th>
-  </tr></thead><tbody>${totalsRow}${rows}</tbody>`;
+  table.innerHTML = `<thead>
+    <tr><th>Dự án</th><th>Mã</th><th>Trạng thái</th><th>Giá trị HĐ</th><th>Chi phí dự toán</th><th>Doanh thu dự toán</th><th>Đã thu (thực tế)</th><th>Đã chi (thực tế)</th><th>Chênh lệch</th><th></th></tr>
+    ${totalsRow}
+  </thead><tbody>${rows}</tbody>`;
 }
 
 let currentContractFiles = []; // [{url, name, uploadedAt}]
+let currentContractInfo = [null,null,null,null,null]; // 5 slot: {name, fileUrl, fileName} | null — ứng với "Thông tin HĐ 1..5"
+
+function renderContractInfoStatus(i){
+  const el = document.getElementById(`proj-hd${i}-status`);
+  if(!el) return;
+  const info = currentContractInfo[i-1];
+  if(info && info.fileUrl){
+    el.innerHTML = `<a href="${info.fileUrl}" target="_blank" class="tag tag-blue">📎 ${escapeHtml(info.fileName||'Xem file')}</a> <button type="button" class="btn btn-ghost btn-sm" data-remove-hd="${i}">Xóa file</button>`;
+    el.querySelector('[data-remove-hd]')?.addEventListener('click', ()=>{
+      currentContractInfo[i-1] = { ...(currentContractInfo[i-1]||{}), fileUrl:'', fileName:'' };
+      renderContractInfoStatus(i);
+    });
+  } else {
+    el.innerHTML = `<span class="helper-text">Chưa có file.</span>`;
+  }
+}
+
+for(let i=1;i<=5;i++){
+  document.getElementById(`proj-hd${i}-file`)?.addEventListener('change', async (e)=>{
+    const file = e.target.files[0];
+    e.target.value = '';
+    if(!file) return;
+    toast(`⏳ Đang tải "${file.name}" lên OneDrive...`);
+    try{
+      const projName = document.getElementById('project-name').value.trim() || 'KhongTenDuAn';
+      const folder = 'Projects/' + projName.replace(/[^\w\-]+/g, '_') + '/HD' + i;
+      const result = await msUploadFile(file, folder);
+      currentContractInfo[i-1] = {
+        name: document.getElementById(`proj-hd${i}-name`).value.trim(),
+        fileUrl: result.webUrl, fileName: result.name,
+      };
+      renderContractInfoStatus(i);
+      toast('Đã thêm file cho HĐ ' + i);
+    }catch(err){ toast('Lỗi tải lên OneDrive: ' + err.message); }
+  });
+}
 
 function renderContractFileStatus(){
   const el = document.getElementById('project-files-list');
@@ -163,6 +200,14 @@ function openProjectModal(id){
     currentContractFiles = [];
   }
   document.getElementById('project-file-input').value = '';
+  currentContractInfo = Array.isArray(p.contractInfo) ? p.contractInfo.slice(0,5) : [];
+  while(currentContractInfo.length < 5) currentContractInfo.push(null);
+  for(let i=1;i<=5;i++){
+    const info = currentContractInfo[i-1];
+    document.getElementById(`proj-hd${i}-name`).value = info ? (info.name||'') : '';
+    document.getElementById(`proj-hd${i}-file`).value = '';
+    renderContractInfoStatus(i);
+  }
   renderContractFileStatus();
   openModal('modal-project');
 }
@@ -199,6 +244,12 @@ document.getElementById('save-project-btn').addEventListener('click', async ()=>
     warrantyStartDate: document.getElementById('project-warranty-start').value,
     note: document.getElementById('project-note').value.trim(),
     contractFiles: currentContractFiles,
+    contractInfo: [1,2,3,4,5].map(i=>{
+      const name = document.getElementById(`proj-hd${i}-name`).value.trim();
+      const info = currentContractInfo[i-1];
+      if(!name && !(info && info.fileUrl)) return null;
+      return { name, fileUrl: info ? (info.fileUrl||'') : '', fileName: info ? (info.fileName||'') : '' };
+    }),
     // xóa field cũ (single-file) để tránh dữ liệu thừa/nhầm lẫn khi đọc lại
     contractFileUrl: firebase.firestore.FieldValue.delete(),
     contractFile: firebase.firestore.FieldValue.delete(),
