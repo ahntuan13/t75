@@ -197,50 +197,111 @@ document.getElementById('restore-backup-input')?.addEventListener('change', asyn
   try{
     const buf = await file.arrayBuffer();
     const wb = XLSX.read(buf, {type:'array', cellDates:true});
-    const sheet = wb.Sheets['ThuChi'] || wb.Sheets[wb.SheetNames[0]];
-    const rows = XLSX.utils.sheet_to_json(sheet, {defval:''});
-    if(rows.length===0){ alert('File sao lưu trống, không có gì để khôi phục.'); return; }
+    const asDateStr = (v)=> v instanceof Date ? v.toISOString().slice(0,10) : String(v||'');
+    const readSheet = (name)=> wb.Sheets[name] ? XLSX.utils.sheet_to_json(wb.Sheets[name], {defval:'', cellDates:true}) : [];
 
-    const restored = rows.map(row=>{
-      const proj = PROJECTS.find(p=> p.name === row['Dự án']);
-      return {
-        projectId: proj ? proj.id : '', projectName: row['Dự án']||'',
-        type: row['Loại']==='Thu' ? 'IN' : 'OUT',
-        date: row['Ngày'] instanceof Date ? row['Ngày'].toISOString().slice(0,10) : String(row['Ngày']||''),
-        code: row['Mã']||'', content: row['Nội dung']||'', description: row['Diễn giải']||'',
-        amount: Number(row['Thành tiền'])||0,
-        invoiceStatus: row['Trạng thái hóa đơn']==='Đã xuất' ? 'issued' : 'pending',
-        transferStatus: (row['Trạng thái CK/Nhận']||'').startsWith('Đã') ? 'done' : 'pending',
-        note: row['Ghi chú']||'',
-        unit:'', qty:0, unitPrice:0, invoiceNumber:'', invoiceDate:'', bankName:'', bankAccount:'', bankHolder:'', transferDate:'',
-        invoiceImage:'', transferImage:'',
-      };
-    });
+    // Khai báo 6 nhóm dữ liệu có thể khôi phục — mỗi nhóm biết cách đọc đúng cột trong sheet của nó
+    // và map lại đúng cấu trúc field mà app đang dùng (khớp NGUYÊN VẸN với format lúc Sao lưu).
+    const groups = [
+      {
+        key:'tx', label:'Thu Chi', sheet:'ThuChi', collection:'transactions', currentArr: TRANSACTIONS,
+        map: (row)=>{
+          const proj = PROJECTS.find(p=> p.name === row['Dự án']);
+          return {
+            projectId: proj?proj.id:'', projectName: row['Dự án']||'', type: row['Loại']==='Thu'?'IN':'OUT',
+            date: asDateStr(row['Ngày']), code: row['Mã']||'', content: row['Nội dung']||'', description: row['Diễn giải']||'',
+            amount: Number(row['Thành tiền'])||0,
+            invoiceStatus: row['Trạng thái hóa đơn']==='Đã xuất'?'issued':'pending', invoiceNumber: row['Số hóa đơn']||'',
+            transferStatus: (row['Trạng thái CK/Nhận']||'').startsWith('Đã')?'done':'pending',
+            bankName: row['Ngân hàng']||'', bankAccount: row['Số TK']||'', approvalStatus: row['Trạng thái duyệt']||'',
+            note: row['Ghi chú']||'', unit:'', qty:0, unitPrice:0, invoiceDate:'', bankHolder:'', transferDate:'', invoiceImage:'', transferImage:'',
+          };
+        },
+      },
+      {
+        key:'fc', label:'Chi phí gián tiếp', sheet:'ChiPhiGianTiep', collection:'fixedCosts', currentArr: (typeof FIXEDCOSTS!=='undefined'?FIXEDCOSTS:[]),
+        map: (row)=> ({
+          type: row['Loại']==='Thu'?'IN':'OUT', date: asDateStr(row['Ngày']), code: row['Mã']||'',
+          content: row['Nội dung']||'', description: row['Diễn giải']||'', amount: Number(row['Thành tiền'])||0,
+          advanceExplainStatus: row['Trạng thái giải chi']||'', note: row['Ghi chú']||'',
+          projectId:'', projectName:'', invoiceStatus:'pending', transferStatus:'pending',
+        }),
+      },
+      {
+        key:'proj', label:'Dự án', sheet:'DuAn', collection:'projects', currentArr: (typeof PROJECTS!=='undefined'?PROJECTS:[]),
+        map: (row)=> ({
+          name: row['Tên dự án']||'', code: row['Mã']||'', customer: row['Khách hàng']||'', taxCode: row['MST']||'',
+          contractValue: Number(row['Giá trị HĐ'])||0, costBudget: Number(row['Chi phí dự toán'])||0, revenueBudget: Number(row['Doanh thu dự toán'])||0,
+          status: row['Trạng thái']||'active', signDate: asDateStr(row['Ngày ký HĐ']), completionDate: asDateStr(row['Ngày hoàn thành']), note: row['Ghi chú']||'',
+        }),
+      },
+      {
+        key:'ord', label:'Lệnh chi/Tạm ứng', sheet:'LenhChiTamUng', collection:'paymentOrders', currentArr: (typeof ORDERS!=='undefined'?ORDERS:[]),
+        map: (row)=>{
+          const proj = PROJECTS.find(p=> p.name === row['Dự án']);
+          return {
+            orderType: row['Loại']||'payment', date: asDateStr(row['Ngày']), payee: row['Người nhận']||'', reason: row['Lý do']||'',
+            projectId: proj?proj.id:'', projectName: row['Dự án']||'', amount: Number(row['Số tiền'])||0,
+            approvalStatus: row['Trạng thái duyệt']||'', approvedBy: row['Đã duyệt bởi']||'', explanation: row['Giải chi']||'',
+          };
+        },
+      },
+      {
+        key:'emp', label:'Nhân viên', sheet:'NhanVien', collection:'employees', currentArr: (typeof EMPLOYEES!=='undefined'?EMPLOYEES:[]),
+        map: (row)=> ({
+          name: row['Họ tên']||'', position: row['Chức vụ']||'', payType: row['Nhóm lương']==='Công nhân'?'daily':'monthly',
+          contractSalary: Number(row['Lương HĐLĐ/BHXH'])||0, effectiveRate: Number(row['Lương hiệu quả'])||0, note: row['Ghi chú']||'',
+        }),
+      },
+      {
+        key:'ts', label:'Chấm công', sheet:'ChamCong', collection:'timesheets', currentArr: (typeof TIMESHEETS!=='undefined'?TIMESHEETS:[]),
+        map: (row, ctx)=>{
+          const emp = (ctx.employees||[]).find(e=> e.name === row['Nhân viên']);
+          const buildShift = (projCol, hourCol)=> ({ projectId:'', projectName: row[projCol]||'', hours: Number(row[hourCol])||0 });
+          return {
+            employeeId: emp?emp.id:'', employeeName: row['Nhân viên']||'', date: asDateStr(row['Ngày']),
+            shifts: { sang: buildShift('Sáng - Dự án','Sáng - Giờ'), chieu: buildShift('Chiều - Dự án','Chiều - Giờ'), toi: buildShift('Tối - Dự án','Tối - Giờ (TC)') },
+          };
+        },
+      },
+    ];
 
-    if(!confirm(`File sao lưu có ${restored.length} giao dịch.\n\n⚠️ KHÔI PHỤC sẽ XÓA TOÀN BỘ ${TRANSACTIONS.length} giao dịch Thu Chi HIỆN TẠI và thay bằng đúng ${restored.length} giao dịch trong file sao lưu này.\n\nChỉ dùng khi chắc chắn dữ liệu hiện tại đã bị mất/lỗi. Thao tác KHÔNG hoàn tác được. Bạn có chắc chắn muốn tiếp tục?`)) return;
-    if(!confirm('Xác nhận LẦN CUỐI: bạn chắc chắn muốn XÓA dữ liệu Thu Chi hiện tại và khôi phục từ file sao lưu?')) return;
+    // Đọc trước để biết sheet nào THỰC SỰ có dữ liệu trong file, chỉ hỏi khôi phục đúng các nhóm đó
+    const available = groups.map(g=> ({...g, rows: readSheet(g.sheet).filter(r=> Object.values(r).some(v=>v!==''))}))
+      .filter(g=> g.rows.length > 0);
+    if(available.length === 0){ alert('File sao lưu không có dữ liệu nào (hoặc không đúng định dạng do app này tạo ra).'); return; }
+
+    const summary = available.map(g=>`- ${g.label}: ${g.rows.length} dòng`).join('\n');
+    if(!confirm(`File sao lưu có các nhóm dữ liệu sau:\n${summary}\n\n⚠️ Khôi phục sẽ XÓA TOÀN BỘ dữ liệu HIỆN TẠI của TỪNG NHÓM này và thay bằng đúng nội dung trong file. Không hoàn tác được.\n\nBấm OK để khôi phục TẤT CẢ các nhóm trên. Bấm Cancel để hủy.`)) return;
+    if(!confirm('Xác nhận LẦN CUỐI: bạn chắc chắn muốn khôi phục dữ liệu từ file sao lưu này?')) return;
 
     if(el) el.innerHTML = '⏳ Đang khôi phục dữ liệu...';
     const CHUNK = 400;
-    // Xóa dữ liệu hiện tại
-    const currentIds = TRANSACTIONS.map(t=>t.id);
-    for(let i=0;i<currentIds.length;i+=CHUNK){
-      const batch = db.batch();
-      currentIds.slice(i,i+CHUNK).forEach(id=> batch.delete(db.collection('transactions').doc(id)));
-      await batch.commit();
+    let totalRestored = 0;
+    for(const g of available){
+      // Xóa dữ liệu hiện tại của nhóm này
+      const currentIds = g.currentArr.map(x=>x.id);
+      for(let i=0;i<currentIds.length;i+=CHUNK){
+        const batch = db.batch();
+        currentIds.slice(i,i+CHUNK).forEach(id=> batch.delete(db.collection(g.collection).doc(id)));
+        await batch.commit();
+      }
+      // Ghi lại từ file sao lưu
+      const ctx = { employees: (typeof EMPLOYEES!=='undefined'?EMPLOYEES:[]) };
+      for(let i=0;i<g.rows.length;i+=CHUNK){
+        const batch = db.batch();
+        g.rows.slice(i,i+CHUNK).forEach(row=>{
+          const ref = db.collection(g.collection).doc();
+          batch.set(ref, {...g.map(row, ctx), createdAt: firebase.firestore.FieldValue.serverTimestamp(), createdBy: auth.currentUser.email, restoredFromBackup: true});
+        });
+        await batch.commit();
+      }
+      totalRestored += g.rows.length;
+      if(el) el.innerHTML = `⏳ Đã khôi phục ${g.label} (${g.rows.length} dòng)...`;
     }
-    // Ghi lại dữ liệu từ file sao lưu
-    for(let i=0;i<restored.length;i+=CHUNK){
-      const batch = db.batch();
-      restored.slice(i,i+CHUNK).forEach(t=>{
-        const ref = db.collection('transactions').doc();
-        batch.set(ref, {...t, createdAt: firebase.firestore.FieldValue.serverTimestamp(), createdBy: auth.currentUser.email, restoredFromBackup: true});
-      });
-      await batch.commit();
-    }
-    if(el) el.innerHTML = `✅ Đã khôi phục xong ${restored.length} giao dịch từ file sao lưu.`;
-    toast(`✅ Đã khôi phục ${restored.length} giao dịch Thu Chi`);
-    logActivity('backup', {note: `Khôi phục ${restored.length} giao dịch từ file sao lưu: ${file.name}`});
+    if(el) el.innerHTML = `✅ Đã khôi phục xong ${totalRestored} bản ghi trong ${available.length} nhóm dữ liệu.`;
+    toast(`✅ Đã khôi phục ${totalRestored} bản ghi (${available.length} nhóm dữ liệu)`);
+    logActivity('backup', {note: `Khôi phục ${totalRestored} bản ghi từ ${available.length} nhóm (${available.map(g=>g.label).join(', ')}): ${file.name}`});
   }catch(err){
     alert('Lỗi khôi phục: ' + err.message);
   }
