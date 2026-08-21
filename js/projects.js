@@ -114,6 +114,7 @@ function renderContractInfoStatus(i){
 }
 
 for(let i=1;i<=5;i++){
+  bindMoneyInput(`proj-hd${i}-value`);
   document.getElementById(`proj-hd${i}-file`)?.addEventListener('change', async (e)=>{
     const file = e.target.files[0];
     e.target.value = '';
@@ -125,6 +126,9 @@ for(let i=1;i<=5;i++){
       const result = await msUploadFile(file, folder);
       currentContractInfo[i-1] = {
         name: document.getElementById(`proj-hd${i}-name`).value.trim(),
+        customer: document.getElementById(`proj-hd${i}-customer`).value.trim(),
+        value: parseMoneyInput(document.getElementById(`proj-hd${i}-value`)),
+        signDate: document.getElementById(`proj-hd${i}-date`).value,
         fileUrl: result.webUrl, fileName: result.name,
       };
       renderContractInfoStatus(i);
@@ -205,6 +209,9 @@ function openProjectModal(id){
   for(let i=1;i<=5;i++){
     const info = currentContractInfo[i-1];
     document.getElementById(`proj-hd${i}-name`).value = info ? (info.name||'') : '';
+    document.getElementById(`proj-hd${i}-customer`).value = info ? (info.customer||'') : '';
+    setMoneyInputValue(document.getElementById(`proj-hd${i}-value`), info ? info.value : '');
+    document.getElementById(`proj-hd${i}-date`).value = info ? (info.signDate||'') : '';
     document.getElementById(`proj-hd${i}-file`).value = '';
     renderContractInfoStatus(i);
   }
@@ -246,9 +253,12 @@ document.getElementById('save-project-btn').addEventListener('click', async ()=>
     contractFiles: currentContractFiles,
     contractInfo: [1,2,3,4,5].map(i=>{
       const name = document.getElementById(`proj-hd${i}-name`).value.trim();
+      const customer = document.getElementById(`proj-hd${i}-customer`).value.trim();
+      const value = parseMoneyInput(document.getElementById(`proj-hd${i}-value`));
+      const signDate = document.getElementById(`proj-hd${i}-date`).value;
       const info = currentContractInfo[i-1];
-      if(!name && !(info && info.fileUrl)) return null;
-      return { name, fileUrl: info ? (info.fileUrl||'') : '', fileName: info ? (info.fileName||'') : '' };
+      if(!name && !customer && !value && !signDate && !(info && info.fileUrl)) return null;
+      return { name, customer, value, signDate, fileUrl: info ? (info.fileUrl||'') : '', fileName: info ? (info.fileName||'') : '' };
     }),
     // xóa field cũ (single-file) để tránh dữ liệu thừa/nhầm lẫn khi đọc lại
     contractFileUrl: firebase.firestore.FieldValue.delete(),
