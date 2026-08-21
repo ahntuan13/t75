@@ -148,6 +148,14 @@
             <div id="chart-project-budget-summary"></div>
             <div class="chart-wrap"><canvas id="chart-project-budget"></canvas></div>
           </div>
+          <div class="card">
+            <div class="card-head">
+              <h3>👷 Nhân lực theo dự án (giờ công)</h3>
+              <div class="actions"><input type="month" id="labor-chart-month"><button class="btn btn-ghost btn-sm" id="labor-chart-alltime">Xem tổng thể (mọi tháng)</button></div>
+            </div>
+            <p class="helper-text" style="margin-bottom:10px;">Chỉ tính giờ công của Công nhân & Quản lý dự án/Giám sát — không tính Giám đốc, Phó Giám đốc, Kế toán.</p>
+            <div class="chart-wrap" style="height:420px;"><canvas id="chart-labor-hours"></canvas></div>
+          </div>
         </div>
         <div class="card">
           <div class="card-head"><h3>Giao dịch gần đây</h3></div>
@@ -381,8 +389,14 @@
           <div class="table-wrap"><table class="data" id="payroll-summary-table"></table></div>
         </div>
         <div class="card">
-          <div class="card-head"><h3>🏗 Chi phí lương phân bổ theo dự án</h3></div>
-          <p class="helper-text" style="margin-bottom:10px;">Tổng tiền lương quy đổi theo tỉ lệ giờ công mỗi nhân viên làm cho từng dự án trong tháng.</p>
+          <div class="card-head">
+            <h3>🏗 Chi phí lương phân bổ theo dự án</h3>
+            <div class="actions">
+              <button class="btn btn-primary btn-sm" id="btn-run-payroll-allocation">💰 Phân bổ lương tháng này vào Thu Chi</button>
+              <button class="btn btn-danger btn-sm" id="btn-undo-payroll-allocation">🗑 Xóa các khoản đã phân bổ tháng này</button>
+            </div>
+          </div>
+          <p class="helper-text" style="margin-bottom:10px;">Tổng tiền lương quy đổi theo tỉ lệ giờ công mỗi nhân viên làm cho từng dự án trong tháng. Bấm nút trên để chủ động ghi các khoản này vào Thu Chi ngay (không cần đợi tự động ngày 15) — hệ thống sẽ hỏi lại nếu tháng này đã phân bổ rồi để tránh tạo trùng.</p>
           <div class="table-wrap"><table class="data" id="payroll-project-cost-table"></table></div>
         </div>
         <div class="card">
@@ -493,8 +507,8 @@
         <div class="card">
           <div class="card-head"><h3>📥 Khôi phục dữ liệu Thu Chi từ file sao lưu</h3></div>
           <p class="helper-text" style="margin-bottom:14px;">
-            Dùng khi lỡ mất/hỏng dữ liệu Thu Chi. Tải file sao lưu (.xlsx) đúng định dạng từ thư mục <code>Backups/</code> trên OneDrive về máy, rồi chọn lại ở đây.
-            <br><em>Lưu ý: hiện tại nút này chỉ khôi phục được sheet "ThuChi" (phần dữ liệu quan trọng nhất) — báo mình nếu cần khôi phục thêm các nhóm còn lại (Dự án, Lệnh chi, Nhân viên, Chấm công).</em>
+            Dùng khi lỡ mất/hỏng dữ liệu. Tải file sao lưu (.xlsx) đúng định dạng từ thư mục <code>Backups/</code> trên OneDrive về máy, rồi chọn lại ở đây — hệ thống sẽ tự nhận diện và khôi phục đúng từng nhóm dữ liệu có trong file (Thu Chi, Chi phí gián tiếp, Dự án, Lệnh chi/Tạm ứng, Nhân viên, Chấm công).
+            <br><em>Lưu ý: bản sao lưu Excel chỉ lưu các trường thông tin cốt lõi (đủ để khôi phục đúng số liệu tài chính) — một số trường phụ như file đính kèm hợp đồng, ghi chú riêng của Lệnh chi... sẽ KHÔNG được khôi phục lại do không nằm trong file Excel. Báo mình nếu cần backup đầy đủ 100% mọi trường dữ liệu.</em>
             <strong style="color:var(--red);">⚠️ Khôi phục sẽ XÓA TOÀN BỘ dữ liệu Thu Chi hiện tại và thay bằng đúng nội dung trong file sao lưu — không hoàn tác được.</strong>
           </p>
           <button class="btn btn-danger btn-sm" id="btn-restore-backup">📥 Chọn file sao lưu để khôi phục</button>
@@ -588,11 +602,54 @@
           <div class="helper-text">Tự ghi lại ngày khi bạn chuyển Trạng thái sang "Còn giữ 5% bảo hành".</div>
         </div>
         <div class="field full">
-          <label>📎 Đính kèm hồ sơ dự án (hợp đồng, hồ sơ thanh toán, quyết toán... — mọi loại file)</label>
+          <label>📎 Đính kèm hồ sơ dự án (1 dự án có thể có nhiều HĐ khác nhau — mỗi HĐ 1 file riêng)</label>
+          <div class="helper-text" style="margin-bottom:4px;">File tối đa 4MB/file. Lần đầu upload sẽ hiện popup đăng nhập Microsoft 365 công ty. Upload xong bấm thẳng vào tên file để xem lại.</div>
+        </div>
+        <div class="exp-block">
+          <label class="exp-block-title">Thông tin HĐ 1</label>
+          <div class="exp-row">
+            <div class="field grow2"><label>Tên/Số hợp đồng</label><input id="proj-hd1-name" placeholder="VD: HĐ đợt 1 - ..."></div>
+            <div class="field"><label>File đính kèm</label><input type="file" id="proj-hd1-file"></div>
+          </div>
+          <div id="proj-hd1-status" class="helper-text" style="margin-top:2px;"></div>
+        </div>
+        <div class="exp-block">
+          <label class="exp-block-title">Thông tin HĐ 2</label>
+          <div class="exp-row">
+            <div class="field grow2"><label>Tên/Số hợp đồng</label><input id="proj-hd2-name" placeholder="VD: HĐ đợt 2 - ..."></div>
+            <div class="field"><label>File đính kèm</label><input type="file" id="proj-hd2-file"></div>
+          </div>
+          <div id="proj-hd2-status" class="helper-text" style="margin-top:2px;"></div>
+        </div>
+        <div class="exp-block">
+          <label class="exp-block-title">Thông tin HĐ 3</label>
+          <div class="exp-row">
+            <div class="field grow2"><label>Tên/Số hợp đồng</label><input id="proj-hd3-name" placeholder="VD: HĐ đợt 3 - ..."></div>
+            <div class="field"><label>File đính kèm</label><input type="file" id="proj-hd3-file"></div>
+          </div>
+          <div id="proj-hd3-status" class="helper-text" style="margin-top:2px;"></div>
+        </div>
+        <div class="exp-block">
+          <label class="exp-block-title">Thông tin HĐ 4</label>
+          <div class="exp-row">
+            <div class="field grow2"><label>Tên/Số hợp đồng</label><input id="proj-hd4-name" placeholder="VD: HĐ đợt 4 - ..."></div>
+            <div class="field"><label>File đính kèm</label><input type="file" id="proj-hd4-file"></div>
+          </div>
+          <div id="proj-hd4-status" class="helper-text" style="margin-top:2px;"></div>
+        </div>
+        <div class="exp-block">
+          <label class="exp-block-title">Thông tin HĐ 5</label>
+          <div class="exp-row">
+            <div class="field grow2"><label>Tên/Số hợp đồng</label><input id="proj-hd5-name" placeholder="VD: HĐ đợt 5 - ..."></div>
+            <div class="field"><label>File đính kèm</label><input type="file" id="proj-hd5-file"></div>
+          </div>
+          <div id="proj-hd5-status" class="helper-text" style="margin-top:2px;"></div>
+        </div>
+        <div class="field full">
+          <label>Các file đính kèm khác (hồ sơ thanh toán, quyết toán... — mọi loại file)</label>
           <div id="project-files-list" style="margin-bottom:8px;"></div>
           <button type="button" class="btn btn-ghost btn-sm" id="project-add-attachment-btn">+ Thêm file đính kèm</button>
           <input type="file" id="project-file-input" style="display:none;">
-          <div class="helper-text" style="margin-top:6px;">File tối đa 4MB/file. Lần đầu upload sẽ hiện popup đăng nhập Microsoft 365 công ty — nếu trình duyệt chặn popup, bấm cho phép popup của trang này. Upload xong bấm thẳng vào tên file để xem lại.</div>
         </div>
         <div class="field full"><label>Link hợp đồng khác (Google Drive, dùng khi file lớn)</label><input id="project-contract-link" placeholder="https://drive.google.com/..."></div>
         <div class="field"><label>Trạng thái</label>
