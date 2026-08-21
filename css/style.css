@@ -218,10 +218,9 @@ input,select,textarea{font-family:inherit;}
 .card-head .actions{display:flex;gap:8px;}
 
 /* ---------- Table ---------- */
-.table-wrap{overflow-x:auto;}
-table.data{width:100%;border-collapse:collapse;font-size:12.5px;}
-table.data td:not(.num){max-width:220px;word-wrap:break-word;}
 .table-wrap{overflow-x:auto;overflow-y:auto;max-height:72vh;}
+table.data{width:100%;border-collapse:separate;border-spacing:0;font-size:12.5px;}
+table.data td:not(.num){max-width:220px;word-wrap:break-word;}
 table.data thead{position:sticky;top:0;z-index:5;}
 table.data th{
   text-align:center;padding:10px 12px;background:var(--bg-soft);color:var(--ink-dim);
