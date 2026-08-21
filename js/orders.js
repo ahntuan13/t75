@@ -529,9 +529,11 @@ function getFilteredOrders(){
 
 function orderRowHtml(o){
   const myEmail = (auth.currentUser && auth.currentUser.email || '').toLowerCase();
-  let approveActions = '';
+  // Cột "Duyệt" riêng, tách khỏi cột Trạng thái và khỏi nhóm icon Sửa/Xem/Xóa —
+  // GĐ/PGĐ (bất kỳ ai trong danh sách approverEmails) bấm thẳng từ bảng, không cần mở Sửa lệnh.
+  let approveCell = '';
   if((o.approvalStatus||'none')==='pending' && myEmail && isAuthorizedApprover(myEmail)){
-    approveActions = `<button class="icon-btn" data-approve-order="${o.id}" title="Duyệt">✅</button><button class="icon-btn" data-reject-order="${o.id}" title="Từ chối">❌</button>`;
+    approveCell = `<button class="icon-btn" data-approve-order="${o.id}" title="Duyệt">✅</button><button class="icon-btn" data-reject-order="${o.id}" title="Từ chối">❌</button>`;
   }
   return `<tr${o.transactionId ? ' class="tx-row-explained"' : ''}>
       <td><input type="checkbox" class="order-select-cb" data-order-id="${o.id}"></td>
@@ -541,7 +543,8 @@ function orderRowHtml(o){
       <td>${escapeHtml(o.reason)}</td>
       <td>${escapeHtml(o.projectName||'—')}</td>
       <td class="num"><strong>${fmtVND(o.amount)}</strong></td>
-      <td>${statusTag(o)} ${approveActions}</td>
+      <td>${statusTag(o)}</td>
+      <td class="order-approve-cell">${approveCell}</td>
       <td>
         <div class="row-actions">
           <button class="icon-btn" data-view-order="${o.id}" title="Xem chi tiết">👁</button>
@@ -555,7 +558,7 @@ function orderRowHtml(o){
     </tr>`;
 }
 const ORDER_THEAD = `<thead><tr>
-    <th></th><th>Ngày</th><th>Loại</th><th>Người nhận</th><th>Lý do</th><th>Dự án</th><th>Số tiền</th><th>Trạng thái</th><th></th>
+    <th></th><th>Ngày</th><th>Loại</th><th>Người nhận</th><th>Lý do</th><th>Dự án</th><th>Số tiền</th><th>Trạng thái</th><th>Duyệt</th><th></th>
   </tr></thead>`;
 
 function renderOrdersTable(){
