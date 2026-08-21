@@ -142,7 +142,7 @@ function renderOrderApprovalCurrentStatus(o){
   if(!o.approvalStatus || o.approvalStatus==='none'){ el.textContent = 'Chưa gửi duyệt.'; return; }
 
   if(o.approvalStatus==='pending'){
-    el.innerHTML = `🟡 Đang chờ ${roleLabel} (${escapeHtml(o.approverEmail||'')}) duyệt.` +
+    el.innerHTML = `🟡 Đang chờ 1 trong 2 người duyệt (${escapeHtml((APPROVERS.approverEmails||[]).join(', '))}) xử lý.` +
       (canDecide ? `<div style="margin-top:10px;display:flex;gap:8px;">
           <button type="button" class="btn btn-primary btn-sm" id="order-modal-approve-btn">✅ Duyệt</button>
           <button type="button" class="btn btn-ghost btn-sm" id="order-modal-reject-btn">❌ Từ chối</button>
