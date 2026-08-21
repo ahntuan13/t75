@@ -943,8 +943,12 @@ function printPayslip(employeeId){
   const html = `
     <html><head><title>Phiếu lương - ${escapeHtml(emp.name)}</title>
     <style>
-      @page{size:A5 portrait;margin:12mm;}
+      @page{size:A5 portrait;margin:10mm;}
       body{font-family:Arial,Helvetica,sans-serif;color:#111;font-size:12.5px;margin:0;}
+      .co-header{display:flex;align-items:center;gap:10px;border-bottom:2px solid #7a1f1f;padding-bottom:6px;margin-bottom:8px;}
+      .co-header img{height:38px;}
+      .co-name{color:#7a1f1f;font-weight:800;font-size:12.5px;letter-spacing:.2px;}
+      .co-info{font-size:9px;color:#444;line-height:1.4;}
       .top{display:flex;justify-content:space-between;font-size:12px;margin-bottom:4px;}
       h2{text-align:center;text-transform:uppercase;margin:6px 0 2px;letter-spacing:1px;font-size:17px;}
       .sub-center{text-align:center;color:#555;margin-bottom:14px;font-size:12px;}
@@ -962,6 +966,13 @@ function printPayslip(employeeId){
       .sig .space{height:52px;display:flex;align-items:center;justify-content:center;}
       .sig .space img{max-height:52px;max-width:100%;}
     </style></head><body>
+    <div class="co-header">
+      <img src="${(typeof COMPANY_HEADER!=='undefined' ? COMPANY_HEADER.logo : '')}">
+      <div>
+        <div class="co-name">${(typeof COMPANY_HEADER!=='undefined' ? COMPANY_HEADER.name : 'TUAN 75 INSULATION TECHNICAL SERVICES CO.,LTD')}</div>
+        <div class="co-info">${(typeof COMPANY_HEADER!=='undefined' ? COMPANY_HEADER.address+'<br>'+COMPANY_HEADER.tel+' — '+COMPANY_HEADER.email : '')}</div>
+      </div>
+    </div>
     <div class="top"><span>Mã nhân viên: <b>${empIndex}</b></span><span>Tháng ${Number(m)}/${y}</span></div>
     <h2>Phiếu lương</h2>
     <div class="info-row"><b>Họ và tên:</b> ${escapeHtml(emp.name)}</div>
