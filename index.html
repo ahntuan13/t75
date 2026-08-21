@@ -481,7 +481,7 @@
         <div class="card">
           <div class="card-head"><h3>💾 Sao lưu dữ liệu Thu Chi lên OneDrive</h3></div>
           <p class="helper-text" style="margin-bottom:14px;">
-            Xuất toàn bộ dữ liệu Thu Chi hiện tại thành file Excel và lưu vào thư mục <code>Backups/</code> trên OneDrive công ty.<br><br>
+            Xuất toàn bộ <strong>4 nhóm dữ liệu chính</strong> (Thu Chi + Chi phí gián tiếp, Dự án, Lệnh chi/Tạm ứng + Nhân viên + Chấm công) thành 1 file Excel nhiều sheet, lưu vào thư mục <code>Backups/</code> trên OneDrive công ty.<br><br>
             <strong>Về việc tự động 20h hằng ngày:</strong> app tĩnh (GitHub Pages) không có server chạy nền nên không thể tự sao lưu đúng giờ dù không ai mở app
             (muốn làm được thật sự cần nâng cấp Firebase Cloud Functions — gói trả phí Blaze, báo mình nếu bạn muốn triển khai thêm phần đó).
             Giải pháp hiện tại: <strong>mỗi khi Admin mở app sau 20h mà hôm đó CHƯA sao lưu lần nào, hệ thống sẽ tự động sao lưu ngay lúc đó</strong> (không cần bấm nút) —
@@ -494,6 +494,7 @@
           <div class="card-head"><h3>📥 Khôi phục dữ liệu Thu Chi từ file sao lưu</h3></div>
           <p class="helper-text" style="margin-bottom:14px;">
             Dùng khi lỡ mất/hỏng dữ liệu Thu Chi. Tải file sao lưu (.xlsx) đúng định dạng từ thư mục <code>Backups/</code> trên OneDrive về máy, rồi chọn lại ở đây.
+            <br><em>Lưu ý: hiện tại nút này chỉ khôi phục được sheet "ThuChi" (phần dữ liệu quan trọng nhất) — báo mình nếu cần khôi phục thêm các nhóm còn lại (Dự án, Lệnh chi, Nhân viên, Chấm công).</em>
             <strong style="color:var(--red);">⚠️ Khôi phục sẽ XÓA TOÀN BỘ dữ liệu Thu Chi hiện tại và thay bằng đúng nội dung trong file sao lưu — không hoàn tác được.</strong>
           </p>
           <button class="btn btn-danger btn-sm" id="btn-restore-backup">📥 Chọn file sao lưu để khôi phục</button>
@@ -699,7 +700,7 @@
           <div class="helper-text" style="margin-bottom:8px;">Gửi khoản Chi này cho Giám đốc duyệt (đăng nhập đúng email đã cài đặt mới thấy nút duyệt).</div>
           <select id="tx-approval-target">
             <option value="">-- Chưa gửi duyệt --</option>
-            <option value="GD">Gửi Giám đốc duyệt</option>
+            <option value="GD">Gửi duyệt (GĐ/Người duyệt phụ)</option>
           </select>
           <div class="helper-text" id="tx-approval-current-status" style="margin-top:8px;"></div>
         </div>
@@ -852,7 +853,7 @@
           <div class="helper-text" style="margin-bottom:8px;">Gửi các khoản giải trình này cho Giám đốc duyệt (áp dụng cho toàn bộ các khoản Thu Chi được tạo ra bên dưới).</div>
           <select id="exp-approval-target">
             <option value="">-- Chưa gửi duyệt --</option>
-            <option value="GD">Gửi Giám đốc duyệt</option>
+            <option value="GD">Gửi duyệt (GĐ/Người duyệt phụ)</option>
           </select>
         </div>
         <div class="field full"><label>Tổng đã phân bổ / Số tiền lệnh gốc</label><div class="helper-text" id="exp-total-check" style="font-size:13px;"></div></div>
@@ -903,7 +904,7 @@
           <div class="helper-text" style="margin-bottom:8px;">Gửi lệnh chi này cho Giám đốc duyệt (đăng nhập đúng email đã cài đặt mới thấy nút duyệt). Khi được Duyệt, hệ thống tự động ghi khoản chi này vào mục Thu chi.</div>
           <select id="order-approval-target">
             <option value="">-- Chưa gửi duyệt --</option>
-            <option value="GD">Gửi Giám đốc duyệt</option>
+            <option value="GD">Gửi duyệt (GĐ/Người duyệt phụ)</option>
           </select>
           <div class="helper-text" id="order-approval-current-status" style="margin-top:8px;"></div>
         </div>
