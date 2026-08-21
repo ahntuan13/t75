@@ -384,8 +384,13 @@
           <input type="month" id="payroll-filter-month">
         </div>
         <div class="card">
-          <div class="card-head"><h3>Tổng hợp lương theo tháng</h3></div>
-          <div class="helper-text" style="margin-bottom:10px;">Bấm vào tên nhân viên để chỉnh các khoản tạm ứng/thưởng/khấu trừ riêng tháng này, hoặc bấm 🖨 để xuất phiếu lương PDF.</div>
+          <div class="card-head">
+            <h3>Tổng hợp lương theo tháng</h3>
+            <div class="actions">
+              <button class="btn btn-primary btn-sm" id="btn-export-all-payslips">🗜 In tất cả phiếu lương (.zip)</button>
+            </div>
+          </div>
+          <div class="helper-text" style="margin-bottom:10px;">Bấm vào tên nhân viên để chỉnh các khoản tạm ứng/thưởng/khấu trừ riêng tháng này, hoặc bấm 🖨 để xuất phiếu lương PDF từng người. Bấm nút trên để xuất TOÀN BỘ phiếu lương tháng này thành 1 file nén .zip (đặt tên "Phieu luong Thang ...").</div>
           <div class="table-wrap"><table class="data" id="payroll-summary-table"></table></div>
         </div>
         <div class="card">
@@ -1146,6 +1151,8 @@
 <script src="https://cdn.jsdelivr.net/npm/@azure/msal-browser@3/lib/msal-browser.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/pdfjs-dist@3.11.174/build/pdf.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/html2pdf.js@0.10.1/dist/html2pdf.bundle.min.js"></script>
 <script src="js/firebase-config.js"></script>
 <script src="js/utils.js"></script>
 <script src="js/onedrive.js"></script>
