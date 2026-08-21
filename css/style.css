@@ -314,6 +314,7 @@ tr.tx-row-explained td:not(:last-child){text-decoration:line-through;}
 .row-actions{display:flex;gap:6px;}
 .icon-btn{background:var(--bg-soft);border:none;color:var(--ink-dim);font-size:13px;padding:6px 8px;border-radius:8px;}
 .icon-btn:hover{background:var(--primary-dim);color:var(--primary);}
+.order-approve-cell{white-space:nowrap;text-align:center;}
 .empty-state{text-align:center;padding:44px 20px;color:var(--ink-faint);}
 .empty-state .big{font-size:30px;margin-bottom:8px;}
 .thumb-img{width:36px;height:36px;object-fit:cover;border-radius:6px;border:1px solid var(--line);cursor:pointer;}
