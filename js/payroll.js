@@ -21,12 +21,14 @@ let TIMESHEETS = [];
 let PAYROLL_ADJUSTMENTS = []; // {id, employeeId, month, bhxhOverride, tamUngCuoiThang, tienUngMrTuan, thuongChuyenCan, khauTruTamUngKhac, khauTruNgayNghi, note}
 
 function listenPayroll(){
+  let payrollAllocCheckDone = false;
   db.collection('employees').orderBy('createdAt','asc').onSnapshot((snap)=>{
     EMPLOYEES = snap.docs.map(d=> ({id:d.id, ...d.data()}));
     fillEmployeeSelects();
     renderEmployeesTable();
     renderPayrollSummary();
     renderTimesheetGrid();
+    maybeCheckPayrollAllocation();
   }, (err)=> console.error('employees listen error', err));
 
   db.collection('timesheets').orderBy('date','desc').onSnapshot((snap)=>{
@@ -35,12 +37,22 @@ function listenPayroll(){
     renderTimesheetSummary();
     renderTimesheetGrid();
     renderPayrollSummary();
+    maybeCheckPayrollAllocation();
   }, (err)=> console.error('timesheets listen error', err));
 
   db.collection('payrollAdjustments').onSnapshot((snap)=>{
     PAYROLL_ADJUSTMENTS = snap.docs.map(d=> ({id:d.id, ...d.data()}));
     renderPayrollSummary();
   }, (err)=> console.error('payrollAdjustments listen error', err));
+
+  // Chỉ kiểm tra phân bổ lương tự động 1 LẦN mỗi phiên, và chỉ khi CẢ Nhân viên lẫn Chấm công
+  // đã có dữ liệu (đợi PROJECTS cũng đã sẵn sàng vì được tải sớm hơn ở nơi khác trong app).
+  function maybeCheckPayrollAllocation(){
+    if(payrollAllocCheckDone) return;
+    if(EMPLOYEES.length === 0) return; // chưa chắc đã tải xong, đợi lần callback sau
+    payrollAllocCheckDone = true;
+    if(typeof checkMonthlyPayrollAllocation==='function') checkMonthlyPayrollAllocation();
+  }
 }
 
 function fillEmployeeSelects(){
@@ -494,12 +506,19 @@ function isVnHoliday(y, m, d){
   const dateStr = `${y}-${String(m).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
   return !!VN_HOLIDAYS_2026[dateStr];
 }
-// Hệ số lương theo ngày: đi làm trúng NGÀY LỄ = x3, trúng CHỦ NHẬT = x1.5, ngày thường (kể cả Thứ 7) = x1.
+// Hệ số lương theo NGÀY (áp dụng cho ca Sáng/Chiều, và cả ngày nếu là Lễ/Chủ nhật): Lễ x3, Chủ nhật x2, ngày thường x1.
 function dayPayMultiplier(dateStr){
   if(VN_HOLIDAYS_2026[dateStr]) return 3;
   const dow = new Date(dateStr+'T00:00:00').getDay();
-  if(dow === 0) return 1.5; // Chủ nhật
+  if(dow === 0) return 2; // Chủ nhật
   return 1;
+}
+// Hệ số riêng cho ca TỐI (tăng ca sau 17h01): ngày thường = x1.5; nếu rơi vào Chủ nhật/Lễ thì dùng
+// LUÔN hệ số ngày đó (x2/x3) — không cộng dồn 2 lớp hệ số chồng lên nhau.
+function eveningShiftMultiplier(dateStr){
+  const dayMult = dayPayMultiplier(dateStr);
+  if(dayMult > 1) return dayMult; // Lễ/CN: cả ngày (kể cả ca Tối) tính theo hệ số ngày cao hơn
+  return 1.5; // Ngày thường: ca Tối = tăng ca x1.5
 }
 
 function renderTimesheetGrid(){
@@ -537,7 +556,7 @@ function renderTimesheetGrid(){
     const isSat = dm.isWeekend && !dm.isSunday;
     const bg = dm.isHoliday ? 'var(--red-dim)' : dm.isSunday ? 'var(--gold-dim)' : isSat ? 'var(--blue-dim)' : 'var(--bg-soft)';
     const color = dm.isHoliday ? 'var(--red)' : dm.isSunday ? '#9a6b00' : isSat ? 'var(--blue)' : 'var(--ink-dim)';
-    const tip = dm.isHoliday ? dm.holidayName : (dm.isSunday ? 'Chủ nhật — hệ số x1.5' : isSat ? 'Thứ 7' : dm.dowLabel);
+    const tip = dm.isHoliday ? dm.holidayName : (dm.isSunday ? 'Chủ nhật — hệ số x2' : isSat ? 'Thứ 7' : dm.dowLabel);
     const mult = dm.multiplier > 1 ? `<div style="font-size:8.5px;font-weight:800;">x${dm.multiplier}</div>` : '';
     return `<th style="min-width:52px;background:${bg};color:${color};" title="${escapeHtml(tip)}">${dm.d}<div style="font-size:9px;font-weight:600;opacity:.8;">${dm.isHoliday ? '🎌' : dm.dowLabel}</div>${mult}</th>`;
   }).join('');
@@ -618,13 +637,15 @@ document.getElementById('ts-filter-month').value = todayISO().slice(0,7);
 function computeEmployeeSalary(emp, month){
   const empTimesheets = TIMESHEETS.filter(t=> t.employeeId===emp.id && monthKey(t.date)===month);
   let totalHours = 0;
-  let weightedHours = 0; // Giờ QUY ĐỔI theo hệ số ngày công (Lễ x3, Chủ nhật x1.5, ngày thường x1) — dùng để tính lương Công nhân
+  let weightedHours = 0; // Giờ QUY ĐỔI theo hệ số: Lễ x3 / Chủ nhật x2 (cả ngày) / ca Tối ngày thường x1.5 — dùng để tính lương Công nhân
   const projectHours = {}; // projectName -> hours (để phân bổ chi phí theo dự án)
   empTimesheets.forEach(t=>{
     const h = tsHours(t);
     totalHours += h.total;
-    const mult = (typeof dayPayMultiplier==='function') ? dayPayMultiplier(t.date) : 1;
-    weightedHours += h.total * mult;
+    const dayMult = (typeof dayPayMultiplier==='function') ? dayPayMultiplier(t.date) : 1;
+    const eveMult = (typeof eveningShiftMultiplier==='function') ? eveningShiftMultiplier(t.date) : 1;
+    // Giờ Sáng+Chiều dùng hệ số NGÀY; riêng giờ ca Tối dùng hệ số CA TỐI (ngày thường x1.5, Lễ/CN thì bằng hệ số ngày).
+    weightedHours += h.regular * dayMult + h.ot * eveMult;
     Object.values(t.shifts||{}).forEach(s=>{
       if(s && s.hours){
         const key = s.projectName || 'Không thuộc dự án';
@@ -721,6 +742,63 @@ function renderPayrollProjectCost(month, results){
 
 document.getElementById('payroll-filter-month')?.addEventListener('change', renderPayrollSummary);
 document.getElementById('payroll-filter-month').value = todayISO().slice(0,7);
+
+// ---------------- TỰ ĐỘNG PHÂN BỔ LƯƠNG VÀO THU CHI DỰ ÁN — ngày 15 hàng tháng ----------------
+// Do app tĩnh không có server chạy nền, áp dụng đúng nguyên tắc "kiểm tra khi mở app" giống sao lưu:
+// mỗi khi ADMIN mở app từ ngày 15 trở đi mà THÁNG NÀY CHƯA phân bổ lương, hệ thống tự tạo các khoản Chi
+// "Thanh toán lương CNV tháng X" vào ĐÚNG dự án tương ứng (theo tỉ lệ giờ công), phần không thuộc dự án
+// nào thì vào Chi phí gián tiếp. Chạy xong ghi lại để tháng đó không bị tạo trùng lần 2.
+async function runMonthlyPayrollAllocation(month){
+  const [y, m] = month.split('-');
+  const results = EMPLOYEES.map(e=> computeEmployeeSalary(e, month));
+  const totals = {}; // projectName -> tổng tiền phân bổ
+  results.forEach(r=>{
+    const sumProjHours = Object.values(r.projectHours).reduce((s,h)=>s+h,0);
+    if(sumProjHours <= 0) return;
+    Object.entries(r.projectHours).forEach(([projName, hours])=>{
+      const share = (hours / sumProjHours) * r.totalIncome;
+      totals[projName] = (totals[projName]||0) + share;
+    });
+  });
+  const entries = Object.entries(totals).filter(([,amt])=> amt > 0);
+  if(entries.length === 0) return false;
+
+  const batch = db.batch();
+  entries.forEach(([projName, amount])=>{
+    const proj = PROJECTS.find(p=> p.name === projName);
+    const targetCollection = proj ? 'transactions' : 'fixedCosts'; // "Không thuộc dự án" -> Chi phí gián tiếp
+    const ref = db.collection(targetCollection).doc();
+    batch.set(ref, {
+      type:'OUT', projectId: proj ? proj.id : '', projectName: proj ? proj.name : '',
+      date: `${y}-${m}-15`, code:'NC',
+      content: `Thanh toán lương CNV tháng ${Number(m)}`,
+      description: 'Tự động phân bổ chi phí lương theo tỉ lệ giờ công từng dự án',
+      unit:'', qty:0, unitPrice:0, amount: Math.round(amount),
+      invoiceNumber:'', invoiceDate:'', bankName:'', bankAccount:'', bankHolder:'', transferDate:'',
+      note: `Tự động tạo từ phân bổ lương tháng ${month}`,
+      invoiceImage:'', transferImage:'', invoiceStatus:'pending', transferStatus:'pending',
+      createdAt: firebase.firestore.FieldValue.serverTimestamp(), createdBy: auth.currentUser.email,
+    });
+  });
+  await batch.commit();
+  await db.collection('settings').doc('payrollAllocationMeta').set({ lastAllocatedMonth: month }, {merge:true});
+  logActivity('create', {projectName:'Phân bổ lương tự động', content:`Lương tháng ${month} vào ${entries.length} dự án`, type:'OUT'});
+  toast(`💰 Đã tự động phân bổ lương tháng ${Number(m)} vào Thu Chi (${entries.length} dự án)`);
+  return true;
+}
+
+async function checkMonthlyPayrollAllocation(){
+  try{
+    if(!isAdmin()) return;
+    const now = new Date();
+    if(now.getDate() < 15) return; // chưa tới ngày 15 thì chưa phân bổ, chờ lần mở app sau
+    const month = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}`;
+    const snap = await db.collection('settings').doc('payrollAllocationMeta').get();
+    const lastMonth = snap.exists ? snap.data().lastAllocatedMonth : null;
+    if(lastMonth === month) return; // tháng này đã phân bổ rồi
+    await runMonthlyPayrollAllocation(month);
+  }catch(err){ console.error('checkMonthlyPayrollAllocation error', err); }
+}
 
 document.getElementById('payroll-summary-table')?.addEventListener('click', (e)=>{
   const adjId = e.target.closest('[data-open-adjust]')?.dataset.openAdjust;
