@@ -80,34 +80,85 @@ document.getElementById('log-filter-days')?.addEventListener('change', renderAct
 async function runBackupToOneDrive(silent){
   const el = document.getElementById('backup-status');
   if(typeof XLSX === 'undefined') return false;
-  if(TRANSACTIONS.length === 0) return false;
+  const hasAnyData = TRANSACTIONS.length || (typeof FIXEDCOSTS!=='undefined' && FIXEDCOSTS.length) ||
+    (typeof PROJECTS!=='undefined' && PROJECTS.length) || (typeof ORDERS!=='undefined' && ORDERS.length) ||
+    (typeof EMPLOYEES!=='undefined' && EMPLOYEES.length);
+  if(!hasAnyData) return false;
   if(el) el.innerHTML = '⏳ Đang tạo file sao lưu...';
   try{
-    const data = TRANSACTIONS.slice()
+    const wb = XLSX.utils.book_new();
+
+    // 1) DÒNG TIỀN: Thu Chi (theo dự án)
+    const txData = TRANSACTIONS.slice()
       .sort((a,b)=> (a.projectName||'').localeCompare(b.projectName||'','vi') || (a.date||'').localeCompare(b.date||''))
       .map(t=> ({
         'Dự án': t.projectName||'', 'Loại': t.type==='IN'?'Thu':'Chi', 'Ngày': t.date||'', 'Mã': t.code||'',
         'Nội dung': t.content||'', 'Diễn giải': t.description||'', 'Thành tiền': t.amount||0,
         'Trạng thái hóa đơn': (t.invoiceStatus||'pending')==='issued'?'Đã xuất':'Chưa xuất',
-        'Trạng thái CK/Nhận': (t.transferStatus||'pending')==='done' ? (t.type==='IN'?'Đã nhận':'Đã CK') : (t.type==='IN'?'Chưa nhận':'Chưa CK'),
+        'Số hóa đơn': t.invoiceNumber||'', 'Trạng thái CK/Nhận': (t.transferStatus||'pending')==='done' ? (t.type==='IN'?'Đã nhận':'Đã CK') : (t.type==='IN'?'Chưa nhận':'Chưa CK'),
+        'Ngân hàng': t.bankName||'', 'Số TK': t.bankAccount||'', 'Trạng thái duyệt': t.approvalStatus||'', 'Ghi chú': t.note||'',
+      }));
+    XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(txData.length?txData:[{}]), 'ThuChi');
+
+    // 2) DÒNG TIỀN: Chi phí gián tiếp
+    const fcData = (typeof FIXEDCOSTS!=='undefined'?FIXEDCOSTS:[]).slice()
+      .sort((a,b)=> (a.date||'').localeCompare(b.date||''))
+      .map(t=> ({
+        'Loại': t.type==='IN'?'Thu':'Chi', 'Ngày': t.date||'', 'Mã': t.code||'', 'Nội dung': t.content||'',
+        'Diễn giải': t.description||'', 'Thành tiền': t.amount||0, 'Trạng thái giải chi': t.advanceExplainStatus||'',
         'Ghi chú': t.note||'',
       }));
-    const ws = XLSX.utils.json_to_sheet(data);
-    const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, ws, 'ThuChi');
+    XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(fcData.length?fcData:[{}]), 'ChiPhiGianTiep');
+
+    // 3) DỰ ÁN
+    const projData = (typeof PROJECTS!=='undefined'?PROJECTS:[]).map(p=> ({
+      'Tên dự án': p.name||'', 'Mã': p.code||'', 'Khách hàng': p.customer||'', 'MST': p.taxCode||'',
+      'Giá trị HĐ': p.contractValue||0, 'Chi phí dự toán': p.costBudget||0, 'Doanh thu dự toán': p.revenueBudget||0,
+      'Trạng thái': p.status||'', 'Ngày ký HĐ': p.signDate||'', 'Ngày hoàn thành': p.completionDate||'', 'Ghi chú': p.note||'',
+    }));
+    XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(projData.length?projData:[{}]), 'DuAn');
+
+    // 4) CHI & LƯƠNG: Lệnh chi/Tạm ứng
+    const ordData = (typeof ORDERS!=='undefined'?ORDERS:[]).map(o=> ({
+      'Loại': o.orderType||'', 'Ngày': o.date||'', 'Người nhận': o.payee||'', 'Lý do': o.reason||'',
+      'Dự án': o.projectName||'', 'Số tiền': o.amount||0, 'Trạng thái duyệt': o.approvalStatus||'',
+      'Đã duyệt bởi': o.approvedBy||'', 'Giải chi': o.explanation||'',
+    }));
+    XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(ordData.length?ordData:[{}]), 'LenhChiTamUng');
+
+    // 5) CHI & LƯƠNG: Nhân viên
+    const empData = (typeof EMPLOYEES!=='undefined'?EMPLOYEES:[]).map(e=> ({
+      'Họ tên': e.name||'', 'Chức vụ': e.position||'', 'Nhóm lương': e.payType==='daily'?'Công nhân':'Quản lý',
+      'Lương HĐLĐ/BHXH': e.contractSalary||0, 'Lương hiệu quả': e.effectiveRate||0, 'Ghi chú': e.note||'',
+    }));
+    XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(empData.length?empData:[{}]), 'NhanVien');
+
+    // 6) CHI & LƯƠNG: Chấm công
+    const tsData = (typeof TIMESHEETS!=='undefined'?TIMESHEETS:[]).map(t=>{
+      const s = t.shifts||{};
+      return {
+        'Nhân viên': t.employeeName||'', 'Ngày': t.date||'',
+        'Sáng - Dự án': s.sang?.projectName||'', 'Sáng - Giờ': s.sang?.hours||0,
+        'Chiều - Dự án': s.chieu?.projectName||'', 'Chiều - Giờ': s.chieu?.hours||0,
+        'Tối - Dự án': s.toi?.projectName||'', 'Tối - Giờ (TC)': s.toi?.hours||0,
+      };
+    });
+    XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(tsData.length?tsData:[{}]), 'ChamCong');
+
     const wbBuf = XLSX.write(wb, {type:'array', bookType:'xlsx'});
     const blob = new Blob([wbBuf], {type:'application/octet-stream'});
 
     const now = new Date();
     const dateStr = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}-${String(now.getDate()).padStart(2,'0')}`;
-    const fileName = `Backup_ThuChi_${dateStr}${silent ? '_auto' : ''}.xlsx`;
+    const fileName = `Backup_TUAN75_${dateStr}${silent ? '_auto' : ''}.xlsx`;
     const file = new File([blob], fileName, {type:'application/octet-stream'});
 
     if(el) el.innerHTML = '⏳ Đang tải lên OneDrive... (có thể hiện popup đăng nhập Microsoft 365 lần đầu)';
     const result = await msUploadFile(file, 'Backups');
-    if(el) el.innerHTML = `✅ Đã sao lưu xong lúc ${now.toLocaleString('vi-VN')} — <a href="${result.webUrl}" target="_blank">Xem file trên OneDrive</a>`;
-    toast(silent ? '💾 Đã tự động sao lưu Thu Chi (sau 20h hôm nay)' : 'Đã sao lưu Thu Chi lên OneDrive');
-    logActivity('backup', {note: `Sao lưu ${data.length} giao dịch: ${fileName}${silent?' (tự động)':''}`});
+    const totalCount = txData.length + fcData.length + projData.length + ordData.length + empData.length + tsData.length;
+    if(el) el.innerHTML = `✅ Đã sao lưu xong lúc ${now.toLocaleString('vi-VN')} (${totalCount} bản ghi, 6 nhóm dữ liệu) — <a href="${result.webUrl}" target="_blank">Xem file trên OneDrive</a>`;
+    toast(silent ? '💾 Đã tự động sao lưu toàn bộ dữ liệu (sau 20h hôm nay)' : 'Đã sao lưu toàn bộ dữ liệu lên OneDrive');
+    logActivity('backup', {note: `Sao lưu đầy đủ: ${txData.length} Thu Chi, ${fcData.length} Chi phí gián tiếp, ${projData.length} Dự án, ${ordData.length} Lệnh chi, ${empData.length} NV, ${tsData.length} Chấm công — ${fileName}${silent?' (tự động)':''}`});
     await db.collection('settings').doc('backupMeta').set({ lastBackupDate: dateStr, lastBackupAt: firebase.firestore.FieldValue.serverTimestamp() }, {merge:true});
     return true;
   }catch(err){
@@ -146,7 +197,7 @@ document.getElementById('restore-backup-input')?.addEventListener('change', asyn
   try{
     const buf = await file.arrayBuffer();
     const wb = XLSX.read(buf, {type:'array', cellDates:true});
-    const sheet = wb.Sheets[wb.SheetNames[0]];
+    const sheet = wb.Sheets['ThuChi'] || wb.Sheets[wb.SheetNames[0]];
     const rows = XLSX.utils.sheet_to_json(sheet, {defval:''});
     if(rows.length===0){ alert('File sao lưu trống, không có gì để khôi phục.'); return; }
 
