@@ -55,30 +55,21 @@ function renderFixedCostsTable(){
     return;
   }
   const sorted = rows.slice().sort((a,b)=> (b.date||'').localeCompare(a.date||''));
-  // Tổng chỉ tính các khoản CHƯA giải trình (khoản đã giải trình được tính bên Thu Chi rồi, tránh trùng)
-  const activeSorted = sorted.filter(t => t.advanceExplainStatus !== 'explained');
-  const sumIn = activeSorted.filter(t=>t.type==='IN').reduce((s,t)=>s+Number(t.amount||0),0);
-  const sumOut = activeSorted.filter(t=>t.type==='OUT').reduce((s,t)=>s+Number(t.amount||0),0);
   const theadHtml = `<thead><tr>
-    <th>Ngày</th><th>Loại</th><th>Dự án</th><th>Nội dung</th><th>Diễn giải</th><th>Thành tiền</th><th>Trạng thái hóa đơn</th><th>Trạng thái CK/Nhận tiền</th><th>Trạng thái duyệt</th><th></th>
+    <th>Ngày</th><th>Loại</th><th>Dự án</th><th>Nội dung</th><th>Diễn giải</th><th>Thành tiền</th><th>Hóa đơn</th><th>CK/Nhận tiền</th><th>Duyệt</th><th></th>
   </tr></thead>`;
-  wrap.innerHTML = `
-    <div class="card tx-project-block">
-      <div class="tx-project-head">
-        <h4>Chi phí gián tiếp (${sorted.length})</h4>
-        <div class="tx-project-summary">
-          <span style="color:var(--teal)">Thu: <strong>${fmtVND(sumIn)}</strong></span>
-          <span style="color:var(--red)">Chi: <strong>${fmtVND(sumOut)}</strong></span>
-          <span>Chênh lệch: <strong>${fmtVND(sumIn-sumOut)}</strong></span>
-        </div>
-      </div>
-      <div class="table-wrap">
-        <table class="data">
-          ${theadHtml}
-          <tbody>${sorted.map(txRowHtml).join('')}</tbody>
-        </table>
-      </div>
-    </div>`;
+
+  // Tách riêng các khoản "Chờ duyệt" ra 1 khung riêng ở TRÊN CÙNG để dễ nhận biết — giống hệt bên Thu Chi.
+  // Sau khi Duyệt/Từ chối, dòng đó tự "rơi" xuống khung chính bên dưới ở lần render kế tiếp.
+  const pendingRows = sorted.filter(t=> t.type==='OUT' && t.approvalStatus==='pending');
+  const otherRows = sorted.filter(t=> !(t.type==='OUT' && t.approvalStatus==='pending'));
+
+  let html = '';
+  if(pendingRows.length){
+    html += txTableBlockHtml(`🟡 Khung chờ duyệt (${pendingRows.length})`, pendingRows, theadHtml, {pendingBlock:true, showSummary:false});
+  }
+  html += txTableBlockHtml(`Chi phí gián tiếp (${otherRows.length})`, otherRows, theadHtml, {emptyText:'Chưa có khoản nào khác ngoài các khoản đang chờ duyệt ở trên.'});
+  wrap.innerHTML = html;
 }
 
 // Giải trình: chuyển 1 khoản tạm ứng "Chờ giải trình" sang Thu Chi — mở lại đúng form Nhập giao dịch,
