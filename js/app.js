@@ -9,7 +9,7 @@ const VIEW_TITLES = {
 function switchView(view){
   document.querySelectorAll('.nav-item').forEach(n=> n.classList.toggle('active', n.dataset.view===view));
   document.querySelectorAll('.view').forEach(v=> v.classList.toggle('active', v.id==='view-'+view));
-  document.getElementById('sidebar').classList.remove('open');
+  closeMobileSidebar();
   // re-render on view switch to ensure charts sized correctly
   if(view==='dashboard' && window.renderDashboard) renderDashboard();
   if(view==='reports' && window.renderReports) renderReports();
@@ -20,9 +20,16 @@ document.querySelectorAll('.nav-item').forEach(item=>{
   item.addEventListener('click', ()=> switchView(item.dataset.view));
 });
 
+// ---------------- Menu trượt (drawer) trên điện thoại/tablet đứng ----------------
+function closeMobileSidebar(){
+  document.getElementById('sidebar').classList.remove('open');
+  document.getElementById('sidebar-backdrop')?.classList.remove('open');
+}
 document.getElementById('menu-toggle').addEventListener('click', ()=>{
   document.getElementById('sidebar').classList.toggle('open');
+  document.getElementById('sidebar-backdrop')?.classList.toggle('open');
 });
+document.getElementById('sidebar-backdrop')?.addEventListener('click', closeMobileSidebar);
 
 // ---------------- Modal "Tạo nhanh" (nút + nổi, dùng chung cho MỌI trang) ----------------
 document.getElementById('fab-quick-create')?.addEventListener('click', ()=> openModal('modal-quickcreate'));
@@ -33,7 +40,8 @@ document.getElementById('qc-add-tx')?.addEventListener('click', ()=>{ closeModal
 // Lệnh chi/Tạm ứng giờ được tạo trực tiếp từ trang Lệnh chi/Lệnh tạm ứng (xem js/orders.js), không còn trong Tạo nhanh nữa.
 document.getElementById('qc-add-employee')?.addEventListener('click', ()=>{ closeModal('modal-quickcreate'); openEmployeeModal(); });
 document.getElementById('qc-add-timesheet')?.addEventListener('click', ()=>{ closeModal('modal-quickcreate'); openTimesheetModal(); });
-document.getElementById('qc-add-fc')?.addEventListener('click', ()=>{ closeModal('modal-quickcreate'); openTxModal(null, null, 'fixedCosts'); });
+// Đã bỏ lối tắt "Chi phí gián tiếp" khỏi Tạo nhanh — mục này giờ chỉ được tạo tự động
+// (từ Lệnh tạm ứng không gắn dự án khi Duyệt, hoặc Upload Excel), không tạo tay trực tiếp nữa.
 
 // ---------------- Định dạng các ô nhập tiền có dấu phẩy ----------------
 ['project-contract-value','project-cost-budget','project-revenue-budget',
