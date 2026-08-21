@@ -135,13 +135,14 @@ input,select,textarea{font-family:inherit;}
 
 /* ---------- App Shell ---------- */
 #app-screen{display:none;min-height:100vh;}
-.shell{display:grid;grid-template-columns:240px 1fr;min-height:100vh;}
+.shell{display:grid;grid-template-columns:240px 1fr;min-height:100vh;isolation:isolate;}
 .sidebar{
   background:var(--sidebar-bg);
   color:var(--ink-dim);padding:20px 14px;display:flex;flex-direction:column;
   position:sticky;top:0;height:100vh;
   overflow-y:auto; overflow-x:hidden;
   border-right:1px solid var(--line);
+  z-index:10;
 }
 .sidebar .brand{display:flex;align-items:center;gap:10px;padding:6px 8px 22px;}
 .sidebar .brand .mark{
@@ -169,7 +170,18 @@ input,select,textarea{font-family:inherit;}
 .logout-btn{background:none;border:none;color:var(--ink-faint);font-size:15px;padding:4px;}
 .logout-btn:hover{color:var(--red);}
 
-.main{padding:26px 32px 60px;max-width:1440px;}
+.main{padding:26px 32px 60px;max-width:1440px;min-width:0;overflow-x:hidden;}
+/* Laptop cỡ nhỏ - trung (vd 1280x800, 1366x768): bớt padding + thu gọn lưới KPI một chút
+   để không bị chật, nhưng vẫn giữ sidebar đầy đủ 240px như màn hình lớn. */
+@media (max-width:1366px) and (min-width:1101px){
+  .main{padding:22px 24px 50px;}
+  .kpi-grid{grid-template-columns:repeat(auto-fit,minmax(180px,1fr));}
+}
+/* Màn hình lớn / ultra-wide (vd 1920px, 2560px trở lên): nới rộng vùng nội dung và canh giữa
+   thay vì để trống mảng lớn bên phải, đọc dữ liệu đỡ bị dồn hết về mép trái. */
+@media (min-width:1920px){
+  .main{max-width:1700px;margin:0 auto;padding:32px 40px 70px;}
+}
 .topbar{display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;flex-wrap:wrap;gap:12px;}
 .topbar h2{font-size:22px;font-weight:800;margin:0;letter-spacing:-.3px;color:var(--ink);}
 .topbar .sub{color:var(--ink-dim);font-size:13px;margin-top:3px;}
@@ -408,7 +420,7 @@ tr.tx-row-explained td:not(:last-child){text-decoration:line-through;}
 .theme-toggle:hover{background:var(--primary-dim);color:var(--primary);}
 
 /* ---------- Chart wrap ---------- */
-.chart-wrap{position:relative;height:340px;}
+.chart-wrap{position:relative;height:340px;overflow:hidden;min-width:0;}
 .two-col{display:grid;grid-template-columns:1.3fr 1fr;gap:16px;}
 @media (max-width:980px){.two-col{grid-template-columns:1fr;}}
 
