@@ -48,7 +48,8 @@ document.getElementById('labor-chart-alltime')?.addEventListener('click', ()=>{
   if(el) el.value = '';
   renderLaborChart();
 });
-document.getElementById('labor-chart-month')?.setAttribute('value', todayISO().slice(0,7));
+// Mặc định hiện TỔNG THỂ (mọi tháng, mọi dự án) — không lọc theo tháng hiện tại nữa,
+// tránh việc chỉ hiện đúng vài dự án có công trong tháng này mà ẩn mất các dự án khác.
 
 // ---------- WELCOME CARD (lời chào real-time + thông tin người dùng) ----------
 function greetingByHour(){
