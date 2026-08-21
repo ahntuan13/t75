@@ -155,7 +155,7 @@ function renderEmployeesTable(){
       <td>
         <div class="row-actions">
           ${!isSubAdmin() ? `<button class="icon-btn" data-edit-emp="${e.id}" title="Sửa">✎</button>` : ''}
-          ${isAdmin() ? `<button class="icon-btn" data-del-emp="${e.id}" title="Xóa">🗑</button>` : ''}
+          ${!isSubAdmin() ? `<button class="icon-btn" data-del-emp="${e.id}" title="Xóa">🗑</button>` : ''}
         </div>
       </td>
     </tr>`;
@@ -461,7 +461,7 @@ function renderTimesheetTable(){
       <td>
         <div class="row-actions">
           ${!isSubAdmin() ? `<button class="icon-btn" data-edit-ts="${t.id}" title="Sửa">✎</button>` : ''}
-          ${isAdmin() ? `<button class="icon-btn" data-del-ts="${t.id}" title="Xóa">🗑</button>` : ''}
+          ${!isSubAdmin() ? `<button class="icon-btn" data-del-ts="${t.id}" title="Xóa">🗑</button>` : ''}
         </div>
       </td>
     </tr>`;
@@ -922,11 +922,11 @@ function buildPayslipHtml(employeeId){
   // Đúng 15 dòng khoản mục theo mẫu Excel gốc công ty (STT | KHOẢN MỤC | SỐ TIỀN)
   const rows = [
     [1, 'TỔNG CÔNG [2]=[1]/8', `${days} công`],
-    [2, 'NGÀY CÔNG', fmtVND(dayRate)],
+    [2, 'ĐƠN GIÁ', fmtVND(dayRate)],
     [3, 'THÀNH TIỀN [4]=[2]×[3]', fmtVND(r.totalIncome)],
     [4, 'TIỀN TẠM ỨNG CUỐI THÁNG', fmtVND(r.tamUng)],
     [5, 'TIỀN ỨNG MR/MS TUẤN', fmtVND(r.ungTuan)],
-    [6, 'TẠM ỨNG CÁ NHÂN (TẠM ỨNG TẾT)', fmtVND(r.thuong)],
+    [6, 'TẠM ỨNG CÁ NHÂN', fmtVND(r.thuong)],
     [7, 'KHẤU TRỪ TIỀN NGHỈ', fmtVND(r.khauNghi)],
     [8, 'KHẤU TRỪ TIỀN TẠM ỨNG KHÁC', fmtVND(r.khacTamUng)],
     [9, 'THÁNG ĐÃ THANH TOÁN', fmtVND(0)],
