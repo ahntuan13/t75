@@ -120,6 +120,8 @@ function listenApprovers(){
     const el = document.getElementById('approver-emails');
     if(el) el.value = (APPROVERS.approverEmails||[]).join(', ');
     if(window.renderTxTable) renderTxTable();
+    if(window.renderOrdersTable) renderOrdersTable();
+    if(window.renderAdvanceTable) renderAdvanceTable();
     if(window.renderApprovalBanner) renderApprovalBanner();
     if(window.renderNotifications) renderNotifications();
   }, (err)=> console.error('approvers listen error', err));
