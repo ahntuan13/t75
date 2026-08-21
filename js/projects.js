@@ -115,6 +115,8 @@ function renderContractInfoStatus(i){
 
 for(let i=1;i<=5;i++){
   bindMoneyInput(`proj-hd${i}-value`);
+  bindMoneyInput(`proj-hd${i}-cost-budget`);
+  bindMoneyInput(`proj-hd${i}-revenue-budget`);
   document.getElementById(`proj-hd${i}-file`)?.addEventListener('change', async (e)=>{
     const file = e.target.files[0];
     e.target.value = '';
@@ -128,6 +130,8 @@ for(let i=1;i<=5;i++){
         name: document.getElementById(`proj-hd${i}-name`).value.trim(),
         customer: document.getElementById(`proj-hd${i}-customer`).value.trim(),
         value: parseMoneyInput(document.getElementById(`proj-hd${i}-value`)),
+        costBudget: parseMoneyInput(document.getElementById(`proj-hd${i}-cost-budget`)),
+        revenueBudget: parseMoneyInput(document.getElementById(`proj-hd${i}-revenue-budget`)),
         signDate: document.getElementById(`proj-hd${i}-date`).value,
         fileUrl: result.webUrl, fileName: result.name,
       };
@@ -211,6 +215,8 @@ function openProjectModal(id){
     document.getElementById(`proj-hd${i}-name`).value = info ? (info.name||'') : '';
     document.getElementById(`proj-hd${i}-customer`).value = info ? (info.customer||'') : '';
     setMoneyInputValue(document.getElementById(`proj-hd${i}-value`), info ? info.value : '');
+    setMoneyInputValue(document.getElementById(`proj-hd${i}-cost-budget`), info ? info.costBudget : '');
+    setMoneyInputValue(document.getElementById(`proj-hd${i}-revenue-budget`), info ? info.revenueBudget : '');
     document.getElementById(`proj-hd${i}-date`).value = info ? (info.signDate||'') : '';
     document.getElementById(`proj-hd${i}-file`).value = '';
     renderContractInfoStatus(i);
@@ -255,10 +261,12 @@ document.getElementById('save-project-btn').addEventListener('click', async ()=>
       const name = document.getElementById(`proj-hd${i}-name`).value.trim();
       const customer = document.getElementById(`proj-hd${i}-customer`).value.trim();
       const value = parseMoneyInput(document.getElementById(`proj-hd${i}-value`));
+      const costBudget = parseMoneyInput(document.getElementById(`proj-hd${i}-cost-budget`));
+      const revenueBudget = parseMoneyInput(document.getElementById(`proj-hd${i}-revenue-budget`));
       const signDate = document.getElementById(`proj-hd${i}-date`).value;
       const info = currentContractInfo[i-1];
-      if(!name && !customer && !value && !signDate && !(info && info.fileUrl)) return null;
-      return { name, customer, value, signDate, fileUrl: info ? (info.fileUrl||'') : '', fileName: info ? (info.fileName||'') : '' };
+      if(!name && !customer && !value && !costBudget && !revenueBudget && !signDate && !(info && info.fileUrl)) return null;
+      return { name, customer, value, costBudget, revenueBudget, signDate, fileUrl: info ? (info.fileUrl||'') : '', fileName: info ? (info.fileName||'') : '' };
     }),
     // xóa field cũ (single-file) để tránh dữ liệu thừa/nhầm lẫn khi đọc lại
     contractFileUrl: firebase.firestore.FieldValue.delete(),
