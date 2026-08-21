@@ -244,6 +244,10 @@ table.data td.num{text-align:right;font-family:'IBM Plex Mono',monospace;font-va
 .tag-gold{background:var(--gold-dim);color:var(--gold);}
 .tag-gray{background:var(--bg-soft);color:var(--ink-dim);}
 .tx-project-block{padding:16px 20px;}
+.tx-pending-block{border:1.5px solid var(--gold);background:var(--gold-dim);}
+.tx-pending-block .tx-project-head{border-bottom-color:var(--gold);}
+.tx-pending-block h4{color:var(--gold);}
+.tx-pending-block table.data{background:var(--card);}
 .tx-project-head{display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;margin-bottom:10px;padding-bottom:10px;border-bottom:1.5px solid var(--line);}
 .tx-project-head h4{margin:0;font-size:15px;}
 .tx-project-summary{display:flex;gap:16px;font-size:12.5px;color:var(--ink-dim);flex-wrap:wrap;}
