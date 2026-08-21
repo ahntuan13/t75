@@ -154,7 +154,7 @@
               <div class="actions"><input type="month" id="labor-chart-month"><button class="btn btn-ghost btn-sm" id="labor-chart-alltime">Xem tổng thể (mọi tháng)</button></div>
             </div>
             <p class="helper-text" style="margin-bottom:10px;">Chỉ tính giờ công của Công nhân & Quản lý dự án/Giám sát — không tính Giám đốc, Phó Giám đốc, Kế toán.</p>
-            <div class="chart-wrap" style="height:420px;"><canvas id="chart-labor-hours"></canvas></div>
+            <div class="chart-wrap"><canvas id="chart-labor-hours"></canvas></div>
           </div>
         </div>
         <div class="card">
@@ -609,7 +609,12 @@
           <label class="exp-block-title">Thông tin HĐ 1</label>
           <div class="exp-row">
             <div class="field grow2"><label>Tên/Số hợp đồng</label><input id="proj-hd1-name" placeholder="VD: HĐ đợt 1 - ..."></div>
-            <div class="field"><label>File đính kèm</label><input type="file" id="proj-hd1-file"></div>
+            <div class="field grow2"><label>Khách hàng</label><input id="proj-hd1-customer" placeholder="Tên khách hàng của HĐ này"></div>
+            <div class="field"><label>Giá trị HĐ</label><input type="text" id="proj-hd1-value" placeholder="0"></div>
+          </div>
+          <div class="exp-row">
+            <div class="field"><label>Ngày ký</label><input type="date" id="proj-hd1-date"></div>
+            <div class="field grow2"><label>File đính kèm</label><input type="file" id="proj-hd1-file"></div>
           </div>
           <div id="proj-hd1-status" class="helper-text" style="margin-top:2px;"></div>
         </div>
@@ -617,7 +622,12 @@
           <label class="exp-block-title">Thông tin HĐ 2</label>
           <div class="exp-row">
             <div class="field grow2"><label>Tên/Số hợp đồng</label><input id="proj-hd2-name" placeholder="VD: HĐ đợt 2 - ..."></div>
-            <div class="field"><label>File đính kèm</label><input type="file" id="proj-hd2-file"></div>
+            <div class="field grow2"><label>Khách hàng</label><input id="proj-hd2-customer" placeholder="Tên khách hàng của HĐ này"></div>
+            <div class="field"><label>Giá trị HĐ</label><input type="text" id="proj-hd2-value" placeholder="0"></div>
+          </div>
+          <div class="exp-row">
+            <div class="field"><label>Ngày ký</label><input type="date" id="proj-hd2-date"></div>
+            <div class="field grow2"><label>File đính kèm</label><input type="file" id="proj-hd2-file"></div>
           </div>
           <div id="proj-hd2-status" class="helper-text" style="margin-top:2px;"></div>
         </div>
@@ -625,7 +635,12 @@
           <label class="exp-block-title">Thông tin HĐ 3</label>
           <div class="exp-row">
             <div class="field grow2"><label>Tên/Số hợp đồng</label><input id="proj-hd3-name" placeholder="VD: HĐ đợt 3 - ..."></div>
-            <div class="field"><label>File đính kèm</label><input type="file" id="proj-hd3-file"></div>
+            <div class="field grow2"><label>Khách hàng</label><input id="proj-hd3-customer" placeholder="Tên khách hàng của HĐ này"></div>
+            <div class="field"><label>Giá trị HĐ</label><input type="text" id="proj-hd3-value" placeholder="0"></div>
+          </div>
+          <div class="exp-row">
+            <div class="field"><label>Ngày ký</label><input type="date" id="proj-hd3-date"></div>
+            <div class="field grow2"><label>File đính kèm</label><input type="file" id="proj-hd3-file"></div>
           </div>
           <div id="proj-hd3-status" class="helper-text" style="margin-top:2px;"></div>
         </div>
@@ -633,7 +648,12 @@
           <label class="exp-block-title">Thông tin HĐ 4</label>
           <div class="exp-row">
             <div class="field grow2"><label>Tên/Số hợp đồng</label><input id="proj-hd4-name" placeholder="VD: HĐ đợt 4 - ..."></div>
-            <div class="field"><label>File đính kèm</label><input type="file" id="proj-hd4-file"></div>
+            <div class="field grow2"><label>Khách hàng</label><input id="proj-hd4-customer" placeholder="Tên khách hàng của HĐ này"></div>
+            <div class="field"><label>Giá trị HĐ</label><input type="text" id="proj-hd4-value" placeholder="0"></div>
+          </div>
+          <div class="exp-row">
+            <div class="field"><label>Ngày ký</label><input type="date" id="proj-hd4-date"></div>
+            <div class="field grow2"><label>File đính kèm</label><input type="file" id="proj-hd4-file"></div>
           </div>
           <div id="proj-hd4-status" class="helper-text" style="margin-top:2px;"></div>
         </div>
@@ -641,7 +661,12 @@
           <label class="exp-block-title">Thông tin HĐ 5</label>
           <div class="exp-row">
             <div class="field grow2"><label>Tên/Số hợp đồng</label><input id="proj-hd5-name" placeholder="VD: HĐ đợt 5 - ..."></div>
-            <div class="field"><label>File đính kèm</label><input type="file" id="proj-hd5-file"></div>
+            <div class="field grow2"><label>Khách hàng</label><input id="proj-hd5-customer" placeholder="Tên khách hàng của HĐ này"></div>
+            <div class="field"><label>Giá trị HĐ</label><input type="text" id="proj-hd5-value" placeholder="0"></div>
+          </div>
+          <div class="exp-row">
+            <div class="field"><label>Ngày ký</label><input type="date" id="proj-hd5-date"></div>
+            <div class="field grow2"><label>File đính kèm</label><input type="file" id="proj-hd5-file"></div>
           </div>
           <div id="proj-hd5-status" class="helper-text" style="margin-top:2px;"></div>
         </div>
