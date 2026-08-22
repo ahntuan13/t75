@@ -63,7 +63,12 @@ async function runOcr(imageSource, onProgress){
 function parseInvoiceText(text, companyName){
   const norm = stripDiacritics(text);
   const get = (regex) => { const m = text.match(regex); return m ? m[1].trim() : ''; };
-  const toNum = (s) => s ? Number(String(s).replace(/[^\d]/g,'')) || 0 : 0;
+  // Số kiểu VN: dấu "." ngăn cách hàng nghìn, dấu "," là phần thập phân (vd "50,0" = 50; "142.593" = 142593).
+  const toNum = (s) => {
+    if(!s) return 0;
+    let str = String(s).replace(/%$/,'').trim().replace(/\./g,'').replace(',', '.');
+    return Number(str) || 0;
+  };
 
   // Số hóa đơn: chấp nhận nhiều kiểu nhãn khác nhau tùy mẫu hóa đơn (Số/No/Ký hiệu/Mẫu số/mã tra cứu MCQT...)
   const invoiceNumber = get(/S[ốôo]\s*h[óoôo][áa]?\s*[đd][ơo]n[\s\S]{0,30}?([A-Z0-9\-]{4,20})/i)
@@ -81,30 +86,46 @@ function parseInvoiceText(text, companyName){
     invoiceDate = `${dm[3]}-${String(dm[2]).padStart(2,'0')}-${String(dm[1]).padStart(2,'0')}`;
   }
 
-  // Dò tìm vùng bảng hàng hóa (từ dòng tiêu đề cột đến trước dòng "Tổng cộng") — TẤT CẢ các bước dò số lượng/
+  // Dò tìm vùng bảng hàng hóa (từ dòng tiêu đề cột đến trước phần tổng kết) — TẤT CẢ các bước dò số lượng/
   // đơn giá/thành tiền/thuế bên dưới đều CHỈ tìm trong vùng này, không tìm trên toàn văn bản — tránh lấy nhầm
   // số liệu ở chỗ khác (vd "Ngày...tháng...", địa chỉ "Số 75, đường D4..." đã từng bị nhận nhầm thành ĐVT/SL).
+  // Có 2 kiểu mẫu hóa đơn hay gặp, phần tổng kết bắt đầu bằng 1 trong các nhãn sau (lấy mốc gần nhất):
+  //  - "Cộng tiền hàng" (kiểu thuế TÍNH CHUNG cho cả hóa đơn, không tách theo từng dòng)
+  //  - "Tổng cộng" / "Tổng hợp" (kiểu có cột Thuế suất/Tiền thuế GTGT riêng cho từng dòng)
   const headerIdx = text.search(/T[êe]n\s*h[àa]ng\s*h[óo][áa]|Description/i);
-  const totalIdx = text.search(/T[ổôo]ng\s*c[ộô]ng/i);
-  const tableText = (headerIdx >= 0 && totalIdx > headerIdx) ? text.slice(headerIdx, totalIdx) : '';
-  const totalText = totalIdx >= 0 ? text.slice(totalIdx, totalIdx + 200) : '';
+  const congTienHangIdx = text.search(/C[ộô]ng\s*ti[ềe]n\s*h[àa]ng/i);
+  const tongCongIdx = text.search(/T[ổôo]ng\s*c[ộô]ng|T[ổôo]ng\s*h[ợo]p/i);
+  const summaryIdx = [congTienHangIdx, tongCongIdx].filter(i=>i>=0).sort((a,b)=>a-b)[0] ?? -1;
+  const tableText = (headerIdx >= 0 && summaryIdx > headerIdx) ? text.slice(headerIdx, summaryIdx) : '';
+  const summaryText = summaryIdx >= 0 ? text.slice(summaryIdx, summaryIdx + 400) : '';
 
   const sellerTaxCode = get(/M[aã]\s*s[ốôo]\s*thu[ếe][\s\S]{0,40}?(\d{10,14})/i);
   const sellerName = get(/(?:[ĐD]on\s*v[ịi]\s*b[áa]n\s*h[àa]ng|Seller)[^\n:]*:?\s*\n?\s*([^\n]{5,120})/i);
   const bankAccount = get(/S[ốôo]\s*t[àa]i\s*kho[ảa]n[\s\S]{0,40}?(\d{6,20})/i);
   const bankName = get(/Ng[âa]n\s*h[àa]ng\s+([^\n\-,.]{3,60})/i);
 
-  // Dòng "Tổng cộng tiền thanh toán": 2-3 số liền nhau = Thành tiền (trước thuế), Tiền thuế GTGT, Thành tiền sau thuế.
-  const totalNums = (totalText.match(/[\d][\d.,]{2,}/g) || []).map(toNum).filter(n=>n>0);
-  let grandAmount = 0, grandVat = 0, grandTotal = 0;
-  if(totalNums.length>=3){ [grandAmount, grandVat, grandTotal] = totalNums; }
-  else if(totalNums.length===2){ [grandAmount, grandTotal] = totalNums; grandVat = grandTotal - grandAmount; }
-  else if(totalNums.length===1){ grandTotal = grandAmount = totalNums[0]; }
+  // Nhãn tổng kết theo ĐÚNG tên trên hóa đơn: "Cộng tiền hàng" (tiền hàng trước thuế), "Thuế suất GTGT" +
+  // "Tiền thuế GTGT" (thuế áp dụng CHUNG cho cả hóa đơn — kiểu mẫu không tách thuế theo từng dòng), và
+  // "Tổng tiền thanh toán" / "Tổng cộng tiền thanh toán" (tổng sau thuế).
+  const congTienHang = toNum(get(/C[ộô]ng\s*ti[ềe]n\s*h[àa]ng[\s\S]{0,30}?([\d][\d.,]{2,})/i));
+  const grandVatRateFlat = Number(get(/Thu[ếe]\s*su[ấa]t\s*GTGT[\s\S]{0,20}?(\d{1,2}(?:[.,]\d)?)\s*%/i)) || 0;
+  const tienThueFlat = toNum(get(/Ti[ềe]n\s*thu[ếe]\s*GTGT[\s\S]{0,30}?([\d][\d.,]{2,})/i));
+  const tongTienThanhToanFlat = toNum(get(/T[ổôo]ng\s*(?:c[ộô]ng\s*)?ti[ềe]n\s*thanh\s*to[áa]n[\s\S]{0,30}?([\d][\d.,]{2,})/i));
+
+  // Dòng tổng cuối cùng (đứng sau vùng bảng) — dùng làm phương án dự phòng khi không tách được rõ theo nhãn ở trên.
+  const summaryNums = (summaryText.match(/[\d][\d.,]{2,}/g) || []).map(toNum).filter(n=>n>0);
+  let grandAmount = congTienHang, grandVat = tienThueFlat, grandTotal = tongTienThanhToanFlat;
+  if(!grandTotal && summaryNums.length){
+    if(summaryNums.length>=3){ [grandAmount, grandVat, grandTotal] = summaryNums.slice(-3); }
+    else if(summaryNums.length===2){ [grandAmount, grandTotal] = summaryNums; grandVat = grandTotal - grandAmount; }
+    else if(summaryNums.length===1){ grandTotal = grandAmount = summaryNums[0]; }
+  }
 
   // Tách từng dòng hàng hóa trong vùng bảng — mỗi dòng bắt đầu bằng 1 đoạn CÓ CHỮ (tên hàng hóa), các số xuất
   // hiện ngay sau đó (cùng dòng hoặc (các) dòng kế tiếp) được gán theo ĐÚNG THỨ TỰ CỘT trên hóa đơn:
   // SL -> Đơn giá -> Thành tiền -> Thuế suất(%) -> Tiền thuế GTGT -> Thành tiền sau thuế.
-  const KNOWN_UNITS = ['Chuyến','Chuyển','Lot','Tháng','Ngày','Cái','Bộ','M2','M3','Kg','Chiếc','Bao','Thùng','Hộp','Tấn','Lít'];
+  const KNOWN_UNITS = ['Chuyến','Chuyển','Lot','Tháng','Ngày','Cái','Bộ','M2','M3','M','Kg','Chiếc','Bao','Thùng','Hộp','Tấn','Lít',
+    'Đôi','Lon','Dĩa','Phần','Chai','Lạng','Cuộn','Kiện','Con','Quyển','Bịch','Gói','Cây','Người','Ca','Suất','Ổ','Vé'];
   const headerWordsRe = /Đơn vị|Số lượng|Đơn giá|Thành tiền|Thuế suất|Tiền thuế|Description|Unit|Quantity|Tên hàng|STT|No\.|Amount/i;
   const rawLines = tableText.split('\n').map(l=>l.trim()).filter(l=> l && !headerWordsRe.test(l));
 
@@ -135,11 +156,12 @@ function parseInvoiceText(text, companyName){
   };
 
   for(const line of rawLines){
+    const startsWithStt = /^\d{1,3}[\.\)]?\s/.test(line); // dòng THẬT SỰ bắt đầu 1 mục mới luôn có STT ở đầu
     const stripped = line.replace(/^\d{1,3}[\.\)]?\s+/, ''); // bỏ số thứ tự đầu dòng "1. " / "1) " / "1 "
     const hasLetters = /[a-zA-ZÀ-ỹ]{2,}/.test(stripped);
-    // CHỈ lấy số "đứng riêng" (không dính liền chữ/số khác ở 2 đầu) — tránh nhận nhầm số bên trong
-    // các mã tra cứu/mã vận đơn xen kẽ chữ+số (vd "01M09KYJAP70ZEKJNBACN10S9Q") thành số tiền/số lượng.
-    const nums = line.match(/(?<![A-Za-zÀ-ỹ0-9])\d[\d.,]*\s*%?(?![A-Za-zÀ-ỹ0-9])/g) || [];
+    // CHỈ lấy số "đứng riêng" (không dính liền chữ, "/" hay "-" ở 2 đầu) — tránh nhận nhầm số bên trong
+    // mã tra cứu/mã quy cách/biển số xe xen kẽ chữ+số (vd "01M09KYJAP70...", "028/025/1000MM", "92H-05704").
+    const nums = stripped.match(/(?<![A-Za-zÀ-ỹ0-9\/\-])\d[\d.,]*\s*%?(?![A-Za-zÀ-ỹ0-9\/\-])/g) || [];
     const isKnownUnitOnly = KNOWN_UNITS.some(u=> new RegExp('^'+u+'$','i').test(stripped.trim()));
     // Dòng BẮT ĐẦU bằng 1 từ ĐVT quen thuộc (vd "Chuyến 1 142.593 ... 8% ...") -> đây là phần số liệu
     // tiếp nối của dòng mô tả phía trên (OCR bị tách dòng giữa tên hàng hóa và số liệu), không phải hàng mới.
@@ -147,6 +169,14 @@ function parseInvoiceText(text, companyName){
     if(startsWithUnit && cur){
       cur.raw += ' ' + line;
       cur._nums.push(...nums);
+      continue;
+    }
+    // Chưa đủ 2 số "thật" đứng riêng (1 dòng số liệu thật luôn có ít nhất SL+Thành tiền = 2 số trở lên) và
+    // mục hiện tại CHƯA thu được số liệu nào -> nhiều khả năng đây là phần mô tả bị xuống dòng giữa chừng
+    // (tên hàng dài, hoặc lẫn biển số xe/mã quy cách) -> nối vào tên, KHÔNG lấy nhầm số lẻ tẻ này làm số liệu.
+    if(!startsWithStt && cur && cur._nums.length===0 && nums.length<2){
+      if(stripped.trim()) cur.name += ' ' + stripped;
+      cur.raw += ' ' + line;
       continue;
     }
     if(hasLetters && !isKnownUnitOnly && nums.length===0){
@@ -162,6 +192,18 @@ function parseInvoiceText(text, companyName){
     }
   }
   finalizeCur();
+
+  // Kiểu hóa đơn KHÔNG tách thuế theo từng dòng (bảng chỉ có Tên/ĐVT/SL/Đơn giá/Thành tiền, không có cột
+  // Thuế suất/Tiền thuế riêng) -> mọi dòng sẽ có vatRate=0 sau khi dò ở trên. Trường hợp này áp DUY NHẤT
+  // 1 mức thuế suất chung (dò được ở nhãn "Thuế suất GTGT" ngoài bảng) cho tất cả các dòng.
+  const noRowHasVat = items.every(it=> !it.vatRate);
+  if(noRowHasVat && grandVatRateFlat){
+    items.forEach(it=>{
+      it.vatRate = grandVatRateFlat;
+      it.vatAmount = Math.round(it.amount * grandVatRateFlat / 100);
+      it.amountAfterTax = it.amount + it.vatAmount;
+    });
+  }
 
   // Không dò được dòng hàng hóa nào (bảng OCR quá lem/mất chữ) -> vẫn trả về ít nhất 1 dòng trống, gán tạm
   // theo số liệu tổng ở "Tổng cộng" để người dùng đỡ phải gõ tay hoàn toàn từ đầu, sau đó tự sửa tên hàng hóa.
