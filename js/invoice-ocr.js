@@ -30,6 +30,36 @@ function stripDiacritics(s){
   return String(s||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/đ/gi,'d').toLowerCase();
 }
 
+// Chuyển chuỗi số trên hóa đơn thành number — TỰ NHẬN DIỆN định dạng, vì các hóa đơn khác nhau dùng
+// ngược quy ước nhau: kiểu VN "435.600,00" (chấm=hàng nghìn, phẩy=thập phân) và kiểu Anh/Mỹ "17,272.73"
+// (phẩy=hàng nghìn, chấm=thập phân) đều gặp trong thực tế. Nhận sai sẽ làm rụng mất phần thập phân
+// (vd "17,272.73" hiểu nhầm kiểu VN sẽ ra 17 thay vì 17272.73) — đây là lỗi đã thực sự gặp phải.
+function parseInvoiceNumber(s){
+  if(!s) return 0;
+  const str = String(s).replace(/%$/,'').trim();
+  if(!/[.,]/.test(str)) return Number(str) || 0;
+  const dotCount = (str.match(/\./g) || []).length;
+  const commaCount = (str.match(/,/g) || []).length;
+  let decimalChar;
+  if(dotCount >= 2 && commaCount <= 1) decimalChar = commaCount === 1 ? ',' : null;
+  else if(commaCount >= 2 && dotCount <= 1) decimalChar = dotCount === 1 ? '.' : null;
+  else if(dotCount === 1 && commaCount === 1) decimalChar = str.lastIndexOf(',') > str.lastIndexOf('.') ? ',' : '.';
+  else if(dotCount === 1 && commaCount === 0){
+    const trailing = str.length - str.lastIndexOf('.') - 1;
+    decimalChar = trailing === 3 ? null : '.'; // đúng 3 số sau dấu -> nhiều khả năng là nhóm hàng nghìn, không phải thập phân
+  } else if(commaCount === 1 && dotCount === 0){
+    const trailing = str.length - str.lastIndexOf(',') - 1;
+    decimalChar = trailing === 3 ? null : ',';
+  } else decimalChar = null;
+
+  if(decimalChar === null) return Number(str.replace(/[.,]/g, '')) || 0;
+  const thousandChar = decimalChar === ',' ? '.' : ',';
+  let cleaned = str.split(thousandChar).join('');
+  const idx = cleaned.lastIndexOf(decimalChar);
+  cleaned = cleaned.slice(0, idx) + '.' + cleaned.slice(idx + 1);
+  return Number(cleaned) || 0;
+}
+
 // Chuyển trang đầu tiên của PDF thành ảnh (dataURL) để OCR đọc được — dùng PDF.js. Dùng làm phương án
 // DỰ PHÒNG khi PDF không có lớp chữ thật (PDF dạng ảnh scan) — xem pdfExtractRows() bên dưới là cách chính.
 async function pdfFirstPageToImage(file){
@@ -137,7 +167,7 @@ function parseItemTableByColumns(rows){
   const flatItems = [];
   dataRows.forEach(row=> row.items.forEach(it=> flatItems.push(it)));
 
-  const toNum = (s) => { if(!s) return 0; const str = String(s).replace(/%$/,'').trim().replace(/\./g,'').replace(',', '.'); return Number(str)||0; };
+  const toNum = parseInvoiceNumber;
   const blankItem = () => ({ name:'', unit:'', qty:0, unitPrice:0, amount:0, vatRate:0, vatAmount:0, amountAfterTax:0 });
   const items = [];
   let cur = null;
@@ -194,12 +224,7 @@ async function runOcr(imageSource, onProgress){
 function parseInvoiceText(text, companyName){
   const norm = stripDiacritics(text);
   const get = (regex) => { const m = text.match(regex); return m ? m[1].trim() : ''; };
-  // Số kiểu VN: dấu "." ngăn cách hàng nghìn, dấu "," là phần thập phân (vd "50,0" = 50; "142.593" = 142593).
-  const toNum = (s) => {
-    if(!s) return 0;
-    let str = String(s).replace(/%$/,'').trim().replace(/\./g,'').replace(',', '.');
-    return Number(str) || 0;
-  };
+  const toNum = parseInvoiceNumber;
 
   // Số hóa đơn: chấp nhận nhiều kiểu nhãn khác nhau tùy mẫu hóa đơn (Số/No/Ký hiệu/Mẫu số/mã tra cứu MCQT...)
   const invoiceNumber = get(/S[ốôo]\s*h[óoôo][áa]?\s*[đd][ơo]n[\s\S]{0,30}?([A-Z0-9\-]{4,20})/i)
@@ -210,8 +235,8 @@ function parseInvoiceText(text, companyName){
 
   // Ngày xuất hóa đơn: "Ngày DD tháng MM năm YYYY" hoặc DD/MM/YYYY, ưu tiên cụm gần chữ "Ngày"/"Date" trước
   let invoiceDate = '';
-  const dm = text.match(/(?:Ng[àa]y|Date|K[ýy]\s*ng[àa]y)[\s\S]{0,10}?(\d{1,2})\s*(?:th[áa]ng|\/|\-)[\s\S]{0,10}?(\d{1,2})\s*(?:n[ăa]m|\/|\-)[\s\S]{0,10}?(\d{4})/i)
-    || text.match(/(\d{1,2})\s*th[áa]ng[\s\S]{0,15}?(\d{1,2})\s*n[ăa]m[\s\S]{0,15}?(\d{4})/i)
+  const dm = text.match(/(?:Ng[àa]y|Date|K[ýy]\s*ng[àa]y)[\s\S]{0,25}?(\d{1,2})\s*(?:th[áa]ng|\/|\-)[\s\S]{0,25}?(\d{1,2})\s*(?:n[ăa]m|\/|\-)[\s\S]{0,25}?(\d{4})/i)
+    || text.match(/(\d{1,2})\s*th[áa]ng[\s\S]{0,25}?(\d{1,2})\s*n[ăa]m[\s\S]{0,25}?(\d{4})/i)
     || text.match(/(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{4})/);
   if(dm){
     invoiceDate = `${dm[3]}-${String(dm[2]).padStart(2,'0')}-${String(dm[1]).padStart(2,'0')}`;
@@ -395,7 +420,8 @@ async function handleInvoiceUpload(file){
     const prefill = {
       type: extracted.direction,
       projectId: '',
-      date: extracted.invoiceDate || todayISO(),
+      date: extracted.invoiceDate || '', // để trống nếu không đọc được ngày trên hóa đơn — KHÔNG tự điền ngày hôm nay
+                                          // (trước đây điền sẵn ngày hôm nay khiến người dùng tưởng nhầm là ngày hóa đơn thật)
       content: extracted.sellerName ? `Hóa đơn ${extracted.sellerName}` : 'Hóa đơn (OCR tự động — cần kiểm tra lại)',
       description: '', // để trống theo yêu cầu — không tự điền tên bên bán/MST vào đây nữa
       amount: extracted.totalAmount || 0,
