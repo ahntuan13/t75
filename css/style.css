@@ -333,15 +333,21 @@ tr.tx-row-explained td:not(:last-child){text-decoration:line-through;}
 .sidebar-notif-pill:hover{border-color:var(--ink-faint); color:var(--ink);}
 .sidebar-notif-pill b{color:var(--red);}
 .notif-panel{
-  position:absolute; bottom:calc(100% + 8px); left:0; width:320px; max-height:420px; overflow-y:auto;
+  position:fixed; width:380px; max-width:calc(100vw - 24px); max-height:460px; overflow-y:auto;
   background:var(--card); border:1px solid var(--line); border-radius:14px; box-shadow:var(--shadow);
   padding:10px; z-index:600; cursor:default; text-align:left;
 }
 .notif-section{margin-bottom:10px;}
 .notif-section-title{font-size:11px;font-weight:800;color:var(--ink-faint);text-transform:uppercase;letter-spacing:.05em;padding:4px 6px;}
-.notif-item{display:block;padding:9px 8px;border-radius:9px;font-size:12.5px;line-height:1.4;cursor:pointer;color:var(--ink-dim);}
+.notif-item{display:block;padding:9px 8px;border-radius:9px;font-size:12.5px;line-height:1.4;cursor:pointer;color:var(--ink-dim);white-space:normal;overflow-wrap:break-word;}
 .notif-item:hover{background:var(--bg-soft);color:var(--ink);}
 .notif-item .notif-title{color:var(--ink);font-weight:600;}
+/* Chưa xem: chữ đậm, có chấm xanh đánh dấu, nằm trên cùng trong từng mục. Đã xem: làm xám đi để dễ phân biệt. */
+.notif-item-unread{background:var(--primary-dim);}
+.notif-item-unread .notif-title{font-weight:800;color:var(--ink);}
+.notif-item-unread .notif-title::before{content:'●';color:var(--primary);margin-right:6px;font-size:9px;vertical-align:middle;}
+.notif-item-read{opacity:.55;}
+.notif-item-read .notif-title{font-weight:500;color:var(--ink-faint);}
 .notif-empty{padding:16px 8px;text-align:center;color:var(--ink-faint);font-size:12.5px;}
 .row-actions{display:flex;gap:6px;}
 .icon-btn{background:var(--bg-soft);border:none;color:var(--ink-dim);font-size:13px;padding:6px 8px;border-radius:8px;}
@@ -478,7 +484,7 @@ tr.tx-row-explained td:not(:last-child){text-decoration:line-through;}
   .icon-btn{padding:8px 9px;font-size:14px;}
   .filters-bar{gap:8px;}
   .filters-bar select,.filters-bar input{flex:1 1 140px;min-width:0;}
-  .notif-panel{width:min(320px, calc(100vw - 32px));left:0;}
+  .notif-panel{width:calc(100vw - 24px);}
   .fab-btn{bottom:84px;right:18px;width:52px;height:52px;font-size:26px;}
   .two-col{gap:12px;}
   .chart-wrap{height:260px;}
