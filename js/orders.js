@@ -648,6 +648,54 @@ function handleOrderTableClick(e){
 // cho đúng dự án đó, cộng dồn đúng vào chi phí dự án tương ứng.
 // =============================================================
 
+// Ảnh hóa đơn/chuyển khoản đính kèm riêng cho từng khung Giải chi 1-5 (mảng 5 phần tử, rỗng nếu chưa chọn ảnh).
+let currentExpInvoiceImages = ['', '', '', '', ''];
+let currentExpTransferImages = ['', '', '', '', ''];
+
+function setExpImagePreview(i, kind, dataUrl){
+  const img = document.getElementById(`exp${i}-${kind}-image-preview`);
+  const btn = document.getElementById(`exp${i}-${kind}-image-remove`);
+  if(!img || !btn) return;
+  if(dataUrl){
+    img.src = dataUrl; img.style.display = 'block'; btn.style.display = 'inline-flex';
+  } else {
+    img.src = ''; img.style.display = 'none'; btn.style.display = 'none';
+  }
+}
+
+for(let i=1;i<=5;i++){
+  const invoiceInput = document.getElementById(`exp${i}-invoice-image`);
+  const transferInput = document.getElementById(`exp${i}-transfer-image`);
+  invoiceInput?.addEventListener('change', async (e)=>{
+    const file = e.target.files[0];
+    if(!file) return;
+    toast('Đang nén ảnh...');
+    try{
+      currentExpInvoiceImages[i-1] = await compressImageFile(file, 900, 0.65);
+      setExpImagePreview(i, 'invoice', currentExpInvoiceImages[i-1]);
+    }catch(err){ toast('Không đọc được ảnh, thử ảnh khác'); }
+  });
+  document.getElementById(`exp${i}-invoice-image-remove`)?.addEventListener('click', ()=>{
+    currentExpInvoiceImages[i-1] = '';
+    if(invoiceInput) invoiceInput.value = '';
+    setExpImagePreview(i, 'invoice', '');
+  });
+  transferInput?.addEventListener('change', async (e)=>{
+    const file = e.target.files[0];
+    if(!file) return;
+    toast('Đang nén ảnh...');
+    try{
+      currentExpTransferImages[i-1] = await compressImageFile(file, 900, 0.65);
+      setExpImagePreview(i, 'transfer', currentExpTransferImages[i-1]);
+    }catch(err){ toast('Không đọc được ảnh, thử ảnh khác'); }
+  });
+  document.getElementById(`exp${i}-transfer-image-remove`)?.addEventListener('click', ()=>{
+    currentExpTransferImages[i-1] = '';
+    if(transferInput) transferInput.value = '';
+    setExpImagePreview(i, 'transfer', '');
+  });
+}
+
 function fillExplainProjectSelects(){
   for(let i=1;i<=5;i++){
     const sel = document.getElementById(`exp${i}-project`);
@@ -712,6 +760,14 @@ function openOrderExplainModal(orderId){
     document.getElementById(`exp${i}-qty`).value = a.qty || 1;
     setMoneyInputValue(document.getElementById(`exp${i}-price`), a.unitPrice);
     setMoneyInputValue(document.getElementById(`exp${i}-amount`), a.amount);
+    currentExpInvoiceImages[i-1] = a.invoiceImage || '';
+    currentExpTransferImages[i-1] = a.transferImage || '';
+    setExpImagePreview(i, 'invoice', currentExpInvoiceImages[i-1]);
+    setExpImagePreview(i, 'transfer', currentExpTransferImages[i-1]);
+    const invoiceInput = document.getElementById(`exp${i}-invoice-image`);
+    const transferInput = document.getElementById(`exp${i}-transfer-image`);
+    if(invoiceInput) invoiceInput.value = '';
+    if(transferInput) transferInput.value = '';
   }
   document.getElementById('exp-approval-target').value = '';
   updateExplainAmountCheck();
@@ -740,6 +796,8 @@ document.getElementById('save-explain-btn')?.addEventListener('click', async ()=
       qty: Number(document.getElementById(`exp${i}-qty`).value) || 1,
       unitPrice: parseMoneyInput(document.getElementById(`exp${i}-price`)),
       amount,
+      invoiceImage: currentExpInvoiceImages[i-1] || '',
+      transferImage: currentExpTransferImages[i-1] || '',
     });
   }
   if(blocks.length === 0){ toast('Vui lòng điền ít nhất 1 khung Giải chi (nhập Số tiền)'); return; }
@@ -764,7 +822,9 @@ document.getElementById('save-explain-btn')?.addEventListener('click', async ()=
         unit: b.unit, qty: b.qty, unitPrice: b.unitPrice, amount: b.amount,
         invoiceNumber:'', invoiceDate:'', bankName:'', bankAccount:'', bankHolder:'', transferDate:'',
         note: `Giải chi từ Lệnh tạm ứng (${o.payee}) — ${o.reason}`,
-        invoiceImage:'', transferImage:'', invoiceStatus:'pending', transferStatus:'pending',
+        invoiceImage: b.invoiceImage || '', transferImage: b.transferImage || '',
+        invoiceStatus: b.invoiceImage ? 'issued' : 'pending',
+        transferStatus: b.transferImage ? 'done' : 'pending',
         createdAt: firebase.firestore.FieldValue.serverTimestamp(),
         createdBy: auth.currentUser.email,
       };
@@ -804,6 +864,8 @@ document.getElementById('save-explain-btn')?.addEventListener('click', async ()=
 
     toast(`✅ Đã giải trình xong — tạo ${blocks.length} khoản Chi phân bổ theo dự án`);
     logActivity('update', {projectName:'Giải chi tạm ứng', content: o.reason, amount: blocks.reduce((s,b)=>s+b.amount,0), type:'OUT'});
+    currentExpInvoiceImages = ['', '', '', '', ''];
+    currentExpTransferImages = ['', '', '', '', ''];
     closeModal('modal-order-explain');
   }catch(err){ toast('Lỗi: '+err.message); }
 });
