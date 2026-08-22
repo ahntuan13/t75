@@ -97,6 +97,10 @@ function applyRolePermissions(){
   if(btnExportTx) btnExportTx.style.display = isAdmin() ? '' : 'none';
   const btnExportFc = document.getElementById('btn-export-fc');
   if(btnExportFc) btnExportFc.style.display = isAdmin() ? '' : 'none';
+  // GĐ (Sub-admin) chỉ xem + duyệt -> ẩn 2 nút quét hóa đơn AI ngay tại trang Hóa đơn.
+  document.querySelectorAll('label[for="ocr-invoice-image-input"], label[for="ocr-invoice-pdf-input"]').forEach(el=>{
+    el.style.display = isSubAdmin() ? 'none' : '';
+  });
   if(window.renderDashboard) renderDashboard();
   if(window.renderNotifications) renderNotifications();
 }
