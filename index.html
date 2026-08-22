@@ -730,12 +730,13 @@
       <input type="hidden" id="tx-id">
       <div class="field full" style="margin-bottom:14px;">
         <label>Loại giao dịch *</label>
-        <div class="seg">
+        <div class="seg seg-4">
           <button type="button" id="seg-in" data-type="IN">↓ Thu (IN)</button>
           <button type="button" id="seg-out" data-type="OUT">↑ Chi (OUT)</button>
+          <button type="button" id="seg-invoice-type">🧾 Hóa Đơn</button>
           <button type="button" id="seg-advance">💳 Tạm ứng</button>
         </div>
-        <div class="helper-text" id="tx-type-hint">Chọn Thu, Chi hoặc Tạm ứng để tiếp tục.</div>
+        <div class="helper-text" id="tx-type-hint">Chọn Thu, Chi, Hóa Đơn hoặc Tạm ứng để tiếp tục.</div>
       </div>
       <div class="form-grid" id="tx-form-fields" style="display:none;">
         <div class="field full" id="tx-project-field"><label id="tx-project-label">Dự án *</label><select id="tx-project"></select></div>
@@ -751,11 +752,22 @@
           </select>
         </div>
         <div class="field full"><label>Nội dung *</label><input id="tx-content" required placeholder="VD: Thanh toán chi phí vật tư"></div>
-        <div class="field full"><label>Diễn giải</label><input id="tx-desc" placeholder="Chi tiết diễn giải"></div>
-        <div class="field"><label>ĐVT</label><input id="tx-unit" placeholder="lot, m2, cái..."></div>
-        <div class="field"><label>Số lượng</label><input type="number" id="tx-qty" placeholder="1"></div>
-        <div class="field"><label>Đơn giá</label><input type="text" id="tx-unitprice" placeholder="0"></div>
-        <div class="field"><label>Thành tiền *</label><input type="text" id="tx-amount" required placeholder="0"></div>
+        <div class="field full" id="tx-desc-field"><label>Diễn giải</label><input id="tx-desc" placeholder="Chi tiết diễn giải"></div>
+
+        <!-- Khối 1 dòng hàng hóa/dịch vụ — dùng cho Thu / Chi / Tạm ứng (giữ như cũ) -->
+        <div class="field" id="tx-simple-unit-field"><label>ĐVT</label><input id="tx-unit" placeholder="lot, m2, cái..."></div>
+        <div class="field" id="tx-simple-qty-field"><label>Số lượng</label><input type="number" id="tx-qty" placeholder="1"></div>
+        <div class="field" id="tx-simple-price-field"><label>Đơn giá</label><input type="text" id="tx-unitprice" placeholder="0"></div>
+        <div class="field" id="tx-simple-amount-field"><label>Thành tiền *</label><input type="text" id="tx-amount" required placeholder="0"></div>
+
+        <!-- Khối nhiều dòng hàng hóa/dịch vụ theo đúng mẫu hóa đơn VAT — chỉ hiện khi chọn loại "Hóa Đơn" -->
+        <div class="field full" id="tx-invoice-items-field" style="display:none;">
+          <label>Tên hàng hóa, dịch vụ *</label>
+          <div class="helper-text" style="margin-bottom:8px;">Nếu hóa đơn có nhiều dòng hàng hóa/dịch vụ, bấm "+ Thêm dòng" để nhập đủ — mỗi dòng tự tính Tiền thuế GTGT và Thành tiền sau thuế.</div>
+          <div id="tx-invoice-items-list"></div>
+          <button type="button" class="btn btn-ghost btn-sm" id="tx-invoice-item-add" style="margin-top:4px;">+ Thêm dòng</button>
+          <div class="helper-text" id="tx-invoice-items-total" style="margin-top:10px;font-weight:700;color:var(--ink);"></div>
+        </div>
 
         <div class="field full" style="border-top:1px solid var(--line);padding-top:14px;margin-top:2px;">
           <label style="font-size:13px;font-weight:700;color:var(--ink);">🧾 Thông tin hóa đơn</label>
