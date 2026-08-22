@@ -257,8 +257,7 @@
         <div class="topbar">
           <div><h2>Hóa đơn</h2><div class="sub">Thống kê các giao dịch có hóa đơn</div></div>
           <div class="topbar-actions">
-            <label class="btn btn-primary btn-sm" for="ocr-invoice-image-input">📷 Quét hóa đơn (ảnh)</label>
-            <label class="btn btn-ghost btn-sm" for="ocr-invoice-pdf-input">📄 Quét hóa đơn (PDF)</label>
+            <label class="btn btn-primary btn-sm" for="ocr-invoice-pdf-input">📄 Quét hóa đơn (PDF)</label>
           </div>
         </div>
         <div class="filters-bar">
@@ -564,10 +563,6 @@
           <span class="qc-icon" style="background:var(--purple-dim);color:var(--purple);">👤</span>
           <span class="qc-text"><strong>Thêm nhân viên</strong><span class="helper-text">Thêm hồ sơ nhân viên</span></span>
         </button>
-        <label class="qc-item" for="ocr-invoice-image-input" id="qc-upload-invoice-image">
-          <span class="qc-icon" style="background:var(--teal-dim);color:var(--teal);">📷</span>
-          <span class="qc-text"><strong>Upload hóa đơn (ảnh)</strong><span class="helper-text">AI tự đọc thông tin từ ảnh</span></span>
-        </label>
         <label class="qc-item" for="ocr-invoice-pdf-input" id="qc-upload-invoice-pdf">
           <span class="qc-icon" style="background:var(--blue-dim, var(--primary-dim));color:var(--primary);">📄</span>
           <span class="qc-text"><strong>Upload hóa đơn (PDF)</strong><span class="helper-text">AI tự đọc thông tin từ file PDF</span></span>
@@ -576,7 +571,6 @@
     </div>
   </div>
 </div>
-<input type="file" id="ocr-invoice-image-input" accept="image/*" style="display:none">
 <input type="file" id="ocr-invoice-pdf-input" accept="application/pdf,.pdf" style="display:none">
 
 <div class="modal-backdrop" id="modal-project">
