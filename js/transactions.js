@@ -284,7 +284,7 @@ function openTxModal(id, prefill, target, explainSourceId){
   setTxType(id ? (t.type || 'IN') : (prefill ? (prefill.type || 'OUT') : ''));
   document.getElementById('tx-project-field').style.display = isFc ? 'none' : '';
   document.getElementById('tx-project').value = t.projectId || '';
-  document.getElementById('tx-date').value = t.date || todayISO();
+  document.getElementById('tx-date').value = t.date || ((id || prefill) ? '' : todayISO());
   document.getElementById('tx-code').value = t.code || '';
   document.getElementById('tx-content').value = t.content || '';
   document.getElementById('tx-desc').value = t.description || '';
@@ -349,7 +349,7 @@ document.getElementById('save-tx-btn').addEventListener('click', async ()=>{
   const date = document.getElementById('tx-date').value;
   const amount = parseMoneyInput(document.getElementById('tx-amount'));
   if(!currentTxType){ toast('Vui lòng chọn Thu hoặc Chi'); return; }
-  if(!isFc && !projectId){ toast('Vui lòng chọn dự án'); return; }
+  // Không bắt buộc chọn Dự án nữa — cho phép lưu với Dự án để trống (vd chi phí chung không thuộc dự án nào).
   if(!isInvoiceTxMode && !content){ toast('Vui lòng nhập nội dung'); return; }
   if(!date){ toast('Vui lòng chọn ngày'); return; }
   if(!amount){ toast('Vui lòng nhập thành tiền'); return; }
