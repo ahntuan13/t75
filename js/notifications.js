@@ -78,7 +78,10 @@ function renderNotifications(){
   if(!badge || !panel || !auth.currentUser) return;
 
   const { pendingForMe, decidedForMe, invoiceOverdue } = computeNotifications();
-  const total = pendingForMe.length + decidedForMe.length + invoiceOverdue.length;
+  // Số trên chuông CHỈ đếm những gì còn cần xử lý (chờ duyệt + hóa đơn quá hạn chưa cập nhật).
+  // "Đã có kết quả duyệt" chỉ mang tính thông báo/thông tin, không tính là việc còn tồn đọng nữa
+  // — vd 10 thông báo, duyệt xong 4 thì số hiện trên chuông phải giảm còn 6, không giữ nguyên 10.
+  const total = pendingForMe.length + invoiceOverdue.length;
   badge.textContent = total > 99 ? '99+' : String(total);
 
   const section = (title, items, renderItem) => items.length ? `
