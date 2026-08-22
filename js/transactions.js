@@ -19,6 +19,101 @@ let currentTransferImage = '';
 let currentInvoiceStatus = 'pending';
 let currentTransferStatus = 'pending';
 
+// ---------------- Loại "Hóa Đơn" — nhiều dòng hàng hóa/dịch vụ theo đúng mẫu hóa đơn VAT ----------------
+let isInvoiceTxMode = false; // true khi đang chọn loại "🧾 Hóa Đơn" ở Nhập giao dịch
+let invoiceItemRows = []; // mảng các dòng: {name, unit, qty, unitPrice, amount, vatRate, vatAmount, amountAfterTax}
+let invoiceItemSeq = 0; // id tăng dần cho từng dòng, tránh trùng id DOM khi thêm/xóa liên tục
+
+function newInvoiceItemRow(prefill){
+  invoiceItemSeq++;
+  return Object.assign({
+    _id: invoiceItemSeq, name:'', unit:'', qty:1, unitPrice:0, amount:0, vatRate:0, vatAmount:0, amountAfterTax:0,
+  }, prefill || {});
+}
+
+function recalcInvoiceItemRow(row){
+  row.amount = (Number(row.qty)||0) * (Number(row.unitPrice)||0);
+  row.vatAmount = Math.round(row.amount * (Number(row.vatRate)||0) / 100);
+  row.amountAfterTax = row.amount + row.vatAmount;
+}
+
+function renderInvoiceItemRows(){
+  const wrap = document.getElementById('tx-invoice-items-list');
+  if(!wrap) return;
+  wrap.innerHTML = invoiceItemRows.map((row, idx)=> `
+    <div class="inv-item-block" data-row-id="${row._id}">
+      <div class="inv-item-block-head">
+        <strong>Dòng ${idx+1}</strong>
+        ${invoiceItemRows.length>1 ? `<button type="button" class="inv-item-remove" data-remove-row="${row._id}">🗑 Xóa dòng</button>` : ''}
+      </div>
+      <div class="exp-row">
+        <div class="field grow2"><label>Tên hàng hóa, dịch vụ</label><input data-field="name" data-row-id="${row._id}" value="${escapeHtml(row.name)}" placeholder="VD: Xi măng Hà Tiên PC40"></div>
+        <div class="field"><label>ĐVT</label><input data-field="unit" data-row-id="${row._id}" value="${escapeHtml(row.unit)}" placeholder="lot, m2, cái..."></div>
+        <div class="field grow-sm"><label>Số lượng</label><input type="number" data-field="qty" data-row-id="${row._id}" value="${row.qty}"></div>
+      </div>
+      <div class="exp-row">
+        <div class="field"><label>Đơn giá</label><input type="text" class="money-input" data-field="unitPrice" data-row-id="${row._id}" value="${row.unitPrice ? fmtNum(row.unitPrice) : ''}" placeholder="0"></div>
+        <div class="field"><label>Thành tiền</label><input type="text" disabled value="${fmtNum(row.amount)}"></div>
+        <div class="field"><label>Thuế suất GTGT (%)</label><input type="number" data-field="vatRate" data-row-id="${row._id}" value="${row.vatRate}" placeholder="0, 5, 8, 10..."></div>
+      </div>
+      <div class="exp-row">
+        <div class="field"><label>Tiền thuế GTGT</label><input type="text" disabled value="${fmtNum(row.vatAmount)}"></div>
+        <div class="field"><label>Thành tiền sau thuế</label><input type="text" disabled value="${fmtNum(row.amountAfterTax)}"></div>
+      </div>
+    </div>`).join('');
+
+  const total = invoiceItemRows.reduce((s,r)=> s + r.amountAfterTax, 0);
+  const totalBeforeTax = invoiceItemRows.reduce((s,r)=> s + r.amount, 0);
+  const totalVat = invoiceItemRows.reduce((s,r)=> s + r.vatAmount, 0);
+  document.getElementById('tx-invoice-items-total').innerHTML =
+    `Tổng tiền hàng: ${fmtVND(totalBeforeTax)} — Tổng tiền thuế GTGT: ${fmtVND(totalVat)} — <span style="color:var(--primary)">Tổng thanh toán: ${fmtVND(total)}</span>`;
+  setMoneyInputValue(document.getElementById('tx-amount'), total);
+}
+
+document.getElementById('tx-invoice-items-list')?.addEventListener('input', (e)=>{
+  const rowId = Number(e.target.dataset.rowId);
+  const field = e.target.dataset.field;
+  if(!rowId || !field) return;
+  const row = invoiceItemRows.find(r=> r._id===rowId);
+  if(!row) return;
+  if(e.target.classList.contains('money-input')) formatMoneyInput(e.target);
+  row[field] = (field==='name' || field==='unit') ? e.target.value
+    : field==='unitPrice' ? parseMoneyInput(e.target)
+    : Number(e.target.value) || 0;
+  recalcInvoiceItemRow(row);
+  renderInvoiceItemRows();
+  // giữ nguyên focus đúng ô đang gõ sau khi render lại (tránh mất con trỏ khi tự tính lại các ô disabled)
+  const reFocus = document.querySelector(`[data-row-id="${rowId}"][data-field="${field}"]`);
+  if(reFocus){ reFocus.focus(); const v = reFocus.value; reFocus.value=''; reFocus.value=v; }
+});
+document.getElementById('tx-invoice-items-list')?.addEventListener('click', (e)=>{
+  const rowId = Number(e.target.closest('[data-remove-row]')?.dataset.removeRow);
+  if(!rowId) return;
+  invoiceItemRows = invoiceItemRows.filter(r=> r._id!==rowId);
+  renderInvoiceItemRows();
+});
+document.getElementById('tx-invoice-item-add')?.addEventListener('click', ()=>{
+  invoiceItemRows.push(newInvoiceItemRow());
+  renderInvoiceItemRows();
+});
+
+function setInvoiceTxMode(on){
+  isInvoiceTxMode = on;
+  ['tx-simple-unit-field','tx-simple-qty-field','tx-simple-price-field','tx-simple-amount-field'].forEach(id=>{
+    const el = document.getElementById(id);
+    if(el) el.style.display = on ? 'none' : '';
+  });
+  const itemsField = document.getElementById('tx-invoice-items-field');
+  if(itemsField) itemsField.style.display = on ? '' : 'none';
+  const amountField = document.getElementById('tx-simple-amount-field');
+  // Khi ở chế độ Hóa Đơn, "Thành tiền" tổng vẫn tồn tại ẩn (dùng chung field tx-amount để lưu tổng),
+  // chỉ ẩn input hiển thị đơn lẻ đi vì đã có tổng hiển thị riêng trong khối nhiều dòng.
+  if(on && invoiceItemRows.length===0){
+    invoiceItemRows = [newInvoiceItemRow()];
+  }
+  if(on) renderInvoiceItemRows();
+}
+
 function setInvoiceStatus(status){
   currentInvoiceStatus = status;
   document.getElementById('seg-invoice-yes').className = status==='issued' ? 'active-gold' : '';
@@ -132,7 +227,8 @@ function renderApprovalBanner(){
 function setTxType(type){
   currentTxType = type;
   document.getElementById('seg-in').className = type==='IN' ? 'active-in' : '';
-  document.getElementById('seg-out').className = type==='OUT' ? 'active-out' : '';
+  document.getElementById('seg-out').className = (type==='OUT' && !isInvoiceTxMode) ? 'active-out' : '';
+  document.getElementById('seg-invoice-type').className = (type==='OUT' && isInvoiceTxMode) ? 'active-gold' : '';
   const fields = document.getElementById('tx-form-fields');
   const hint = document.getElementById('tx-type-hint');
   if(!type){
@@ -163,8 +259,9 @@ function setTxType(type){
   // Khối gửi duyệt GĐ/PGĐ chỉ áp dụng cho khoản Chi
   document.getElementById('tx-approval-block').style.display = type==='OUT' ? '' : 'none';
 }
-document.getElementById('seg-in').addEventListener('click', ()=> setTxType('IN'));
-document.getElementById('seg-out').addEventListener('click', ()=> setTxType('OUT'));
+document.getElementById('seg-in').addEventListener('click', ()=>{ setInvoiceTxMode(false); setTxType('IN'); });
+document.getElementById('seg-out').addEventListener('click', ()=>{ setInvoiceTxMode(false); setTxType('OUT'); });
+document.getElementById('seg-invoice-type').addEventListener('click', ()=>{ setInvoiceTxMode(true); setTxType('OUT'); });
 document.getElementById('seg-advance')?.addEventListener('click', ()=>{
   closeModal('modal-tx');
   openOrderModal(null, 'advance');
@@ -187,6 +284,9 @@ function openTxModal(id, prefill, target, explainSourceId){
   const t = id ? sourceArr.find(x=>x.id===id) : (prefill || {});
   // giao dịch mới không có prefill: chưa chọn Thu/Chi, bắt buộc chọn trước.
   // Có prefill (VD: từ AI đọc hóa đơn) thì tự chọn sẵn đúng loại AI đã xác định được.
+  const hasInvoiceItems = Array.isArray(t.invoiceItems) && t.invoiceItems.length > 0;
+  invoiceItemRows = hasInvoiceItems ? t.invoiceItems.map(it=> newInvoiceItemRow(it)) : [];
+  setInvoiceTxMode(hasInvoiceItems);
   setTxType(id ? (t.type || 'IN') : (prefill ? (prefill.type || 'OUT') : ''));
   document.getElementById('tx-project-field').style.display = isFc ? 'none' : '';
   document.getElementById('tx-project').value = t.projectId || '';
@@ -257,6 +357,10 @@ document.getElementById('save-tx-btn').addEventListener('click', async ()=>{
   if(!content){ toast('Vui lòng nhập nội dung'); return; }
   if(!date){ toast('Vui lòng chọn ngày'); return; }
   if(!amount){ toast('Vui lòng nhập thành tiền'); return; }
+  if(isInvoiceTxMode && !invoiceItemRows.some(r=> r.name.trim())){
+    toast('Vui lòng nhập tên ít nhất 1 hàng hóa/dịch vụ');
+    return;
+  }
   if((currentInvoiceImage.length + currentTransferImage.length) > 900000){
     toast('Ảnh quá lớn, vui lòng chọn ảnh khác hoặc chụp ở độ phân giải thấp hơn');
     return;
@@ -277,9 +381,9 @@ document.getElementById('save-tx-btn').addEventListener('click', async ()=>{
     projectId: isFc ? '' : projectId, projectName: isFc ? '' : (proj ? proj.name : ''),
     date, code: document.getElementById('tx-code').value.trim(),
     content, description: document.getElementById('tx-desc').value.trim(),
-    unit: document.getElementById('tx-unit').value.trim(),
-    qty: Number(document.getElementById('tx-qty').value)||0,
-    unitPrice: parseMoneyInput(document.getElementById('tx-unitprice')),
+    unit: isInvoiceTxMode ? '' : document.getElementById('tx-unit').value.trim(),
+    qty: isInvoiceTxMode ? 0 : (Number(document.getElementById('tx-qty').value)||0),
+    unitPrice: isInvoiceTxMode ? 0 : parseMoneyInput(document.getElementById('tx-unitprice')),
     amount,
     invoiceNumber: document.getElementById('tx-invoice-number').value.trim(),
     invoiceDate: document.getElementById('tx-invoice-date').value,
@@ -293,6 +397,13 @@ document.getElementById('save-tx-btn').addEventListener('click', async ()=>{
     invoiceStatus: currentInvoiceStatus,
     transferStatus: currentTransferStatus,
   };
+
+  if(isInvoiceTxMode){
+    data.invoiceItems = invoiceItemRows.map(({_id, ...rest})=> rest);
+  } else if(id){
+    // Sửa 1 giao dịch từng ở chế độ Hóa Đơn nhưng giờ đổi lại Thu/Chi thường -> xóa hẳn field cũ (chỉ hợp lệ khi update).
+    data.invoiceItems = firebase.firestore.FieldValue.delete();
+  }
 
   // Gửi duyệt GĐ/PGĐ (chỉ áp dụng cho khoản Chi, và chỉ khi người dùng chủ động chọn ở dropdown)
   if(currentTxType === 'OUT'){
@@ -338,6 +449,8 @@ document.getElementById('save-tx-btn').addEventListener('click', async ()=>{
       }
     }
     closeModal('modal-tx');
+    isInvoiceTxMode = false;
+    invoiceItemRows = [];
   }catch(err){ toast('Lỗi: '+err.message); }
 });
 
@@ -518,18 +631,39 @@ function openTxViewModal(id, source){
   const t = (currentViewSource==='fc' ? (typeof FIXEDCOSTS!=='undefined'?FIXEDCOSTS:[]) : TRANSACTIONS).find(x=>x.id===id);
   if(!t) return;
   const row = (label, value) => value ? `<dt>${label}</dt><dd>${value}</dd>` : '';
+  const hasItems = Array.isArray(t.invoiceItems) && t.invoiceItems.length > 0;
   let html = `<dl class="tx-view-grid">
-    ${row('Loại giao dịch', t.type==='IN' ? '<span class="tag tag-in">Thu</span>' : '<span class="tag tag-out">Chi</span>')}
+    ${row('Loại giao dịch', t.type==='IN' ? '<span class="tag tag-in">Thu</span>' : (hasItems ? '<span class="tag tag-gold">🧾 Hóa Đơn</span>' : '<span class="tag tag-out">Chi</span>'))}
     ${currentViewSource==='fc' ? '' : row('Dự án', escapeHtml(t.projectName||'—'))}
     ${row('Ngày', fmtDate(t.date))}
     ${row('Mã (code)', t.code ? escapeHtml(t.code) : '')}
     ${row('Nội dung', '<strong>'+escapeHtml(t.content||'')+'</strong>')}
     ${row('Diễn giải', escapeHtml(t.description||''))}
-    ${row('ĐVT', escapeHtml(t.unit||''))}
-    ${row('Số lượng', t.qty ? String(t.qty) : '')}
-    ${row('Đơn giá', t.unitPrice ? fmtVND(t.unitPrice) : '')}
+    ${!hasItems ? row('ĐVT', escapeHtml(t.unit||'')) : ''}
+    ${!hasItems ? row('Số lượng', t.qty ? String(t.qty) : '') : ''}
+    ${!hasItems ? row('Đơn giá', t.unitPrice ? fmtVND(t.unitPrice) : '') : ''}
     ${row('Thành tiền', '<strong style="color:'+(t.type==='IN'?'var(--teal)':'var(--red)')+'">'+fmtVND(t.amount)+'</strong>')}
   </dl>`;
+
+  if(hasItems){
+    html += `<div class="tx-view-section"><h5>📦 Chi tiết hàng hóa, dịch vụ</h5>
+      <div class="table-wrap"><table class="data" style="font-size:12.5px;">
+        <thead><tr><th>Tên hàng hóa, dịch vụ</th><th>ĐVT</th><th>SL</th><th>Đơn giá</th><th>Thành tiền</th><th>Thuế suất</th><th>Tiền thuế</th><th>Sau thuế</th></tr></thead>
+        <tbody>${t.invoiceItems.map(it=>`
+          <tr>
+            <td>${escapeHtml(it.name||'—')}</td>
+            <td>${escapeHtml(it.unit||'')}</td>
+            <td class="num">${it.qty||0}</td>
+            <td class="num">${fmtVND(it.unitPrice||0)}</td>
+            <td class="num">${fmtVND(it.amount||0)}</td>
+            <td class="num">${it.vatRate||0}%</td>
+            <td class="num">${fmtVND(it.vatAmount||0)}</td>
+            <td class="num"><strong>${fmtVND(it.amountAfterTax||0)}</strong></td>
+          </tr>`).join('')}
+        </tbody>
+      </table></div>
+    </div>`;
+  }
 
   // Trạng thái hóa đơn — ai đăng nhập cũng bấm đổi được, TRỪ Sub-admin (GĐ chỉ xem)
   const invoiceIssued = (t.invoiceStatus||'pending')==='issued';
