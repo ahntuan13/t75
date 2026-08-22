@@ -33,9 +33,9 @@ function computeNotifications(){
   const pendingForMe = [];
   if(amAdmin || isGD){
     TRANSACTIONS.filter(t=> t.type==='OUT' && t.approvalStatus==='pending')
-      .forEach(t=> pendingForMe.push({ label: t.content, amount: t.amount, view: 'transactions', section: 'Thu Chi' }));
+      .forEach(t=> pendingForMe.push({ id:`pending-tx-${t.id}`, label: t.content, amount: t.amount, view: 'transactions', section: 'Thu Chi' }));
     (typeof ORDERS!=='undefined' ? ORDERS : []).filter(o=> o.approvalStatus==='pending')
-      .forEach(o=> pendingForMe.push({ label: o.reason, amount: o.amount,
+      .forEach(o=> pendingForMe.push({ id:`pending-ord-${o.id}`, label: o.reason, amount: o.amount,
         view: isAdv(o) ? 'advance' : 'orders', section: isAdv(o) ? 'Lệnh tạm ứng' : 'Lệnh chi' }));
   }
 
@@ -47,7 +47,7 @@ function computeNotifications(){
     .forEach(t=>{
       const days = daysSince(t.approvedAt);
       if(days!==null && days <= NOTIF_RECENT_DECISION_DAYS){
-        decidedForMe.push({ label: `Chi: ${t.content}`, amount: t.amount, status: t.approvalStatus, view: 'transactions' });
+        decidedForMe.push({ id:`decided-tx-${t.id}`, label: `Chi: ${t.content}`, amount: t.amount, status: t.approvalStatus, view: 'transactions' });
       }
     });
   (typeof ORDERS!=='undefined' ? ORDERS : []).filter(o=> (o.approvalStatus==='approved' || o.approvalStatus==='rejected')
@@ -55,7 +55,7 @@ function computeNotifications(){
     .forEach(o=>{
       const days = daysSince(o.approvedAt);
       if(days!==null && days <= NOTIF_RECENT_DECISION_DAYS){
-        decidedForMe.push({ label: `Lệnh chi: ${o.reason}`, amount: o.amount, status: o.approvalStatus, view: (typeof isAdvanceOrder==='function' && isAdvanceOrder(o)) ? 'advance' : 'orders' });
+        decidedForMe.push({ id:`decided-ord-${o.id}`, label: `Lệnh chi: ${o.reason}`, amount: o.amount, status: o.approvalStatus, view: (typeof isAdvanceOrder==='function' && isAdvanceOrder(o)) ? 'advance' : 'orders' });
       }
     });
 
@@ -67,9 +67,22 @@ function computeNotifications(){
     const notIssued = (t.invoiceStatus||'pending') !== 'issued';
     const missingInfo = !t.invoiceNumber || !t.invoiceDate;
     return notIssued || missingInfo;
-  }).map(t=> ({ label: `${t.content} (${t.projectName||'—'})`, amount: t.amount, view: 'invoices' }));
+  }).map(t=> ({ id:`overdue-${t.id}`, label: `${t.content} (${t.projectName||'—'})`, amount: t.amount, view: 'invoices' }));
 
   return { pendingForMe, decidedForMe, invoiceOverdue };
+}
+
+// ---------------- Đánh dấu "đã xem" (lưu cục bộ trên trình duyệt, theo từng thông báo) ----------------
+// Thông báo CHƯA có trong danh sách "đã xem" -> hiển thị đậm + nằm trên. Sau khi mở bảng thông báo 1 lần,
+// toàn bộ thông báo đang hiển thị được đánh dấu "đã xem" -> lần mở sau sẽ hiện xám đi (trừ khi có gì mới).
+function getSeenNotifIds(){
+  try{ return new Set(JSON.parse(localStorage.getItem('t75_seen_notifs') || '[]')); }
+  catch(e){ return new Set(); }
+}
+function markNotifsSeen(ids){
+  const seen = getSeenNotifIds();
+  ids.forEach(id=> seen.add(id));
+  try{ localStorage.setItem('t75_seen_notifs', JSON.stringify([...seen].slice(-500))); }catch(e){}
 }
 
 function renderNotifications(){
@@ -84,38 +97,68 @@ function renderNotifications(){
   const total = pendingForMe.length + invoiceOverdue.length;
   badge.textContent = total > 99 ? '99+' : String(total);
 
+  const seenIds = getSeenNotifIds();
+  // Thông báo CHƯA xem nằm lên trên (đậm), đã xem nằm dưới (xám) — sắp riêng trong từng nhóm.
+  const sortUnreadFirst = (arr) => arr.slice().sort((a,b)=> (seenIds.has(a.id)?1:0) - (seenIds.has(b.id)?1:0));
+  const allIds = [...pendingForMe, ...decidedForMe, ...invoiceOverdue].map(n=>n.id);
+
   const section = (title, items, renderItem) => items.length ? `
     <div class="notif-section">
       <div class="notif-section-title">${title}</div>
-      ${items.map(renderItem).join('')}
+      ${sortUnreadFirst(items).map(n=> renderItem(n, seenIds.has(n.id))).join('')}
     </div>` : '';
 
   let html = '';
-  html += section('🟡 Đang chờ bạn duyệt', pendingForMe, (n)=> `
-    <div class="notif-item" data-notif-view="${n.view}">
+  html += section('🟡 Đang chờ bạn duyệt', pendingForMe, (n, seen)=> `
+    <div class="notif-item ${seen ? 'notif-item-read' : 'notif-item-unread'}" data-notif-view="${n.view}">
       <div class="notif-title">[${escapeHtml(n.section)}] ${escapeHtml(n.label)}</div>
       <div>${fmtVND(n.amount)}</div>
     </div>`);
-  html += section('✅ Đã có kết quả duyệt', decidedForMe, (n)=> `
-    <div class="notif-item" data-notif-view="${n.view}">
+  html += section('✅ Đã có kết quả duyệt', decidedForMe, (n, seen)=> `
+    <div class="notif-item ${seen ? 'notif-item-read' : 'notif-item-unread'}" data-notif-view="${n.view}">
       <div class="notif-title">${n.status==='approved' ? '✅ Đã duyệt' : '❌ Từ chối'}: ${escapeHtml(n.label)}</div>
       <div>${fmtVND(n.amount)}</div>
     </div>`);
-  html += section('⏰ Hóa đơn cần cập nhật (quá 7 ngày)', invoiceOverdue, (n)=> `
-    <div class="notif-item" data-notif-view="${n.view}">
+  html += section('⏰ Hóa đơn cần cập nhật (quá 7 ngày)', invoiceOverdue, (n, seen)=> `
+    <div class="notif-item ${seen ? 'notif-item-read' : 'notif-item-unread'}" data-notif-view="${n.view}">
       <div class="notif-title">${escapeHtml(n.label)}</div>
       <div>${fmtVND(n.amount)} — chưa xuất/thiếu thông tin hóa đơn</div>
     </div>`);
 
   panel.innerHTML = html || `<div class="notif-empty">Không có thông báo nào.</div>`;
+  // Mở bảng ra xem 1 lần là coi như đã xem hết — lần mở sau các mục này sẽ hiện xám đi (trừ khi có mục mới).
+  markNotifsSeen(allIds);
+}
+
+// Định vị bảng thông báo cạnh nút chuông — dùng position:fixed + tính toạ độ bằng JS, không phụ thuộc
+// vào bất kỳ khung cha nào có overflow:hidden (trước đây bị nhốt trong sidebar 240px nên bị cắt chữ).
+function positionNotifPanel(){
+  const btn = document.getElementById('notif-bell-btn');
+  const panel = document.getElementById('notif-panel');
+  if(!btn || !panel) return;
+  const rect = btn.getBoundingClientRect();
+  const panelWidth = Math.min(380, window.innerWidth - 24);
+  let left = rect.left;
+  if(left + panelWidth > window.innerWidth - 12) left = window.innerWidth - panelWidth - 12;
+  if(left < 12) left = 12;
+  panel.style.left = left + 'px';
+  panel.style.bottom = (window.innerHeight - rect.top + 8) + 'px';
+  panel.style.top = 'auto';
 }
 
 document.getElementById('notif-bell-btn')?.addEventListener('click', (e)=>{
   e.stopPropagation();
   const panel = document.getElementById('notif-panel');
   const isOpen = panel.style.display === 'block';
-  if(!isOpen) renderNotifications();
+  if(!isOpen){
+    renderNotifications();
+    positionNotifPanel();
+  }
   panel.style.display = isOpen ? 'none' : 'block';
+});
+window.addEventListener('resize', ()=>{
+  const panel = document.getElementById('notif-panel');
+  if(panel && panel.style.display === 'block') positionNotifPanel();
 });
 document.getElementById('notif-panel')?.addEventListener('click', (e)=>{
   const item = e.target.closest('[data-notif-view]');
