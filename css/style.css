@@ -313,7 +313,7 @@ tr.tx-row-explained td:not(:last-child){text-decoration:line-through;}
 .approval-banner button{white-space:nowrap;}
 .sidebar-backdrop{display:none;}
 .fab-btn{
-  position:fixed; bottom:26px; right:26px; z-index:500;
+  position:fixed; bottom:92px; right:26px; z-index:500;
   width:56px; height:56px; border-radius:50%; border:none;
   background:var(--primary); color:#fff; font-size:28px; font-weight:400; line-height:1;
   box-shadow:0 8px 20px rgba(79,110,247,.4); cursor:pointer;
@@ -479,7 +479,7 @@ tr.tx-row-explained td:not(:last-child){text-decoration:line-through;}
   .filters-bar{gap:8px;}
   .filters-bar select,.filters-bar input{flex:1 1 140px;min-width:0;}
   .notif-panel{width:min(320px, calc(100vw - 32px));left:0;}
-  .fab-btn{bottom:18px;right:18px;width:52px;height:52px;font-size:26px;}
+  .fab-btn{bottom:84px;right:18px;width:52px;height:52px;font-size:26px;}
   .two-col{gap:12px;}
   .chart-wrap{height:260px;}
 }
