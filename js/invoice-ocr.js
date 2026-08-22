@@ -81,49 +81,93 @@ function parseInvoiceText(text, companyName){
     invoiceDate = `${dm[3]}-${String(dm[2]).padStart(2,'0')}-${String(dm[1]).padStart(2,'0')}`;
   }
 
+  // Dò tìm vùng bảng hàng hóa (từ dòng tiêu đề cột đến trước dòng "Tổng cộng") — TẤT CẢ các bước dò số lượng/
+  // đơn giá/thành tiền/thuế bên dưới đều CHỈ tìm trong vùng này, không tìm trên toàn văn bản — tránh lấy nhầm
+  // số liệu ở chỗ khác (vd "Ngày...tháng...", địa chỉ "Số 75, đường D4..." đã từng bị nhận nhầm thành ĐVT/SL).
+  const headerIdx = text.search(/T[êe]n\s*h[àa]ng\s*h[óo][áa]|Description/i);
+  const totalIdx = text.search(/T[ổôo]ng\s*c[ộô]ng/i);
+  const tableText = (headerIdx >= 0 && totalIdx > headerIdx) ? text.slice(headerIdx, totalIdx) : '';
+  const totalText = totalIdx >= 0 ? text.slice(totalIdx, totalIdx + 200) : '';
+
   const sellerTaxCode = get(/M[aã]\s*s[ốôo]\s*thu[ếe][\s\S]{0,40}?(\d{10,14})/i);
   const sellerName = get(/(?:[ĐD]on\s*v[ịi]\s*b[áa]n\s*h[àa]ng|Seller)[^\n:]*:?\s*\n?\s*([^\n]{5,120})/i);
   const bankAccount = get(/S[ốôo]\s*t[àa]i\s*kho[ảa]n[\s\S]{0,40}?(\d{6,20})/i);
   const bankName = get(/Ng[âa]n\s*h[àa]ng\s+([^\n\-,.]{3,60})/i);
 
-  // Dòng "Tổng cộng tiền thanh toán" thường đi kèm 2-3 số liền nhau: Thành tiền (trước thuế), Tiền thuế GTGT,
-  // Thành tiền sau thuế — cho phép khoảng cách/ xuống dòng linh hoạt vì OCR hay tách cột sai vị trí.
-  const totalLineMatch = text.match(/T[ổôo]ng\s*c[ộô]ng\s*ti[ềe]n\s*thanh\s*to[áa]n[\s\S]{0,120}/i)
-    || text.match(/T[ổôo]ng\s*c[ộô]ng[\s\S]{0,120}/i);
-  let amountBeforeTax = 0, vatAmount = 0, totalAmount = 0;
-  if(totalLineMatch){
-    const nums = (totalLineMatch[0].match(/[\d][\d.,]{2,}/g) || []).map(toNum).filter(n=>n>0);
-    if(nums.length>=3){ [amountBeforeTax, vatAmount, totalAmount] = nums; }
-    else if(nums.length===2){ [amountBeforeTax, totalAmount] = nums; vatAmount = totalAmount - amountBeforeTax; }
-    else if(nums.length===1){ totalAmount = amountBeforeTax = nums[0]; }
+  // Dòng "Tổng cộng tiền thanh toán": 2-3 số liền nhau = Thành tiền (trước thuế), Tiền thuế GTGT, Thành tiền sau thuế.
+  const totalNums = (totalText.match(/[\d][\d.,]{2,}/g) || []).map(toNum).filter(n=>n>0);
+  let grandAmount = 0, grandVat = 0, grandTotal = 0;
+  if(totalNums.length>=3){ [grandAmount, grandVat, grandTotal] = totalNums; }
+  else if(totalNums.length===2){ [grandAmount, grandTotal] = totalNums; grandVat = grandTotal - grandAmount; }
+  else if(totalNums.length===1){ grandTotal = grandAmount = totalNums[0]; }
+
+  // Tách từng dòng hàng hóa trong vùng bảng — mỗi dòng bắt đầu bằng 1 đoạn CÓ CHỮ (tên hàng hóa), các số xuất
+  // hiện ngay sau đó (cùng dòng hoặc (các) dòng kế tiếp) được gán theo ĐÚNG THỨ TỰ CỘT trên hóa đơn:
+  // SL -> Đơn giá -> Thành tiền -> Thuế suất(%) -> Tiền thuế GTGT -> Thành tiền sau thuế.
+  const KNOWN_UNITS = ['Chuyến','Chuyển','Lot','Tháng','Ngày','Cái','Bộ','M2','M3','Kg','Chiếc','Bao','Thùng','Hộp','Tấn','Lít'];
+  const headerWordsRe = /Đơn vị|Số lượng|Đơn giá|Thành tiền|Thuế suất|Tiền thuế|Description|Unit|Quantity|Tên hàng|STT|No\.|Amount/i;
+  const rawLines = tableText.split('\n').map(l=>l.trim()).filter(l=> l && !headerWordsRe.test(l));
+
+  const items = [];
+  let cur = null;
+  const finalizeCur = () => {
+    if(!cur) return;
+    const nums = cur._nums;
+    const pctIdx = nums.findIndex(n=> /%$/.test(n));
+    let qty=1, unitPrice=0, amount=0, vatRate=0, vatAmount=0, amountAfterTax=0;
+    if(pctIdx >= 0){
+      vatRate = toNum(nums[pctIdx]);
+      const before = nums.slice(0, pctIdx).map(toNum).filter(n=>n>0);
+      const after = nums.slice(pctIdx+1).map(toNum).filter(n=>n>0);
+      if(before.length>=3){ [qty, unitPrice, amount] = before.slice(-3); }
+      else if(before.length===2){ [unitPrice, amount] = before; }
+      else if(before.length===1){ amount = unitPrice = before[0]; }
+      if(after.length>=2){ [vatAmount, amountAfterTax] = after.slice(0,2); }
+      else if(after.length===1){ amountAfterTax = after[0]; vatAmount = amountAfterTax - amount; }
+    } else {
+      const allNums = nums.map(toNum).filter(n=>n>0);
+      if(allNums.length>=3){ [qty, unitPrice, amount] = allNums.slice(0,3); }
+      else if(allNums.length===2){ [unitPrice, amount] = allNums; }
+      else if(allNums.length===1){ amount = unitPrice = allNums[0]; }
+    }
+    const foundUnit = KNOWN_UNITS.find(u=> new RegExp('(^|\\s)'+u+'(\\s|$)','i').test(cur.raw)) || '';
+    items.push({ name: cur.name, unit: foundUnit, qty: qty||1, unitPrice, amount, vatRate, vatAmount, amountAfterTax: amountAfterTax || amount });
+  };
+
+  for(const line of rawLines){
+    const stripped = line.replace(/^\d{1,3}[\.\)]?\s+/, ''); // bỏ số thứ tự đầu dòng "1. " / "1) " / "1 "
+    const hasLetters = /[a-zA-ZÀ-ỹ]{2,}/.test(stripped);
+    // CHỈ lấy số "đứng riêng" (không dính liền chữ/số khác ở 2 đầu) — tránh nhận nhầm số bên trong
+    // các mã tra cứu/mã vận đơn xen kẽ chữ+số (vd "01M09KYJAP70ZEKJNBACN10S9Q") thành số tiền/số lượng.
+    const nums = line.match(/(?<![A-Za-zÀ-ỹ0-9])\d[\d.,]*\s*%?(?![A-Za-zÀ-ỹ0-9])/g) || [];
+    const isKnownUnitOnly = KNOWN_UNITS.some(u=> new RegExp('^'+u+'$','i').test(stripped.trim()));
+    // Dòng BẮT ĐẦU bằng 1 từ ĐVT quen thuộc (vd "Chuyến 1 142.593 ... 8% ...") -> đây là phần số liệu
+    // tiếp nối của dòng mô tả phía trên (OCR bị tách dòng giữa tên hàng hóa và số liệu), không phải hàng mới.
+    const startsWithUnit = KNOWN_UNITS.find(u=> new RegExp('^'+u+'\\b','i').test(stripped.trim()));
+    if(startsWithUnit && cur){
+      cur.raw += ' ' + line;
+      cur._nums.push(...nums);
+      continue;
+    }
+    if(hasLetters && !isKnownUnitOnly && nums.length===0){
+      finalizeCur();
+      cur = { name: stripped, raw: line, _nums: [] };
+    } else if(hasLetters && !isKnownUnitOnly && nums.length>0){
+      finalizeCur();
+      const nameOnly = stripped.replace(/[\d.,%\s]+$/,'').trim() || stripped;
+      cur = { name: nameOnly, raw: line, _nums: nums };
+    } else if(cur){
+      cur.raw += ' ' + line;
+      cur._nums.push(...nums);
+    }
   }
-  // Thuế suất GTGT dạng phần trăm, vd "8%" — lấy số gần nhất đứng trước dấu %
-  const vatRateMatch = text.match(/(\d{1,2}(?:[.,]\d)?)\s*%/);
-  const vatRate = vatRateMatch ? Number(vatRateMatch[1].replace(',','.')) : 0;
+  finalizeCur();
 
-  // Đơn vị tính + Số lượng: dò 1 từ đơn vị phổ biến đứng gần 1 số lượng nhỏ (best-effort, hay sai với hóa đơn
-  // nhiều dòng — người dùng luôn cần rà soát/ thêm dòng bằng tay nếu hóa đơn có >1 hàng hóa/dịch vụ).
-  const unit = get(/\b(Chuy[ếe]n|Lot|Th[áa]ng|Ng[àa]y|C[áa]i|B[ộô]|M2|Kg|Chi[ếe]c)\b/i);
-  const qtyMatch = text.match(/\b([1-9]\d{0,2})\b\s*(?=\d[\d.,]{3,}|\n)/);
-  const qty = qtyMatch ? Number(qtyMatch[1]) : 1;
-
-  // Tên hàng hóa, dịch vụ: cố gắng lấy dòng mô tả trong bảng (giữa header và dòng "Tổng cộng"),
-  // loại bỏ các dòng chỉ toàn số hoặc trùng với các nhãn cột đã biết. Luôn để trống nếu không chắc,
-  // để người dùng tự nhập tay thay vì điền sai — an toàn hơn là đoán bừa nội dung hàng hóa.
-  let itemName = '';
-  const tableStart = text.search(/T[êe]n\s*h[àa]ng\s*h[óo][áa]|Description/i);
-  const tableEnd = text.search(/T[ổôo]ng\s*c[ộô]ng/i);
-  if(tableStart >= 0 && tableEnd > tableStart){
-    const between = text.slice(tableStart, tableEnd).split('\n')
-      .map(l=>l.trim())
-      .filter(l=> l.length>=6 && !/^[\d.,\s%]+$/.test(l) && !/Đơn vị|Số lượng|Đơn giá|Thành tiền|Thuế suất|Tiền thuế|Description|Unit|Quantity/i.test(l));
-    if(between.length) itemName = between[0].replace(/^\d+\s*/, '').trim();
-  }
-
-  const unitPrice = qty && amountBeforeTax ? Math.round(amountBeforeTax / qty) : amountBeforeTax;
-  const items = [{
-    name: itemName, unit, qty: qty || 1, unitPrice, amount: amountBeforeTax,
-    vatRate, vatAmount, amountAfterTax: totalAmount || amountBeforeTax,
+  // Không dò được dòng hàng hóa nào (bảng OCR quá lem/mất chữ) -> vẫn trả về ít nhất 1 dòng trống, gán tạm
+  // theo số liệu tổng ở "Tổng cộng" để người dùng đỡ phải gõ tay hoàn toàn từ đầu, sau đó tự sửa tên hàng hóa.
+  const finalItems = items.length ? items : [{
+    name: '', unit: '', qty: 1, unitPrice: grandAmount, amount: grandAmount,
+    vatRate: 0, vatAmount: grandVat, amountAfterTax: grandTotal || grandAmount,
   }];
 
   // Đoán Thu/Chi: xem tên công ty xuất hiện gần cụm "bên mua/buyer" hay "bên bán/seller"
@@ -140,7 +184,7 @@ function parseInvoiceText(text, companyName){
   }
 
   return { invoiceNumber, invoiceDate, sellerTaxCode, sellerName, bankAccount, bankName,
-    totalAmount: totalAmount || amountBeforeTax, direction, items };
+    totalAmount: grandTotal || grandAmount, direction, items: finalItems };
 }
 
 async function handleInvoiceUpload(file){
