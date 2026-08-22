@@ -293,6 +293,9 @@ tr td.tx-subhead-empty{color:var(--ink-faint);font-style:italic;font-size:12.5px
 .exp-row .field{flex:1;min-width:120px;margin-bottom:0;}
 .exp-row .field.grow2{flex:2;}
 .exp-row .field.grow-sm{flex:0.6;min-width:70px;}
+/* Giải chi lệnh tạm ứng: gom 5 khung Giải chi thành 1 cột dọc, cuộn lên xuống — không dùng lưới 2 cột như trước. */
+#modal-order-explain .form-grid{grid-template-columns:1fr;}
+.exp-attach-row{border-top:1px dashed var(--line);padding-top:10px;margin-top:4px;}
 @media (max-width:720px){ .exp-row{flex-direction:column;} .exp-row .field{width:100%;} }
 tr.tx-row-explained td{opacity:.5;}
 tr.tx-row-explained td:not(:last-child){text-decoration:line-through;}
