@@ -135,7 +135,7 @@ input,select,textarea{font-family:inherit;}
 
 /* ---------- App Shell ---------- */
 #app-screen{display:none;min-height:100vh;}
-.shell{display:grid;grid-template-columns:240px 1fr;min-height:100vh;isolation:isolate;}
+.shell{display:grid;grid-template-columns:240px 1fr;min-height:100vh;}
 .sidebar{
   background:var(--sidebar-bg);
   color:var(--ink-dim);padding:20px 14px;display:flex;flex-direction:column;
