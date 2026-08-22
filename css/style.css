@@ -298,6 +298,7 @@ tr.tx-row-explained td{opacity:.5;}
 tr.tx-row-explained td:not(:last-child){text-decoration:line-through;}
 .approval-banner{display:flex;align-items:center;gap:12px;justify-content:space-between;background:var(--gold-dim);color:var(--gold);border-radius:12px;padding:12px 16px;margin-bottom:16px;font-weight:600;font-size:13.5px;flex-wrap:wrap;}
 .approval-banner button{white-space:nowrap;}
+.sidebar-backdrop{display:none;}
 .fab-btn{
   position:fixed; bottom:26px; right:26px; z-index:500;
   width:56px; height:56px; border-radius:50%; border:none;
