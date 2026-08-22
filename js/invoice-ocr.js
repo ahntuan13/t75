@@ -30,7 +30,8 @@ function stripDiacritics(s){
   return String(s||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/đ/gi,'d').toLowerCase();
 }
 
-// Chuyển trang đầu tiên của PDF thành ảnh (dataURL) để OCR đọc được — dùng PDF.js
+// Chuyển trang đầu tiên của PDF thành ảnh (dataURL) để OCR đọc được — dùng PDF.js. Dùng làm phương án
+// DỰ PHÒNG khi PDF không có lớp chữ thật (PDF dạng ảnh scan) — xem pdfExtractRows() bên dưới là cách chính.
 async function pdfFirstPageToImage(file){
   if(typeof pdfjsLib === 'undefined') throw new Error('Chưa tải được thư viện đọc PDF, thử lại sau.');
   pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdn.jsdelivr.net/npm/pdfjs-dist@3.11.174/build/pdf.worker.min.js';
@@ -42,6 +43,122 @@ async function pdfFirstPageToImage(file){
   canvas.width = viewport.width; canvas.height = viewport.height;
   await page.render({canvasContext: canvas.getContext('2d'), viewport}).promise;
   return canvas.toDataURL('image/png');
+}
+
+// =============================================================
+// CÁCH CHÍNH (chính xác cao) — Hóa đơn điện tử PDF thường có SẴN LỚP CHỮ THẬT (chọn/copy được chữ bằng
+// chuột), khác hẳn ảnh chụp cần đoán chữ. Đọc thẳng toạ độ (x,y) của từng chữ trong PDF bằng PDF.js —
+// không cần đoán mò qua OCR, độ chính xác gần như tuyệt đối cho các trường có toạ độ rõ ràng.
+// Trả về null nếu PDF không có lớp chữ thật (PDF dạng ảnh scan) -> khi đó phải dùng Tesseract OCR như cũ.
+// =============================================================
+async function pdfExtractRows(file){
+  if(typeof pdfjsLib === 'undefined') throw new Error('Chưa tải được thư viện đọc PDF, thử lại sau.');
+  pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdn.jsdelivr.net/npm/pdfjs-dist@3.11.174/build/pdf.worker.min.js';
+  const buf = await file.arrayBuffer();
+  const pdf = await pdfjsLib.getDocument({data: buf}).promise;
+  const page = await pdf.getPage(1);
+  const content = await page.getTextContent();
+  const rawItems = content.items.filter(it => it.str && it.str.trim());
+  if(rawItems.length < 15) return null; // quá ít chữ -> nhiều khả năng PDF dạng ảnh scan, không có lớp chữ thật
+
+  // Gom các chữ có toạ độ Y gần nhau (chênh lệch nhỏ) thành CÙNG 1 DÒNG THẬT trên trang.
+  const rows = [];
+  rawItems.forEach(it=>{
+    const y = it.transform[5];
+    const x = it.transform[4];
+    let row = rows.find(r=> Math.abs(r.y - y) <= 2.5);
+    if(!row){ row = {y, items: []}; rows.push(row); }
+    row.items.push({ text: it.str, x, w: it.width || (it.str.length * 4) });
+  });
+  rows.sort((a,b)=> b.y - a.y); // PDF: Y càng lớn càng ở TRÊN trang -> sắp giảm dần để đúng thứ tự đọc từ trên xuống
+  rows.forEach(r=> r.items.sort((a,b)=> a.x - b.x)); // trong 1 dòng, sắp trái sang phải
+
+  return { rows };
+}
+
+// Ghép các dòng (đã tách theo toạ độ) thành 1 chuỗi văn bản thường — dùng cho việc dò các trường đơn lẻ
+// (số hóa đơn, ngày, MST, tổng tiền...) bằng luật (regex) giống hệt cách xử lý ảnh OCR, chỉ khác là
+// dữ liệu đầu vào ở đây chính xác tuyệt đối (không phải đoán chữ).
+function pdfRowsToText(rows){
+  return rows.map(r=>{
+    let line = '', lastEnd = null;
+    r.items.forEach(it=>{
+      if(lastEnd!==null && it.x - lastEnd > 8) line += '  ';
+      line += it.text;
+      lastEnd = it.x + it.w;
+    });
+    return line;
+  }).join('\n');
+}
+
+// Trích bảng hàng hóa THEO ĐÚNG CỘT bằng toạ độ X — CHÍNH XÁC HƠN HẲN cách dò theo thứ tự số trong văn bản
+// thường (không còn nhầm lẫn số lượng/đơn giá/mã quy cách/biển số xe với nhau nữa, vì mỗi con số đã nằm
+// sẵn đúng cột toạ độ X của nó trên trang PDF — không cần đoán qua vị trí xuất hiện trước/sau trong câu).
+function parseItemTableByColumns(rows){
+  const headerRowIdx = rows.findIndex(r=>{
+    const t = r.items.map(i=>i.text).join(' ');
+    return /T[êe]n\s*h[àa]ng/i.test(t) && /Đ[ơo]n\s*v[ịi]/i.test(t) && /S[ốôo]\s*l[uư][oợ]ng/i.test(t);
+  });
+  if(headerRowIdx < 0) return null;
+  const headerRow = rows[headerRowIdx];
+  const findColX = (re) => headerRow.items.find(i=> re.test(i.text))?.x;
+  const colDefs = [
+    ['stt', /^(STT|No\.?)$/i],
+    ['name', /T[êe]n\s*h[àa]ng/i],
+    ['unit', /Đ[ơo]n\s*v[ịi]/i],
+    ['qty', /S[ốôo]\s*l[uư][oợ]ng/i],
+    ['price', /Đ[ơo]n\s*gi[áa]/i],
+    ['amount', /Th[àa]nh\s*ti[ềe]n(?!\s*sau)/i],
+    ['vatRate', /Thu[ếe]\s*su[ấa]t/i],
+    ['vatAmt', /Ti[ềe]n\s*thu[ếe]/i],
+    ['afterTax', /Th[àa]nh\s*ti[ềe]n\s*sau|Amount\)?\s*$/i],
+  ];
+  const cols = colDefs.map(([k,re])=> [k, findColX(re)]).filter(([k,x])=> x!=null);
+  if(cols.length < 4) return null; // không xác định đủ cột chính -> không đáng tin, để hàm gọi tự dùng cách dự phòng
+  const bucketOf = (x) => cols.reduce((best,[k,cx])=>{
+    const d = Math.abs(x-cx);
+    return (!best || d<best.d) ? {k,d} : best;
+  }, null)?.k;
+
+  const summaryRowIdx = rows.findIndex((r,i)=> i>headerRowIdx &&
+    /C[ộô]ng\s*ti[ềe]n\s*h[àa]ng|T[ổôo]ng\s*c[ộô]ng|T[ổôo]ng\s*h[ợo]p/i.test(r.items.map(x=>x.text).join(' ')));
+  const dataRows = rows.slice(headerRowIdx+1, summaryRowIdx>=0 ? summaryRowIdx : rows.length);
+
+  const toNum = (s) => { if(!s) return 0; const str = String(s).replace(/%$/,'').trim().replace(/\./g,'').replace(',', '.'); return Number(str)||0; };
+  const items = [];
+  let cur = null;
+  dataRows.forEach(row=>{
+    const buckets = {};
+    row.items.forEach(it=>{
+      const k = bucketOf(it.x);
+      if(!k) return;
+      buckets[k] = (buckets[k] ? buckets[k]+' ' : '') + it.text;
+    });
+    const hasStt = buckets.stt && /^\d+$/.test(buckets.stt.trim());
+    const hasNumericData = buckets.qty || buckets.price || buckets.amount;
+    if(hasStt || (!cur && hasNumericData)){
+      if(cur) items.push(cur);
+      cur = { name:'', unit:'', qty:0, unitPrice:0, amount:0, vatRate:0, vatAmount:0, amountAfterTax:0 };
+    }
+    if(!cur) cur = { name:'', unit:'', qty:0, unitPrice:0, amount:0, vatRate:0, vatAmount:0, amountAfterTax:0 };
+    if(buckets.name) cur.name = (cur.name ? cur.name+' ' : '') + buckets.name.trim();
+    if(buckets.unit) cur.unit = buckets.unit.trim();
+    if(buckets.qty) cur.qty = toNum(buckets.qty) || cur.qty;
+    if(buckets.price) cur.unitPrice = toNum(buckets.price) || cur.unitPrice;
+    if(buckets.amount) cur.amount = toNum(buckets.amount) || cur.amount;
+    if(buckets.vatRate) cur.vatRate = toNum(buckets.vatRate) || cur.vatRate;
+    if(buckets.vatAmt) cur.vatAmount = toNum(buckets.vatAmt) || cur.vatAmount;
+    if(buckets.afterTax) cur.amountAfterTax = toNum(buckets.afterTax) || cur.amountAfterTax;
+  });
+  if(cur) items.push(cur);
+
+  const validItems = items.filter(it=> it.name.trim() && (it.amount>0 || it.unitPrice>0));
+  if(!validItems.length) return null;
+  validItems.forEach(it=>{
+    if(!it.qty) it.qty = 1;
+    if(!it.amountAfterTax) it.amountAfterTax = it.amount + (it.vatAmount||0);
+  });
+  return validItems;
 }
 
 // Chạy OCR (tiếng Việt + tiếng Anh) trên 1 ảnh, trả về toàn bộ chữ đọc được
@@ -232,23 +349,35 @@ function parseInvoiceText(text, companyName){
 async function handleInvoiceUpload(file){
   if(!file) return;
   const isPdf = file.type === 'application/pdf' || /\.pdf$/i.test(file.name);
-  toast('🔍 Đang đọc hóa đơn (OCR miễn phí, có thể mất 10-30 giây)...');
   try{
-    let imageDataUrl;
+    let extracted, imageDataUrl = '';
+
     if(isPdf){
-      toast('Đang chuyển trang 1 của PDF thành ảnh...');
-      imageDataUrl = await pdfFirstPageToImage(file);
+      toast('📄 Đang đọc trực tiếp lớp chữ trong file PDF...');
+      const pdfData = await pdfExtractRows(file);
+      if(pdfData){
+        // CÓ lớp chữ thật trong PDF -> đọc chính xác, KHÔNG cần OCR đoán chữ, rất nhanh.
+        const rawText = pdfRowsToText(pdfData.rows);
+        extracted = parseInvoiceText(rawText, OCR_SETTINGS.companyName);
+        const columnItems = parseItemTableByColumns(pdfData.rows);
+        if(columnItems) extracted.items = columnItems; // ưu tiên kết quả đọc theo đúng cột toạ độ, chính xác hơn
+        imageDataUrl = await pdfFirstPageToImage(file); // vẫn lưu lại ảnh trang hóa đơn để xem/đối chiếu sau này
+      } else {
+        // KHÔNG có lớp chữ (PDF dạng ảnh scan) -> đành phải OCR như ảnh chụp thường.
+        toast('🔍 File PDF này là dạng ảnh scan (không có lớp chữ) — chuyển sang đọc bằng OCR...');
+        imageDataUrl = await pdfFirstPageToImage(file);
+        const rawText = await runOcr(imageDataUrl, (pct)=> toast(`🔍 Đang đọc chữ... ${pct}%`));
+        if(!rawText.trim()){ toast('Không đọc được chữ nào trong file, thử ảnh rõ hơn.'); return; }
+        extracted = parseInvoiceText(rawText, OCR_SETTINGS.companyName);
+      }
     } else {
+      toast('🔍 Đang đọc hóa đơn bằng OCR (có thể mất 10-30 giây)...');
       imageDataUrl = await compressImageFile(file, 1600, 0.85); // ảnh lớn hơn 1 chút để OCR đọc rõ hơn
+      const rawText = await runOcr(imageDataUrl, (pct)=> toast(`🔍 Đang đọc chữ... ${pct}%`));
+      if(!rawText.trim()){ toast('Không đọc được chữ nào trong ảnh, thử ảnh rõ hơn.'); return; }
+      extracted = parseInvoiceText(rawText, OCR_SETTINGS.companyName);
     }
 
-    const rawText = await runOcr(imageDataUrl, (pct)=> toast(`🔍 Đang đọc chữ... ${pct}%`));
-    if(!rawText.trim()){
-      toast('Không đọc được chữ nào trong ảnh, thử ảnh rõ hơn.');
-      return;
-    }
-
-    const extracted = parseInvoiceText(rawText, OCR_SETTINGS.companyName);
     const prefill = {
       type: extracted.direction,
       projectId: '',
@@ -266,10 +395,10 @@ async function handleInvoiceUpload(file){
       note: '', // để trống theo yêu cầu — không dán nguyên văn chữ OCR vào Ghi chú nữa
     };
     openTxModal(null, prefill);
-    toast('✅ OCR đọc xong — kiểm tra KỸ lại thông tin (đặc biệt số tiền, tên hàng hóa, MST) trước khi lưu. Nếu hóa đơn có nhiều dòng hàng hóa, bấm "+ Thêm dòng" để nhập đủ.');
+    toast('✅ Đọc xong — kiểm tra KỸ lại thông tin (đặc biệt số tiền, tên hàng hóa, MST) trước khi lưu. Nếu hóa đơn có nhiều dòng hàng hóa, bấm "+ Thêm dòng" để nhập đủ.');
   }catch(err){
     toast('Lỗi đọc hóa đơn');
-    alert('Lỗi đọc hóa đơn (OCR):\n\n' + err.message);
+    alert('Lỗi đọc hóa đơn:\n\n' + err.message);
   }
 }
 
