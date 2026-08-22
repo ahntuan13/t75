@@ -751,22 +751,40 @@
             <option value="TAX">TAX - Thuế</option>
           </select>
         </div>
-        <div class="field full"><label>Nội dung *</label><input id="tx-content" required placeholder="VD: Thanh toán chi phí vật tư"></div>
-        <div class="field full" id="tx-desc-field"><label>Diễn giải</label><input id="tx-desc" placeholder="Chi tiết diễn giải"></div>
-
         <!-- Khối 1 dòng hàng hóa/dịch vụ — dùng cho Thu / Chi / Tạm ứng (giữ như cũ) -->
+        <div class="field full" id="tx-content-field"><label>Nội dung *</label><input id="tx-content" required placeholder="VD: Thanh toán chi phí vật tư"></div>
         <div class="field" id="tx-simple-unit-field"><label>ĐVT</label><input id="tx-unit" placeholder="lot, m2, cái..."></div>
         <div class="field" id="tx-simple-qty-field"><label>Số lượng</label><input type="number" id="tx-qty" placeholder="1"></div>
         <div class="field" id="tx-simple-price-field"><label>Đơn giá</label><input type="text" id="tx-unitprice" placeholder="0"></div>
         <div class="field" id="tx-simple-amount-field"><label>Thành tiền *</label><input type="text" id="tx-amount" required placeholder="0"></div>
 
-        <!-- Khối nhiều dòng hàng hóa/dịch vụ theo đúng mẫu hóa đơn VAT — chỉ hiện khi chọn loại "Hóa Đơn" -->
+        <!-- Khối nhiều dòng hàng hóa/dịch vụ theo đúng mẫu hóa đơn VAT (dạng bảng ngang) — chỉ hiện khi chọn loại "Hóa Đơn" -->
         <div class="field full" id="tx-invoice-items-field" style="display:none;">
           <label>Tên hàng hóa, dịch vụ *</label>
-          <div class="helper-text" style="margin-bottom:8px;">Nếu hóa đơn có nhiều dòng hàng hóa/dịch vụ, bấm "+ Thêm dòng" để nhập đủ — mỗi dòng tự tính Tiền thuế GTGT và Thành tiền sau thuế.</div>
-          <div id="tx-invoice-items-list"></div>
-          <button type="button" class="btn btn-ghost btn-sm" id="tx-invoice-item-add" style="margin-top:4px;">+ Thêm dòng</button>
-          <div class="helper-text" id="tx-invoice-items-total" style="margin-top:10px;font-weight:700;color:var(--ink);"></div>
+          <div class="helper-text" style="margin-bottom:8px;">Nếu hóa đơn có nhiều dòng hàng hóa/dịch vụ, bấm "+ Thêm dòng" để nhập đủ — mỗi dòng tự tính Tiền thuế GTGT và Thành tiền sau thuế. AI đọc hóa đơn cũng sẽ tự thêm đúng số dòng tương ứng.</div>
+          <div class="table-wrap"><table class="data inv-items-table">
+            <thead><tr>
+              <th style="min-width:180px;">Tên hàng hóa, dịch vụ</th>
+              <th style="min-width:90px;">ĐVT</th>
+              <th style="min-width:70px;">SL</th>
+              <th style="min-width:110px;">Đơn giá</th>
+              <th style="min-width:110px;">Thành tiền</th>
+              <th style="min-width:90px;">Thuế suất GTGT</th>
+              <th style="min-width:110px;">Tiền thuế GTGT</th>
+              <th style="min-width:120px;">Thành tiền sau thuế</th>
+              <th></th>
+            </tr></thead>
+            <tbody id="tx-invoice-items-list"></tbody>
+            <tfoot><tr class="inv-items-total-row">
+              <td colspan="4" style="text-align:right;font-weight:700;">Tổng cộng tiền thanh toán</td>
+              <td class="num" id="tx-inv-total-amount" style="font-weight:700;">0</td>
+              <td></td>
+              <td class="num" id="tx-inv-total-vat" style="font-weight:700;">0</td>
+              <td class="num" id="tx-inv-total-after-tax" style="font-weight:700;color:var(--primary);">0</td>
+              <td></td>
+            </tr></tfoot>
+          </table></div>
+          <button type="button" class="btn btn-ghost btn-sm" id="tx-invoice-item-add" style="margin-top:8px;">+ Thêm dòng</button>
         </div>
 
         <div class="field full" style="border-top:1px solid var(--line);padding-top:14px;margin-top:2px;">
@@ -825,6 +843,7 @@
           <div class="helper-text" id="tx-approval-current-status" style="margin-top:8px;"></div>
         </div>
 
+        <div class="field full"><label>Diễn giải</label><input id="tx-desc" placeholder="Chi tiết diễn giải"></div>
         <div class="field full"><label>Ghi chú</label><textarea id="tx-note" rows="2"></textarea></div>
       </div>
     </div>
