@@ -58,16 +58,24 @@ async function runOcr(imageSource, onProgress){
 // LƯU Ý: chữ OCR thật thường bị: mất dấu câu, tách dòng lung tung (nhãn và số liệu có thể nằm ở 2 dòng
 // khác nhau do bố cục bảng biểu), nên các luật dưới đây cố tình "khoan dung" — cho phép khoảng cách xa
 // và xuống dòng giữa nhãn và giá trị, thay vì chỉ khớp trên cùng 1 dòng liền mạch.
+// Luôn trả về "items": mảng ít nhất 1 dòng hàng hóa/dịch vụ (best-effort) để đổ thẳng vào khối nhiều dòng
+// của loại giao dịch "🧾 Hóa Đơn" — người dùng luôn cần rà soát/sửa lại, đặc biệt khi hóa đơn có >1 dòng.
 function parseInvoiceText(text, companyName){
   const norm = stripDiacritics(text);
   const get = (regex) => { const m = text.match(regex); return m ? m[1].trim() : ''; };
+  const toNum = (s) => s ? Number(String(s).replace(/[^\d]/g,'')) || 0 : 0;
 
-  const invoiceNumber = get(/S[ốôo]\s*\(?\s*No\.?\s*\)?[\s\S]{0,40}?(\d{4,10})/i)
+  // Số hóa đơn: chấp nhận nhiều kiểu nhãn khác nhau tùy mẫu hóa đơn (Số/No/Ký hiệu/Mẫu số/mã tra cứu MCQT...)
+  const invoiceNumber = get(/S[ốôo]\s*h[óoôo][áa]?\s*[đd][ơo]n[\s\S]{0,30}?([A-Z0-9\-]{4,20})/i)
+    || get(/S[ốôo]\s*\(?\s*No\.?\s*\)?[\s\S]{0,40}?(\d{4,10})/i)
+    || get(/K[ýy]\s*hi[ệe]u[\s\S]{0,30}?([A-Z0-9\-]{4,20})/i)
+    || get(/MCQT[\s:]*([A-Z0-9\-]{6,30})/i)
     || get(/No\.?\s*[:.\-]?[\s\S]{0,20}?(\d{4,10})/i);
 
-  // Ngày (Date) DD tháng MM năm YYYY — cho phép xuống dòng giữa các phần
+  // Ngày xuất hóa đơn: "Ngày DD tháng MM năm YYYY" hoặc DD/MM/YYYY, ưu tiên cụm gần chữ "Ngày"/"Date" trước
   let invoiceDate = '';
-  const dm = text.match(/(\d{1,2})\s*th[áa]ng[\s\S]{0,15}?(\d{1,2})\s*n[ăa]m[\s\S]{0,15}?(\d{4})/i)
+  const dm = text.match(/(?:Ng[àa]y|Date|K[ýy]\s*ng[àa]y)[\s\S]{0,10}?(\d{1,2})\s*(?:th[áa]ng|\/|\-)[\s\S]{0,10}?(\d{1,2})\s*(?:n[ăa]m|\/|\-)[\s\S]{0,10}?(\d{4})/i)
+    || text.match(/(\d{1,2})\s*th[áa]ng[\s\S]{0,15}?(\d{1,2})\s*n[ăa]m[\s\S]{0,15}?(\d{4})/i)
     || text.match(/(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{4})/);
   if(dm){
     invoiceDate = `${dm[3]}-${String(dm[2]).padStart(2,'0')}-${String(dm[1]).padStart(2,'0')}`;
@@ -77,9 +85,46 @@ function parseInvoiceText(text, companyName){
   const sellerName = get(/(?:[ĐD]on\s*v[ịi]\s*b[áa]n\s*h[àa]ng|Seller)[^\n:]*:?\s*\n?\s*([^\n]{5,120})/i);
   const bankAccount = get(/S[ốôo]\s*t[àa]i\s*kho[ảa]n[\s\S]{0,40}?(\d{6,20})/i);
   const bankName = get(/Ng[âa]n\s*h[àa]ng\s+([^\n\-,.]{3,60})/i);
-  const totalAmountRaw = get(/T[ổôo]ng\s*ti[ềe]n\s*thanh\s*to[áa]n[\s\S]{0,40}?([\d][\d.,]{3,})/i)
-    || get(/T[ổôo]ng\s*c[ộô]ng[\s\S]{0,40}?([\d][\d.,]{3,})/i);
-  const totalAmount = totalAmountRaw ? Number(totalAmountRaw.replace(/[.,]/g,'')) : 0;
+
+  // Dòng "Tổng cộng tiền thanh toán" thường đi kèm 2-3 số liền nhau: Thành tiền (trước thuế), Tiền thuế GTGT,
+  // Thành tiền sau thuế — cho phép khoảng cách/ xuống dòng linh hoạt vì OCR hay tách cột sai vị trí.
+  const totalLineMatch = text.match(/T[ổôo]ng\s*c[ộô]ng\s*ti[ềe]n\s*thanh\s*to[áa]n[\s\S]{0,120}/i)
+    || text.match(/T[ổôo]ng\s*c[ộô]ng[\s\S]{0,120}/i);
+  let amountBeforeTax = 0, vatAmount = 0, totalAmount = 0;
+  if(totalLineMatch){
+    const nums = (totalLineMatch[0].match(/[\d][\d.,]{2,}/g) || []).map(toNum).filter(n=>n>0);
+    if(nums.length>=3){ [amountBeforeTax, vatAmount, totalAmount] = nums; }
+    else if(nums.length===2){ [amountBeforeTax, totalAmount] = nums; vatAmount = totalAmount - amountBeforeTax; }
+    else if(nums.length===1){ totalAmount = amountBeforeTax = nums[0]; }
+  }
+  // Thuế suất GTGT dạng phần trăm, vd "8%" — lấy số gần nhất đứng trước dấu %
+  const vatRateMatch = text.match(/(\d{1,2}(?:[.,]\d)?)\s*%/);
+  const vatRate = vatRateMatch ? Number(vatRateMatch[1].replace(',','.')) : 0;
+
+  // Đơn vị tính + Số lượng: dò 1 từ đơn vị phổ biến đứng gần 1 số lượng nhỏ (best-effort, hay sai với hóa đơn
+  // nhiều dòng — người dùng luôn cần rà soát/ thêm dòng bằng tay nếu hóa đơn có >1 hàng hóa/dịch vụ).
+  const unit = get(/\b(Chuy[ếe]n|Lot|Th[áa]ng|Ng[àa]y|C[áa]i|B[ộô]|M2|Kg|Chi[ếe]c)\b/i);
+  const qtyMatch = text.match(/\b([1-9]\d{0,2})\b\s*(?=\d[\d.,]{3,}|\n)/);
+  const qty = qtyMatch ? Number(qtyMatch[1]) : 1;
+
+  // Tên hàng hóa, dịch vụ: cố gắng lấy dòng mô tả trong bảng (giữa header và dòng "Tổng cộng"),
+  // loại bỏ các dòng chỉ toàn số hoặc trùng với các nhãn cột đã biết. Luôn để trống nếu không chắc,
+  // để người dùng tự nhập tay thay vì điền sai — an toàn hơn là đoán bừa nội dung hàng hóa.
+  let itemName = '';
+  const tableStart = text.search(/T[êe]n\s*h[àa]ng\s*h[óo][áa]|Description/i);
+  const tableEnd = text.search(/T[ổôo]ng\s*c[ộô]ng/i);
+  if(tableStart >= 0 && tableEnd > tableStart){
+    const between = text.slice(tableStart, tableEnd).split('\n')
+      .map(l=>l.trim())
+      .filter(l=> l.length>=6 && !/^[\d.,\s%]+$/.test(l) && !/Đơn vị|Số lượng|Đơn giá|Thành tiền|Thuế suất|Tiền thuế|Description|Unit|Quantity/i.test(l));
+    if(between.length) itemName = between[0].replace(/^\d+\s*/, '').trim();
+  }
+
+  const unitPrice = qty && amountBeforeTax ? Math.round(amountBeforeTax / qty) : amountBeforeTax;
+  const items = [{
+    name: itemName, unit, qty: qty || 1, unitPrice, amount: amountBeforeTax,
+    vatRate, vatAmount, amountAfterTax: totalAmount || amountBeforeTax,
+  }];
 
   // Đoán Thu/Chi: xem tên công ty xuất hiện gần cụm "bên mua/buyer" hay "bên bán/seller"
   let direction = 'OUT';
@@ -94,7 +139,8 @@ function parseInvoiceText(text, companyName){
     }
   }
 
-  return { invoiceNumber, invoiceDate, sellerTaxCode, sellerName, bankAccount, bankName, totalAmount, direction };
+  return { invoiceNumber, invoiceDate, sellerTaxCode, sellerName, bankAccount, bankName,
+    totalAmount: totalAmount || amountBeforeTax, direction, items };
 }
 
 async function handleInvoiceUpload(file){
@@ -122,10 +168,7 @@ async function handleInvoiceUpload(file){
       projectId: '',
       date: extracted.invoiceDate || todayISO(),
       content: extracted.sellerName ? `Hóa đơn ${extracted.sellerName}` : 'Hóa đơn (OCR tự động — cần kiểm tra lại)',
-      description: [
-        extracted.sellerName ? 'Bên bán: ' + extracted.sellerName : '',
-        extracted.sellerTaxCode ? 'MST: ' + extracted.sellerTaxCode : '',
-      ].filter(Boolean).join(' — '),
+      description: '', // để trống theo yêu cầu — không tự điền tên bên bán/MST vào đây nữa
       amount: extracted.totalAmount || 0,
       invoiceNumber: extracted.invoiceNumber || '',
       invoiceDate: extracted.invoiceDate || '',
@@ -133,11 +176,11 @@ async function handleInvoiceUpload(file){
       bankAccount: extracted.bankAccount || '',
       bankName: extracted.bankName || '',
       invoiceImage: imageDataUrl || '',
-      // đính kèm toàn bộ chữ OCR đọc được vào Ghi chú để người dùng đối chiếu, tự sửa những gì đọc sai
-      note: '📄 Chữ OCR đọc được (để đối chiếu, có thể không chính xác 100%):\n' + rawText.trim().slice(0, 1500),
+      invoiceItems: extracted.items || [],
+      note: '', // để trống theo yêu cầu — không dán nguyên văn chữ OCR vào Ghi chú nữa
     };
     openTxModal(null, prefill);
-    toast('✅ OCR đọc xong — kiểm tra KỸ lại thông tin (đặc biệt số tiền, MST) trước khi lưu');
+    toast('✅ OCR đọc xong — kiểm tra KỸ lại thông tin (đặc biệt số tiền, tên hàng hóa, MST) trước khi lưu. Nếu hóa đơn có nhiều dòng hàng hóa, bấm "+ Thêm dòng" để nhập đủ.');
   }catch(err){
     toast('Lỗi đọc hóa đơn');
     alert('Lỗi đọc hóa đơn (OCR):\n\n' + err.message);
