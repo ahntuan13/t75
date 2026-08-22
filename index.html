@@ -560,14 +560,14 @@
           <span class="qc-icon" style="background:var(--purple-dim);color:var(--purple);">👤</span>
           <span class="qc-text"><strong>Thêm nhân viên</strong><span class="helper-text">Thêm hồ sơ nhân viên</span></span>
         </button>
-        <button class="qc-item" id="qc-upload-invoice-image">
+        <label class="qc-item" for="ocr-invoice-image-input" id="qc-upload-invoice-image">
           <span class="qc-icon" style="background:var(--teal-dim);color:var(--teal);">📷</span>
           <span class="qc-text"><strong>Upload hóa đơn (ảnh)</strong><span class="helper-text">AI tự đọc thông tin từ ảnh</span></span>
-        </button>
-        <button class="qc-item" id="qc-upload-invoice-pdf">
+        </label>
+        <label class="qc-item" for="ocr-invoice-pdf-input" id="qc-upload-invoice-pdf">
           <span class="qc-icon" style="background:var(--blue-dim, var(--primary-dim));color:var(--primary);">📄</span>
           <span class="qc-text"><strong>Upload hóa đơn (PDF)</strong><span class="helper-text">AI tự đọc thông tin từ file PDF</span></span>
-        </button>
+        </label>
       </div>
     </div>
   </div>
@@ -821,7 +821,7 @@
 </div>
 
 <div class="modal-backdrop" id="modal-order-explain">
-  <div class="modal" style="max-width:1180px;width:100%;">
+  <div class="modal" style="max-width:720px;width:100%;">
     <div class="modal-head"><h3>🧾 Giải chi lệnh tạm ứng</h3><button class="modal-close" data-close>✕</button></div>
     <div class="modal-body">
       <input type="hidden" id="exp-order-id">
@@ -854,6 +854,24 @@
             <div class="field"><label>Đơn giá</label><input type="text" id="exp1-price" placeholder="0"></div>
             <div class="field"><label>Thành tiền</label><input type="text" id="exp1-amount" placeholder="0"></div>
           </div>
+          <div class="exp-row exp-attach-row">
+            <div class="field">
+              <label>📎 Ảnh hóa đơn (tùy chọn)</label>
+              <input type="file" id="exp1-invoice-image" accept="image/*">
+              <div style="margin-top:6px;">
+                <img id="exp1-invoice-image-preview" style="display:none;max-width:100px;max-height:100px;border-radius:8px;border:1px solid var(--line);">
+                <button type="button" class="btn btn-ghost btn-sm" id="exp1-invoice-image-remove" style="display:none;">Xóa ảnh</button>
+              </div>
+            </div>
+            <div class="field">
+              <label>📎 Ảnh chuyển khoản (tùy chọn)</label>
+              <input type="file" id="exp1-transfer-image" accept="image/*">
+              <div style="margin-top:6px;">
+                <img id="exp1-transfer-image-preview" style="display:none;max-width:100px;max-height:100px;border-radius:8px;border:1px solid var(--line);">
+                <button type="button" class="btn btn-ghost btn-sm" id="exp1-transfer-image-remove" style="display:none;">Xóa ảnh</button>
+              </div>
+            </div>
+          </div>
         </div>
 
         <div class="exp-block">
@@ -878,6 +896,24 @@
             <div class="field grow-sm"><label>SL</label><input type="number" id="exp2-qty" value="1"></div>
             <div class="field"><label>Đơn giá</label><input type="text" id="exp2-price" placeholder="0"></div>
             <div class="field"><label>Thành tiền</label><input type="text" id="exp2-amount" placeholder="0"></div>
+          </div>
+          <div class="exp-row exp-attach-row">
+            <div class="field">
+              <label>📎 Ảnh hóa đơn (tùy chọn)</label>
+              <input type="file" id="exp2-invoice-image" accept="image/*">
+              <div style="margin-top:6px;">
+                <img id="exp2-invoice-image-preview" style="display:none;max-width:100px;max-height:100px;border-radius:8px;border:1px solid var(--line);">
+                <button type="button" class="btn btn-ghost btn-sm" id="exp2-invoice-image-remove" style="display:none;">Xóa ảnh</button>
+              </div>
+            </div>
+            <div class="field">
+              <label>📎 Ảnh chuyển khoản (tùy chọn)</label>
+              <input type="file" id="exp2-transfer-image" accept="image/*">
+              <div style="margin-top:6px;">
+                <img id="exp2-transfer-image-preview" style="display:none;max-width:100px;max-height:100px;border-radius:8px;border:1px solid var(--line);">
+                <button type="button" class="btn btn-ghost btn-sm" id="exp2-transfer-image-remove" style="display:none;">Xóa ảnh</button>
+              </div>
+            </div>
           </div>
         </div>
 
@@ -904,6 +940,24 @@
             <div class="field"><label>Đơn giá</label><input type="text" id="exp3-price" placeholder="0"></div>
             <div class="field"><label>Thành tiền</label><input type="text" id="exp3-amount" placeholder="0"></div>
           </div>
+          <div class="exp-row exp-attach-row">
+            <div class="field">
+              <label>📎 Ảnh hóa đơn (tùy chọn)</label>
+              <input type="file" id="exp3-invoice-image" accept="image/*">
+              <div style="margin-top:6px;">
+                <img id="exp3-invoice-image-preview" style="display:none;max-width:100px;max-height:100px;border-radius:8px;border:1px solid var(--line);">
+                <button type="button" class="btn btn-ghost btn-sm" id="exp3-invoice-image-remove" style="display:none;">Xóa ảnh</button>
+              </div>
+            </div>
+            <div class="field">
+              <label>📎 Ảnh chuyển khoản (tùy chọn)</label>
+              <input type="file" id="exp3-transfer-image" accept="image/*">
+              <div style="margin-top:6px;">
+                <img id="exp3-transfer-image-preview" style="display:none;max-width:100px;max-height:100px;border-radius:8px;border:1px solid var(--line);">
+                <button type="button" class="btn btn-ghost btn-sm" id="exp3-transfer-image-remove" style="display:none;">Xóa ảnh</button>
+              </div>
+            </div>
+          </div>
         </div>
 
         <div class="exp-block">
@@ -929,6 +983,24 @@
             <div class="field"><label>Đơn giá</label><input type="text" id="exp4-price" placeholder="0"></div>
             <div class="field"><label>Thành tiền</label><input type="text" id="exp4-amount" placeholder="0"></div>
           </div>
+          <div class="exp-row exp-attach-row">
+            <div class="field">
+              <label>📎 Ảnh hóa đơn (tùy chọn)</label>
+              <input type="file" id="exp4-invoice-image" accept="image/*">
+              <div style="margin-top:6px;">
+                <img id="exp4-invoice-image-preview" style="display:none;max-width:100px;max-height:100px;border-radius:8px;border:1px solid var(--line);">
+                <button type="button" class="btn btn-ghost btn-sm" id="exp4-invoice-image-remove" style="display:none;">Xóa ảnh</button>
+              </div>
+            </div>
+            <div class="field">
+              <label>📎 Ảnh chuyển khoản (tùy chọn)</label>
+              <input type="file" id="exp4-transfer-image" accept="image/*">
+              <div style="margin-top:6px;">
+                <img id="exp4-transfer-image-preview" style="display:none;max-width:100px;max-height:100px;border-radius:8px;border:1px solid var(--line);">
+                <button type="button" class="btn btn-ghost btn-sm" id="exp4-transfer-image-remove" style="display:none;">Xóa ảnh</button>
+              </div>
+            </div>
+          </div>
         </div>
 
         <div class="exp-block">
@@ -953,6 +1025,24 @@
             <div class="field grow-sm"><label>SL</label><input type="number" id="exp5-qty" value="1"></div>
             <div class="field"><label>Đơn giá</label><input type="text" id="exp5-price" placeholder="0"></div>
             <div class="field"><label>Thành tiền</label><input type="text" id="exp5-amount" placeholder="0"></div>
+          </div>
+          <div class="exp-row exp-attach-row">
+            <div class="field">
+              <label>📎 Ảnh hóa đơn (tùy chọn)</label>
+              <input type="file" id="exp5-invoice-image" accept="image/*">
+              <div style="margin-top:6px;">
+                <img id="exp5-invoice-image-preview" style="display:none;max-width:100px;max-height:100px;border-radius:8px;border:1px solid var(--line);">
+                <button type="button" class="btn btn-ghost btn-sm" id="exp5-invoice-image-remove" style="display:none;">Xóa ảnh</button>
+              </div>
+            </div>
+            <div class="field">
+              <label>📎 Ảnh chuyển khoản (tùy chọn)</label>
+              <input type="file" id="exp5-transfer-image" accept="image/*">
+              <div style="margin-top:6px;">
+                <img id="exp5-transfer-image-preview" style="display:none;max-width:100px;max-height:100px;border-radius:8px;border:1px solid var(--line);">
+                <button type="button" class="btn btn-ghost btn-sm" id="exp5-transfer-image-remove" style="display:none;">Xóa ảnh</button>
+              </div>
+            </div>
           </div>
         </div>
 
