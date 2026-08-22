@@ -115,40 +115,54 @@ function parseItemTableByColumns(rows){
   ];
   const cols = colDefs.map(([k,re])=> [k, findColX(re)]).filter(([k,x])=> x!=null);
   if(cols.length < 4) return null; // không xác định đủ cột chính -> không đáng tin, để hàm gọi tự dùng cách dự phòng
-  const bucketOf = (x) => cols.reduce((best,[k,cx])=>{
-    const d = Math.abs(x-cx);
-    return (!best || d<best.d) ? {k,d} : best;
-  }, null)?.k;
+  // Bề rộng cột nhỏ nhất giữa 2 cột liền kề — dùng làm ngưỡng khoảng cách tối đa hợp lý cho 1 cột,
+  // tránh gán bừa 1 con số/chữ ở xa tít vào cột gần nhất dù cách quá xa (vd chữ từ dòng "Tổng cộng" lem sang).
+  const sortedX = cols.map(([,x])=>x).sort((a,b)=>a-b);
+  const minGap = Math.min(...sortedX.slice(1).map((x,i)=> x - sortedX[i])) || 999;
+  const maxDist = Math.max(minGap * 0.65, 40);
+  const bucketOf = (x) => {
+    let best=null, bestDist=Infinity;
+    cols.forEach(([k,cx])=>{ const d=Math.abs(x-cx); if(d<bestDist){bestDist=d;best=k;} });
+    return bestDist<=maxDist ? best : null;
+  };
 
   const summaryRowIdx = rows.findIndex((r,i)=> i>headerRowIdx &&
     /C[ộô]ng\s*ti[ềe]n\s*h[àa]ng|T[ổôo]ng\s*c[ộô]ng|T[ổôo]ng\s*h[ợo]p/i.test(r.items.map(x=>x.text).join(' ')));
   const dataRows = rows.slice(headerRowIdx+1, summaryRowIdx>=0 ? summaryRowIdx : rows.length);
 
+  // QUAN TRỌNG: xử lý theo DÒNG CHỮ TUẦN TỰ (đã sắp đúng thứ tự trên->dưới, trái->phải), KHÔNG gộp trước
+  // thành "hàng" theo toạ độ Y — cách gộp hàng cũ dễ bị lệch dần khi xuống các dòng phía dưới (dòng 1-3
+  // đúng nhưng dòng 4 trở đi bị rỗng, tên hàng bị cụt — đúng lỗi thực tế đã gặp). Ranh giới giữa các mục
+  // hàng hóa chỉ dựa vào việc gặp đúng 1 số STT mới ở cột đầu tiên — đáng tin hơn nhiều.
+  const flatItems = [];
+  dataRows.forEach(row=> row.items.forEach(it=> flatItems.push(it)));
+
   const toNum = (s) => { if(!s) return 0; const str = String(s).replace(/%$/,'').trim().replace(/\./g,'').replace(',', '.'); return Number(str)||0; };
+  const blankItem = () => ({ name:'', unit:'', qty:0, unitPrice:0, amount:0, vatRate:0, vatAmount:0, amountAfterTax:0 });
   const items = [];
   let cur = null;
-  dataRows.forEach(row=>{
-    const buckets = {};
-    row.items.forEach(it=>{
-      const k = bucketOf(it.x);
-      if(!k) return;
-      buckets[k] = (buckets[k] ? buckets[k]+' ' : '') + it.text;
-    });
-    const hasStt = buckets.stt && /^\d+$/.test(buckets.stt.trim());
-    const hasNumericData = buckets.qty || buckets.price || buckets.amount;
-    if(hasStt || (!cur && hasNumericData)){
+  let expectStt = 1; // STT trên hóa đơn luôn tăng dần 1,2,3... dùng để xác nhận đúng là số thứ tự, không phải số khác
+
+  flatItems.forEach(it=>{
+    const k = bucketOf(it.x);
+    if(!k) return;
+    const text = it.text.trim();
+    if(!text) return;
+    if(k === 'stt' && /^\d{1,3}$/.test(text) && Number(text) === expectStt){
       if(cur) items.push(cur);
-      cur = { name:'', unit:'', qty:0, unitPrice:0, amount:0, vatRate:0, vatAmount:0, amountAfterTax:0 };
+      cur = blankItem();
+      expectStt++;
+      return;
     }
-    if(!cur) cur = { name:'', unit:'', qty:0, unitPrice:0, amount:0, vatRate:0, vatAmount:0, amountAfterTax:0 };
-    if(buckets.name) cur.name = (cur.name ? cur.name+' ' : '') + buckets.name.trim();
-    if(buckets.unit) cur.unit = buckets.unit.trim();
-    if(buckets.qty) cur.qty = toNum(buckets.qty) || cur.qty;
-    if(buckets.price) cur.unitPrice = toNum(buckets.price) || cur.unitPrice;
-    if(buckets.amount) cur.amount = toNum(buckets.amount) || cur.amount;
-    if(buckets.vatRate) cur.vatRate = toNum(buckets.vatRate) || cur.vatRate;
-    if(buckets.vatAmt) cur.vatAmount = toNum(buckets.vatAmt) || cur.vatAmount;
-    if(buckets.afterTax) cur.amountAfterTax = toNum(buckets.afterTax) || cur.amountAfterTax;
+    if(!cur) cur = blankItem();
+    if(k === 'name') cur.name = (cur.name ? cur.name + ' ' : '') + text;
+    else if(k === 'unit' && !cur.unit) cur.unit = text;
+    else if(k === 'qty' && !cur.qty) cur.qty = toNum(text);
+    else if(k === 'price' && !cur.unitPrice) cur.unitPrice = toNum(text);
+    else if(k === 'amount' && !cur.amount) cur.amount = toNum(text);
+    else if(k === 'vatRate' && !cur.vatRate) cur.vatRate = toNum(text);
+    else if(k === 'vatAmt' && !cur.vatAmount) cur.vatAmount = toNum(text);
+    else if(k === 'afterTax' && !cur.amountAfterTax) cur.amountAfterTax = toNum(text);
   });
   if(cur) items.push(cur);
 
@@ -402,16 +416,8 @@ async function handleInvoiceUpload(file){
   }
 }
 
-document.getElementById('qc-upload-invoice-image')?.addEventListener('click', ()=>{
-  closeModal('modal-quickcreate');
-});
 document.getElementById('qc-upload-invoice-pdf')?.addEventListener('click', ()=>{
   closeModal('modal-quickcreate');
-});
-document.getElementById('ocr-invoice-image-input')?.addEventListener('change', (e)=>{
-  const file = e.target.files[0];
-  e.target.value = '';
-  handleInvoiceUpload(file);
 });
 document.getElementById('ocr-invoice-pdf-input')?.addEventListener('change', (e)=>{
   const file = e.target.files[0];
