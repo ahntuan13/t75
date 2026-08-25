@@ -113,10 +113,26 @@ function renderContractInfoStatus(i){
   }
 }
 
+// Tổng Chi phí dự toán / Doanh thu dự toán của cả dự án LUÔN bằng tổng cộng của 5 khung "Thông tin HĐ" —
+// gọi lại mỗi khi 1 trong 5 khung thay đổi, và cả khi vừa mở modal (để hiện đúng ngay từ đầu).
+function recalcProjectBudgetTotals(){
+  let totalCost = 0, totalRevenue = 0;
+  for(let i=1;i<=5;i++){
+    totalCost += parseMoneyInput(document.getElementById(`proj-hd${i}-cost-budget`));
+    totalRevenue += parseMoneyInput(document.getElementById(`proj-hd${i}-revenue-budget`));
+  }
+  setMoneyInputValue(document.getElementById('project-cost-budget'), totalCost);
+  setMoneyInputValue(document.getElementById('project-revenue-budget'), totalRevenue);
+}
+
 for(let i=1;i<=5;i++){
   bindMoneyInput(`proj-hd${i}-value`);
   bindMoneyInput(`proj-hd${i}-cost-budget`);
   bindMoneyInput(`proj-hd${i}-revenue-budget`);
+  // Chi phí dự toán / Doanh thu dự toán của DỰ ÁN luôn bằng TỔNG của cả 5 khung HĐ cộng lại — không cho
+  // gõ tay lệch đi, để tránh 2 nơi hiện 2 số khác nhau.
+  document.getElementById(`proj-hd${i}-cost-budget`)?.addEventListener('input', recalcProjectBudgetTotals);
+  document.getElementById(`proj-hd${i}-revenue-budget`)?.addEventListener('input', recalcProjectBudgetTotals);
   document.getElementById(`proj-hd${i}-file`)?.addEventListener('change', async (e)=>{
     const file = e.target.files[0];
     e.target.value = '';
@@ -221,6 +237,7 @@ function openProjectModal(id){
     document.getElementById(`proj-hd${i}-file`).value = '';
     renderContractInfoStatus(i);
   }
+  recalcProjectBudgetTotals();
   renderContractFileStatus();
   openModal('modal-project');
 }
