@@ -39,7 +39,9 @@ function renderInvoices(){
     <th>Trạng thái</th><th>Số hóa đơn</th><th>Ngày HĐ</th><th>Dự án</th><th>Loại</th><th>Nội dung</th><th>Giá trị</th><th>Ảnh</th><th></th>
   </tr></thead><tbody>${rows.map(t=>{
     // Quá hạn (>7 ngày kể từ ngày tạo) MÀ CHƯA có ảnh hóa đơn đính kèm -> tô đỏ để dễ nhận biết cần xử lý gấp.
-    const overdueNoImage = (typeof daysSince==='function' ? daysSince(t.createdAt) : null) >= (typeof NOTIF_INVOICE_OVERDUE_DAYS!=='undefined'?NOTIF_INVOICE_OVERDUE_DAYS:7) && !t.invoiceImage;
+    // Nếu đã đánh dấu "Đã xuất" rồi thì KHÔNG tô đỏ nữa, dù chưa kịp đính kèm ảnh.
+    const isIssued = (t.invoiceStatus||'pending')==='issued';
+    const overdueNoImage = !isIssued && (typeof daysSince==='function' ? daysSince(t.createdAt) : null) >= (typeof NOTIF_INVOICE_OVERDUE_DAYS!=='undefined'?NOTIF_INVOICE_OVERDUE_DAYS:7) && !t.invoiceImage;
     return `
     <tr class="${overdueNoImage ? 'row-overdue-alert' : ''}">
       <td>${(t.invoiceStatus||'pending')==='issued' ? '<span class="tag tag-gold">✅ Đã xuất</span>' : '<span class="tag tag-gray">⏳ Chưa xuất</span>'}${overdueNoImage ? ' <span class="tag tag-red" title="Quá 7 ngày vẫn chưa có ảnh hóa đơn">⚠️ Quá hạn</span>' : ''}</td>
@@ -106,7 +108,8 @@ function renderTransfers(){
     const doneLabel = t.type==='IN' ? '✅ Đã nhận' : '✅ Đã CK';
     const pendingLabel = t.type==='IN' ? '⏳ Chưa nhận' : '⏳ Chưa CK';
     // Quá hạn (>7 ngày kể từ ngày tạo) MÀ CHƯA có ảnh chuyển khoản đính kèm -> tô đỏ.
-    const overdueNoImage = (typeof daysSince==='function' ? daysSince(t.createdAt) : null) >= (typeof NOTIF_INVOICE_OVERDUE_DAYS!=='undefined'?NOTIF_INVOICE_OVERDUE_DAYS:7) && !t.transferImage;
+    // Nếu đã đánh dấu "Đã nhận/Đã CK" rồi thì KHÔNG tô đỏ nữa, dù chưa kịp đính kèm ảnh.
+    const overdueNoImage = !done && (typeof daysSince==='function' ? daysSince(t.createdAt) : null) >= (typeof NOTIF_INVOICE_OVERDUE_DAYS!=='undefined'?NOTIF_INVOICE_OVERDUE_DAYS:7) && !t.transferImage;
     return `
     <tr class="${overdueNoImage ? 'row-overdue-alert' : ''}">
       <td>${done ? '<span class="tag tag-gold">'+doneLabel+'</span>' : '<span class="tag tag-gray">'+pendingLabel+'</span>'}${overdueNoImage ? ' <span class="tag tag-red" title="Quá 7 ngày vẫn chưa có ảnh chuyển khoản">⚠️ Quá hạn</span>' : ''}</td>
