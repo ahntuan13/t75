@@ -152,6 +152,37 @@ function bindMoneyInput(id){
 
 // ---------------- Nén ảnh (hóa đơn / chuyển khoản) thành base64 để lưu vào Firestore ----------------
 // Firestore giới hạn 1MB/document nên ảnh cần nén nhỏ trước khi lưu.
+// Đọc 1 file ĐÍNH KÈM CHỨNG TỪ (ảnh hoặc PDF) thành base64 data URL — dùng CHUNG cho mọi nơi đính kèm
+// hóa đơn/chuyển khoản trong app (Thu Chi, Giải chi, Lệnh chi...). Ảnh thì tự nén nhỏ lại cho nhẹ;
+// PDF thì giữ nguyên (không nén được), chỉ cảnh báo nếu file quá lớn.
+async function readInvoiceAttachmentFile(file, maxWidth=900, quality=0.65){
+  const isPdf = file.type === 'application/pdf' || /\.pdf$/i.test(file.name);
+  if(isPdf){
+    if(file.size > 4*1024*1024){
+      throw new Error('File PDF quá lớn (>4MB) — vui lòng chọn file nhỏ hơn.');
+    }
+    return await new Promise((resolve, reject)=>{
+      const reader = new FileReader();
+      reader.onload = ()=> resolve(reader.result);
+      reader.onerror = reject;
+      reader.readAsDataURL(file);
+    });
+  }
+  return await compressImageFile(file, maxWidth, quality);
+}
+
+// Hiện preview cho 1 file đính kèm chứng từ đã lưu (base64) — ảnh thì hiện thumbnail như cũ,
+// PDF thì hiện nút "Xem file PDF" (không thể hiện <img> trực tiếp được).
+function invoiceAttachmentPreviewHtml(dataUrl, opts={}){
+  if(!dataUrl) return '';
+  const isPdf = dataUrl.startsWith('data:application/pdf');
+  const imgStyle = opts.imgStyle || 'max-width:150px;max-height:150px;border-radius:8px;border:1px solid var(--line);';
+  if(isPdf){
+    return `<button type="button" class="tag tag-blue" style="cursor:pointer;border:none;" onclick="openAttachmentInNewTab(this.dataset.url)" data-url="${escapeHtml(dataUrl)}">📄 Xem file PDF</button>`;
+  }
+  return `<img src="${dataUrl}" style="${imgStyle}${opts.clickable ? 'cursor:zoom-in;' : ''}" ${opts.clickable ? `data-view-img="${escapeHtml(dataUrl)}"` : ''}>`;
+}
+
 function compressImageFile(file, maxWidth=900, quality=0.65){
   return new Promise((resolve, reject)=>{
     if(!file){ resolve(''); return; }
