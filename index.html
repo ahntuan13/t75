@@ -161,8 +161,9 @@
           <div class="card">
             <div class="card-head">
               <h3>👷 Nhân lực theo dự án (giờ công)</h3>
+              <div class="actions"><input type="month" id="labor-chart-month"></div>
             </div>
-            <p class="helper-text" style="margin-bottom:10px;">6 tháng gần nhất, theo từng dự án (top 7 dự án nhiều giờ công nhất, còn lại gộp "Dự án khác"). Chỉ tính giờ công của Công nhân & Quản lý dự án/Giám sát — không tính Giám đốc, Phó Giám đốc, Kế toán.</p>
+            <p class="helper-text" style="margin-bottom:10px;">So sánh TẤT CẢ dự án trong đúng tháng đã chọn. Chỉ tính giờ công của Công nhân & Quản lý dự án/Giám sát — không tính Giám đốc, Phó Giám đốc, Kế toán.</p>
             <div class="chart-wrap"><canvas id="chart-labor-hours"></canvas></div>
           </div>
         </div>
@@ -595,8 +596,8 @@
         <div class="field"><label>MST (Mã số thuế)</label><input id="project-tax-code" placeholder="VD: 0312345678"></div>
         <div class="field"><label>Số hợp đồng</label><input id="project-contract-number" placeholder="VD: 12/2026/HĐKT-XYZ"></div>
         <div class="field"><label>Giá trị hợp đồng (đã VAT)</label><input type="text" id="project-contract-value" placeholder="0"></div>
-        <div class="field"><label>Chi phí dự toán</label><input type="text" id="project-cost-budget" placeholder="0"></div>
-        <div class="field"><label>Doanh thu dự toán</label><input type="text" id="project-revenue-budget" placeholder="0"></div>
+        <div class="field"><label>Chi phí dự toán <span style="font-weight:400;color:var(--ink-faint);">(tự tính = tổng HĐ 1-5)</span></label><input type="text" id="project-cost-budget" placeholder="0" readonly style="background:var(--bg-soft);"></div>
+        <div class="field"><label>Doanh thu dự toán <span style="font-weight:400;color:var(--ink-faint);">(tự tính = tổng HĐ 1-5)</span></label><input type="text" id="project-revenue-budget" placeholder="0" readonly style="background:var(--bg-soft);"></div>
         <div class="field"><label>Ngày ký hợp đồng</label><input type="date" id="project-sign-date"></div>
         <div class="field"><label>Ngày hoàn thành</label><input type="date" id="project-completion-date"></div>
         <div class="field">
@@ -807,6 +808,14 @@
         </div>
         <div class="field"><label>Số hóa đơn</label><input id="tx-invoice-number"></div>
         <div class="field"><label>Ngày hóa đơn</label><input type="date" id="tx-invoice-date"></div>
+        <div class="field full" id="tx-invoice-detail-fields">
+          <div class="exp-row">
+            <div class="field"><label>Mã số thuế (MST)</label><input id="tx-invoice-tax-code"></div>
+            <div class="field"><label>Thành tiền</label><input type="text" id="tx-pretax-amount" placeholder="0"></div>
+            <div class="field"><label>Tiền thuế GTGT</label><input type="text" id="tx-vat-amount" placeholder="0"></div>
+            <div class="field"><label>Thành tiền sau thuế</label><input type="text" id="tx-total-amount" placeholder="0"></div>
+          </div>
+        </div>
         <div class="field full">
           <label>Ảnh hóa đơn (tùy chọn)</label>
           <input type="file" id="tx-invoice-image" accept="image/*">
@@ -815,6 +824,9 @@
             <img id="tx-invoice-image-preview" style="display:none;max-width:150px;max-height:150px;border-radius:8px;border:1px solid var(--line);">
             <button type="button" class="btn btn-ghost btn-sm" id="tx-invoice-image-remove" style="display:none;">Xóa ảnh</button>
           </div>
+          <input type="file" id="tx-scan-invoice-input" accept="image/*,application/pdf,.pdf" style="display:none;">
+          <button type="button" class="btn btn-primary btn-sm" id="tx-scan-invoice-btn" style="margin-top:10px;">🔍 Quét hóa đơn (AI)</button>
+          <div class="helper-text" style="margin-top:6px;">Chọn file ảnh hoặc PDF hóa đơn — AI tự điền MST, Thành tiền, Tiền thuế GTGT, Thành tiền sau thuế, Số hóa đơn ở trên. Luôn kiểm tra lại trước khi lưu.</div>
         </div>
 
         <div class="field full" style="border-top:1px solid var(--line);padding-top:14px;margin-top:2px;">
