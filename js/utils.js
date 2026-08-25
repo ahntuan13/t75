@@ -54,6 +54,28 @@ function quarterKey(dateStr){
   return `Q${q}/${yearKey(dateStr)}`;
 }
 
+// Mở file đính kèm dạng base64 data URL trong tab mới — dùng Blob URL thay vì gán thẳng href="data:...".
+// LÝ DO: Chrome (và nhiều trình duyệt khác) CHẶN việc điều hướng toàn trang (target="_blank") tới link
+// dạng "data:..." vì lý do bảo mật — bấm vào không có phản ứng gì hoặc mở tab trắng. Chuyển sang "blob:"
+// (từ cùng 1 dữ liệu, chỉ khác cách trình duyệt cấp phép) thì mở được bình thường.
+function openAttachmentInNewTab(dataUrl){
+  if(!dataUrl) return;
+  try{
+    const [header, base64] = dataUrl.split(',');
+    const mimeMatch = header.match(/data:(.*?);base64/);
+    const mime = mimeMatch ? mimeMatch[1] : 'application/octet-stream';
+    const bin = atob(base64);
+    const bytes = new Uint8Array(bin.length);
+    for(let i=0; i<bin.length; i++) bytes[i] = bin.charCodeAt(i);
+    const blob = new Blob([bytes], {type: mime});
+    const url = URL.createObjectURL(blob);
+    window.open(url, '_blank');
+    setTimeout(()=> URL.revokeObjectURL(url), 60000);
+  }catch(err){
+    toast('Không mở được file đính kèm — file có thể bị lỗi, thử tải lên lại.');
+  }
+}
+
 function toast(msg){
   const el = document.getElementById('toast');
   el.textContent = msg;
