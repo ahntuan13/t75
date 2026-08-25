@@ -254,6 +254,9 @@ table.data td.num{text-align:right;font-family:'IBM Plex Mono',monospace;font-va
 .tag-out{background:var(--red-dim);color:var(--red);}
 .tag-blue{background:var(--blue-dim);color:var(--blue);}
 .tag-gold{background:var(--gold-dim);color:var(--gold);}
+.tag-red{background:var(--red-dim);color:var(--red);}
+tr.row-overdue-alert{background:var(--red-dim) !important;}
+tr.row-overdue-alert td{border-color:rgba(245,69,92,.25);}
 .tag-gray{background:var(--bg-soft);color:var(--ink-dim);}
 .tx-project-block{padding:16px 20px;}
 .tx-pending-block{border:1.5px solid var(--gold);background:var(--gold-dim);}
