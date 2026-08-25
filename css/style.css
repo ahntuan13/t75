@@ -170,17 +170,16 @@ input,select,textarea{font-family:inherit;}
 .logout-btn{background:none;border:none;color:var(--ink-faint);font-size:15px;padding:4px;}
 .logout-btn:hover{color:var(--red);}
 
-.main{padding:26px 32px 60px;max-width:1440px;min-width:0;overflow-x:hidden;margin:0 auto;}
+.main{padding:26px 32px 60px;max-width:1900px;min-width:0;overflow-x:hidden;margin:0 auto;width:100%;}
 /* Laptop cỡ nhỏ - trung (vd 1280x800, 1366x768): bớt padding + thu gọn lưới KPI một chút
    để không bị chật, nhưng vẫn giữ sidebar đầy đủ 240px như màn hình lớn. */
 @media (max-width:1366px) and (min-width:1101px){
   .main{padding:22px 24px 50px;}
   .kpi-grid{grid-template-columns:repeat(auto-fit,minmax(180px,1fr));}
 }
-/* Màn hình lớn / ultra-wide (vd 1920px, 2560px trở lên): nới rộng vùng nội dung và canh giữa
-   thay vì để trống mảng lớn bên phải, đọc dữ liệu đỡ bị dồn hết về mép trái. */
-@media (min-width:1920px){
-  .main{max-width:1700px;margin:0 auto;padding:32px 40px 70px;}
+/* Màn hình cực rộng (vd 2560px+): nới thêm chút padding, vẫn canh giữa, không giới hạn hẹp lại nữa. */
+@media (min-width:2200px){
+  .main{padding:32px 48px 70px;}
 }
 .topbar{display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;flex-wrap:wrap;gap:12px;}
 .topbar h2{font-size:22px;font-weight:800;margin:0;letter-spacing:-.3px;color:var(--ink);}
