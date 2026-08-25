@@ -93,6 +93,8 @@ function setInvoiceTxMode(on){
   isInvoiceTxMode = on;
   const contentField = document.getElementById('tx-content-field');
   if(contentField) contentField.style.display = on ? 'none' : '';
+  const invoiceDetailField = document.getElementById('tx-invoice-detail-fields');
+  if(invoiceDetailField) invoiceDetailField.style.display = on ? 'none' : '';
   ['tx-simple-unit-field','tx-simple-qty-field','tx-simple-price-field','tx-simple-amount-field'].forEach(id=>{
     const el = document.getElementById(id);
     if(el) el.style.display = on ? 'none' : '';
@@ -161,6 +163,81 @@ document.getElementById('tx-transfer-image-remove').addEventListener('click', ()
   currentTransferImage = '';
   document.getElementById('tx-transfer-image').value = '';
   setImagePreview('transfer', '');
+});
+
+// ---------------- Tự tính "Thành tiền sau thuế" = Thành tiền + Tiền thuế GTGT (Thu/Chi/Tạm ứng — không phải chế độ Hóa Đơn) ----------------
+function recalcTxInvoiceTotal(){
+  const pretax = parseMoneyInput(document.getElementById('tx-pretax-amount'));
+  const vat = parseMoneyInput(document.getElementById('tx-vat-amount'));
+  if(pretax || vat){
+    setMoneyInputValue(document.getElementById('tx-total-amount'), pretax + vat);
+  }
+}
+['tx-pretax-amount','tx-vat-amount'].forEach(id=>{
+  document.getElementById(id)?.addEventListener('input', recalcTxInvoiceTotal);
+});
+document.getElementById('tx-total-amount')?.addEventListener('input', ()=>{
+  // Đồng bộ 1 chiều: Thành tiền sau thuế -> Số tiền (dùng trong chế độ Thu/Chi/Tạm ứng thường, không phải Hóa Đơn).
+  if(isInvoiceTxMode) return;
+  const total = parseMoneyInput(document.getElementById('tx-total-amount'));
+  if(total) setMoneyInputValue(document.getElementById('tx-amount'), total);
+});
+
+// ---------------- AI quét hóa đơn (ảnh hoặc PDF) cho Thu/Chi/Tạm ứng — dùng chung engine với Hóa Đơn/Lệnh chi ----------------
+document.getElementById('tx-scan-invoice-btn')?.addEventListener('click', ()=>{
+  document.getElementById('tx-scan-invoice-input').click();
+});
+document.getElementById('tx-scan-invoice-input')?.addEventListener('change', async (e)=>{
+  const file = e.target.files[0];
+  e.target.value = '';
+  if(!file) return;
+  const btn = document.getElementById('tx-scan-invoice-btn');
+  const isPdf = file.type === 'application/pdf' || /\.pdf$/i.test(file.name);
+  btn.disabled = true; btn.textContent = '⏳ Đang đọc...';
+  try{
+    let extracted;
+    if(isPdf){
+      const pdfData = await pdfExtractRows(file);
+      if(pdfData){
+        const rawText = pdfRowsToText(pdfData.rows);
+        extracted = parseInvoiceText(rawText, OCR_SETTINGS.companyName);
+        const columnItems = parseItemTableByColumns(pdfData.rows);
+        if(columnItems) extracted.items = columnItems;
+      } else {
+        toast('File PDF này không có lớp chữ thật (dạng scan) — đang đọc bằng OCR...');
+        const imgUrl = await pdfFirstPageToImage(file);
+        const rawText = await runOcr(imgUrl, (pct)=> btn.textContent = `⏳ Đang đọc chữ... ${pct}%`);
+        extracted = parseInvoiceText(rawText, OCR_SETTINGS.companyName);
+      }
+    } else if(file.type.startsWith('image/')){
+      const compressed = await compressImageFile(file, 900, 0.65);
+      currentInvoiceImage = compressed; // tiện thể dùng luôn làm "Ảnh hóa đơn" đính kèm, đỡ phải chọn lại file lần nữa
+      setImagePreview('invoice', compressed);
+      const imgUrl = await compressImageFile(file, 1600, 0.85);
+      const rawText = await runOcr(imgUrl, (pct)=> btn.textContent = `⏳ Đang đọc chữ... ${pct}%`);
+      extracted = parseInvoiceText(rawText, OCR_SETTINGS.companyName);
+    } else {
+      toast('Chỉ quét được file ảnh hoặc PDF.');
+      return;
+    }
+
+    if(extracted.invoiceNumber) document.getElementById('tx-invoice-number').value = extracted.invoiceNumber;
+    if(extracted.invoiceDate) document.getElementById('tx-invoice-date').value = extracted.invoiceDate;
+    if(extracted.sellerTaxCode) document.getElementById('tx-invoice-tax-code').value = extracted.sellerTaxCode;
+    const items = extracted.items || [];
+    const pretax = items.reduce((s,it)=> s + (it.amount||0), 0);
+    const vat = items.reduce((s,it)=> s + (it.vatAmount||0), 0);
+    const total = items.reduce((s,it)=> s + (it.amountAfterTax || it.amount || 0), 0) || extracted.totalAmount || 0;
+    if(pretax) setMoneyInputValue(document.getElementById('tx-pretax-amount'), pretax);
+    if(vat) setMoneyInputValue(document.getElementById('tx-vat-amount'), vat);
+    if(total) setMoneyInputValue(document.getElementById('tx-total-amount'), total);
+    if(total && !isInvoiceTxMode) setMoneyInputValue(document.getElementById('tx-amount'), total);
+    toast('✅ Đã đọc xong — kiểm tra KỸ lại thông tin (MST, số tiền, số hóa đơn) trước khi lưu.');
+  }catch(err){
+    toast('Lỗi đọc file: ' + err.message);
+  }finally{
+    btn.disabled = false; btn.textContent = '🔍 Quét hóa đơn (AI)';
+  }
 });
 
 function listenTransactions(){
@@ -294,6 +371,10 @@ function openTxModal(id, prefill, target, explainSourceId){
   setMoneyInputValue(document.getElementById('tx-amount'), t.amount);
   document.getElementById('tx-invoice-number').value = t.invoiceNumber || '';
   document.getElementById('tx-invoice-date').value = t.invoiceDate || '';
+  document.getElementById('tx-invoice-tax-code').value = t.invoiceTaxCode || '';
+  setMoneyInputValue(document.getElementById('tx-pretax-amount'), t.pretaxAmount);
+  setMoneyInputValue(document.getElementById('tx-vat-amount'), t.vatAmount);
+  setMoneyInputValue(document.getElementById('tx-total-amount'), t.totalAmount);
   document.getElementById('tx-bank-name').value = t.bankName || '';
   document.getElementById('tx-bank-account').value = t.bankAccount || '';
   document.getElementById('tx-bank-holder').value = t.bankHolder || '';
@@ -382,6 +463,10 @@ document.getElementById('save-tx-btn').addEventListener('click', async ()=>{
     unitPrice: isInvoiceTxMode ? 0 : parseMoneyInput(document.getElementById('tx-unitprice')),
     amount,
     invoiceNumber: document.getElementById('tx-invoice-number').value.trim(),
+    invoiceTaxCode: document.getElementById('tx-invoice-tax-code').value.trim(),
+    pretaxAmount: parseMoneyInput(document.getElementById('tx-pretax-amount')),
+    vatAmount: parseMoneyInput(document.getElementById('tx-vat-amount')),
+    totalAmount: parseMoneyInput(document.getElementById('tx-total-amount')),
     invoiceDate: document.getElementById('tx-invoice-date').value,
     bankName: document.getElementById('tx-bank-name').value.trim(),
     bankAccount: document.getElementById('tx-bank-account').value.trim(),
