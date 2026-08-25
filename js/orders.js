@@ -12,6 +12,7 @@
 let ORDERS = [];
 let currentOrderAttachment = ''; // base64 data URL của file đính kèm (mọi loại file)
 let currentOrderAttachmentName = '';
+let currentOrderAttachmentFile = null; // giữ lại File gốc (cần cho AI quét hóa đơn — OCR không đọc được base64 trực tiếp)
 
 function listenOrders(){
   db.collection('paymentOrders').orderBy('date','desc').onSnapshot((snap)=>{
@@ -69,8 +70,13 @@ function openOrderModal(id, context, presetType){
   document.getElementById('order-explanation').value = o.explanation || '';
   currentOrderAttachment = o.attachment || '';
   currentOrderAttachmentName = o.attachmentName || '';
+  currentOrderAttachmentFile = null;
   document.getElementById('order-attachment-input').value = '';
   renderOrderAttachmentStatus();
+  document.getElementById('order-invoice-number').value = o.invoiceNumber || '';
+  setMoneyInputValue(document.getElementById('order-pretax-amount'), o.pretaxAmount);
+  setMoneyInputValue(document.getElementById('order-vat-amount'), o.vatAmount);
+  setMoneyInputValue(document.getElementById('order-total-amount'), o.totalAmount);
   document.getElementById('order-note').value = o.note || '';
   document.getElementById('order-approval-target').value = o.approvalStatus==='pending' ? (o.approverRole||'') : '';
   renderOrderApprovalCurrentStatus(o);
@@ -120,6 +126,7 @@ document.getElementById('order-attachment-input')?.addEventListener('change', (e
     e.target.value = '';
     return;
   }
+  currentOrderAttachmentFile = file;
   const reader = new FileReader();
   reader.onload = ()=>{
     currentOrderAttachment = reader.result;
@@ -128,6 +135,76 @@ document.getElementById('order-attachment-input')?.addEventListener('change', (e
   };
   reader.onerror = ()=> toast('Không đọc được file');
   reader.readAsDataURL(file);
+});
+
+// ---------------- Tự tính "Thành tiền sau thuế" = Thành tiền + Tiền thuế GTGT, và đồng bộ vào "Số tiền" ----------------
+function recalcOrderInvoiceTotal(){
+  const pretax = parseMoneyInput(document.getElementById('order-pretax-amount'));
+  const vat = parseMoneyInput(document.getElementById('order-vat-amount'));
+  if(pretax || vat){
+    setMoneyInputValue(document.getElementById('order-total-amount'), pretax + vat);
+  }
+}
+['order-pretax-amount','order-vat-amount'].forEach(id=>{
+  document.getElementById(id)?.addEventListener('input', recalcOrderInvoiceTotal);
+});
+document.getElementById('order-total-amount')?.addEventListener('input', ()=>{
+  // Đồng bộ 1 chiều: Thành tiền sau thuế -> Số tiền (số tiền thực tế dùng để ghi Thu Chi khi duyệt).
+  // Vẫn có thể tự sửa tay "Số tiền" riêng sau đó nếu cần khác đi.
+  const total = parseMoneyInput(document.getElementById('order-total-amount'));
+  if(total) setMoneyInputValue(document.getElementById('order-amount'), total);
+});
+
+// ---------------- AI quét hóa đơn từ file đính kèm (ảnh hoặc PDF) — dùng chung engine với mục Hóa đơn ----------------
+document.getElementById('order-scan-invoice-btn')?.addEventListener('click', async ()=>{
+  if(!currentOrderAttachmentFile){
+    toast('Vui lòng chọn file đính kèm (ảnh hoặc PDF) trước khi quét.');
+    return;
+  }
+  const btn = document.getElementById('order-scan-invoice-btn');
+  const file = currentOrderAttachmentFile;
+  const isPdf = file.type === 'application/pdf' || /\.pdf$/i.test(file.name);
+  btn.disabled = true; btn.textContent = '⏳ Đang đọc...';
+  try{
+    let extracted;
+    if(isPdf){
+      const pdfData = await pdfExtractRows(file);
+      if(pdfData){
+        const rawText = pdfRowsToText(pdfData.rows);
+        extracted = parseInvoiceText(rawText, OCR_SETTINGS.companyName);
+        const columnItems = parseItemTableByColumns(pdfData.rows);
+        if(columnItems) extracted.items = columnItems;
+      } else {
+        toast('File PDF này không có lớp chữ thật (dạng scan) — đang đọc bằng OCR...');
+        const imgUrl = await pdfFirstPageToImage(file);
+        const rawText = await runOcr(imgUrl, (pct)=> btn.textContent = `⏳ Đang đọc chữ... ${pct}%`);
+        extracted = parseInvoiceText(rawText, OCR_SETTINGS.companyName);
+      }
+    } else if(file.type.startsWith('image/')){
+      const imgUrl = await compressImageFile(file, 1600, 0.85);
+      const rawText = await runOcr(imgUrl, (pct)=> btn.textContent = `⏳ Đang đọc chữ... ${pct}%`);
+      extracted = parseInvoiceText(rawText, OCR_SETTINGS.companyName);
+    } else {
+      toast('Chỉ quét được file ảnh hoặc PDF — file này (Word/Excel...) không đọc được bằng AI.');
+      return;
+    }
+
+    if(extracted.sellerTaxCode) document.getElementById('order-payee-tax').value = extracted.sellerTaxCode;
+    if(extracted.invoiceNumber) document.getElementById('order-invoice-number').value = extracted.invoiceNumber;
+    const items = extracted.items || [];
+    const pretax = items.reduce((s,it)=> s + (it.amount||0), 0);
+    const vat = items.reduce((s,it)=> s + (it.vatAmount||0), 0);
+    const total = items.reduce((s,it)=> s + (it.amountAfterTax || it.amount || 0), 0) || extracted.totalAmount || 0;
+    if(pretax) setMoneyInputValue(document.getElementById('order-pretax-amount'), pretax);
+    if(vat) setMoneyInputValue(document.getElementById('order-vat-amount'), vat);
+    if(total) setMoneyInputValue(document.getElementById('order-total-amount'), total);
+    if(total) setMoneyInputValue(document.getElementById('order-amount'), total);
+    toast('✅ Đã đọc xong — kiểm tra KỸ lại thông tin (MST, số tiền, số hóa đơn) trước khi lưu.');
+  }catch(err){
+    toast('Lỗi đọc file: ' + err.message);
+  }finally{
+    btn.disabled = false; btn.textContent = '🔍 Quét hóa đơn (AI)';
+  }
 });
 
 document.getElementById('btn-add-order')?.addEventListener('click', ()=> openOrderModal(null, 'payment'));
@@ -181,6 +258,10 @@ document.getElementById('save-order-btn').addEventListener('click', async ()=>{
     payee, reason, amount,
     payeeBank: document.getElementById('order-payee-bank').value.trim(),
     payeeTaxCode: document.getElementById('order-payee-tax').value.trim(),
+    invoiceNumber: document.getElementById('order-invoice-number').value.trim(),
+    pretaxAmount: parseMoneyInput(document.getElementById('order-pretax-amount')),
+    vatAmount: parseMoneyInput(document.getElementById('order-vat-amount')),
+    totalAmount: parseMoneyInput(document.getElementById('order-total-amount')),
     requester: document.getElementById('order-requester').value.trim(),
     explanation: document.getElementById('order-explanation').value.trim(),
     attachment: currentOrderAttachment,
@@ -255,7 +336,8 @@ async function decideOrderApproval(id, decision){
         content: o.reason,
         description: `Chi cho ${o.payee}` + (o.payer ? ` (từ ${o.payer})` : '') + (o.note ? ' — '+o.note : ''),
         unit:'', qty:0, unitPrice:0, amount: o.amount,
-        invoiceNumber:'', invoiceDate:'',
+        invoiceNumber: o.invoiceNumber || '', invoiceDate: '',
+        invoiceStatus: o.invoiceNumber ? 'issued' : 'pending',
         bankName:'', bankAccount: o.payeeBank||'', bankHolder: o.payee||'', transferDate:'',
         note:`Tự động tạo từ ${isAdvance ? 'Lệnh tạm ứng' : 'Lệnh chi'} (${o.payee})${o.payeeTaxCode ? ' — MST: '+o.payeeTaxCode : ''}`,
       };
@@ -541,13 +623,23 @@ function getFilteredOrders(){
 
 function orderRowHtml(o){
   const myEmail = (auth.currentUser && auth.currentUser.email || '').toLowerCase();
+  // Gạch xóa dòng CHỈ khi đã thực sự XONG (không còn cần làm gì thêm):
+  // - Lệnh chi thường: gạch ngay khi đã ghi vào Thu Chi (có transactionId) — không có bước "chờ" nào thêm.
+  // - Lệnh TẠM ỨNG: sau khi duyệt vẫn còn "Chờ giải chi" (advanceExplainStatus='pending') — CHƯA xong,
+  //   không gạch vội. Chỉ gạch khi Kế toán đã bấm Giải chi xong (advanceExplainStatus='explained').
+  let isExplainedOrDone = !!o.transactionId;
+  if(o.transactionId && isAdvanceOrder(o)){
+    const linkedTx = (o.transactionCollection === 'fixedCosts' ? (typeof FIXEDCOSTS!=='undefined'?FIXEDCOSTS:[]) : TRANSACTIONS)
+      .find(t=> t.id === o.transactionId);
+    isExplainedOrDone = !!linkedTx && linkedTx.advanceExplainStatus === 'explained';
+  }
   // Cột "Duyệt" riêng, tách khỏi cột Trạng thái và khỏi nhóm icon Sửa/Xem/Xóa —
   // GĐ/PGĐ (bất kỳ ai trong danh sách approverEmails) bấm thẳng từ bảng, không cần mở Sửa lệnh.
   let approveCell = '';
   if((o.approvalStatus||'none')==='pending' && myEmail && isAuthorizedApprover(myEmail)){
     approveCell = `<button class="icon-btn" data-approve-order="${o.id}" title="Duyệt">✅</button><button class="icon-btn" data-reject-order="${o.id}" title="Từ chối">❌</button>`;
   }
-  return `<tr${o.transactionId ? ' class="tx-row-explained"' : ''}>
+  return `<tr${isExplainedOrDone ? ' class="tx-row-explained"' : ''}>
       <td><input type="checkbox" class="order-select-cb" data-order-id="${o.id}"></td>
       <td>${fmtDate(o.date)}</td>
       <td>${escapeHtml(ORDER_TYPE_LABELS[o.orderType] || 'Thanh toán chi phí')}</td>
