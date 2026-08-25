@@ -18,10 +18,9 @@ function renderLaborChart(){
   const emps = (typeof EMPLOYEES!=='undefined' ? EMPLOYEES : []);
   const countedEmpIds = new Set(emps.filter(isLaborCountedEmployee).map(e=>e.id));
 
-  // Gom giờ công theo CẢ Tháng và Dự án cùng lúc: totals[thang][tenDuAn] = tổng giờ công.
-  const totals = {};
+  // Gom giờ công theo Tháng, để biết tháng nào có dữ liệu (phục vụ chọn mặc định tháng gần nhất).
+  const totals = {}; // totals[thang][tenDuAn] = tổng giờ công
   const monthsSet = new Set();
-  const projectTotals = {}; // tổng giờ công theo dự án (dùng để chọn dự án nào hiện riêng, dự án nào gộp "Khác")
   (typeof TIMESHEETS!=='undefined' ? TIMESHEETS : []).forEach(t=>{
     if(!countedEmpIds.has(t.employeeId)) return;
     const m = monthKey(t.date);
@@ -31,52 +30,37 @@ function renderLaborChart(){
         monthsSet.add(m);
         totals[m] = totals[m] || {};
         totals[m][s.projectName] = (totals[m][s.projectName]||0) + Number(s.hours);
-        projectTotals[s.projectName] = (projectTotals[s.projectName]||0) + Number(s.hours);
       }
     });
   });
 
-  // Chỉ hiện 6 tháng GẦN NHẤT có dữ liệu, sắp theo thứ tự thời gian tăng dần (trái->phải).
-  const months = [...monthsSet].sort().slice(-6);
-  // Quá nhiều dự án sẽ rối biểu đồ -> chỉ tách riêng TOP 7 dự án nhiều giờ công nhất, còn lại gộp vào "Dự án khác".
-  const topProjects = Object.entries(projectTotals).sort((a,b)=>b[1]-a[1]).slice(0,7).map(([name])=>name);
-  const hasOthers = Object.keys(projectTotals).length > topProjects.length;
-  const seriesNames = hasOthers ? [...topProjects, 'Dự án khác'] : topProjects;
+  const monthInput = document.getElementById('labor-chart-month');
+  const allMonths = [...monthsSet].sort();
+  // Mặc định chọn THÁNG GẦN NHẤT có dữ liệu (nếu ô chọn tháng đang trống) — để mở trang lên là thấy ngay
+  // số liệu có ý nghĩa, thay vì phải tự bấm chọn tháng trước.
+  if(monthInput && !monthInput.value && allMonths.length){
+    monthInput.value = allMonths[allMonths.length - 1];
+  }
+  const selectedMonth = monthInput ? monthInput.value : '';
 
-  const palette = [CHART_COLORS.purple, CHART_COLORS.teal, CHART_COLORS.gold, CHART_COLORS.blue,
-    CHART_COLORS.red, '#EC4899', '#22C55E', '#94A3B8'];
-  const datasets = seriesNames.map((name, i)=> ({
-    label: name,
-    data: months.map(m=>{
-      if(name === 'Dự án khác'){
-        const known = new Set(topProjects);
-        return Object.entries(totals[m]||{}).filter(([p])=>!known.has(p)).reduce((s,[,h])=>s+h, 0);
-      }
-      return (totals[m]||{})[name] || 0;
-    }),
-    backgroundColor: palette[i % palette.length],
-    borderRadius: 3,
-  }));
+  // Lấy ĐỦ TẤT CẢ dự án có phát sinh giờ công trong đúng tháng đã chọn — không giới hạn top N nữa,
+  // để so sánh được toàn bộ dự án trong cùng 1 tháng.
+  const monthData = totals[selectedMonth] || {};
+  const list = Object.entries(monthData).map(([name,hours])=>({name,hours})).sort((a,b)=>b.hours-a.hours);
 
-  const monthLabel = (m) => { const [y,mo] = m.split('-'); return `Th.${Number(mo)}/${y}`; };
-  canvas.parentElement.style.height = '400px';
+  canvas.parentElement.style.height = Math.max(340, list.length*32+70) + 'px';
   if(chartLaborHours) chartLaborHours.destroy();
   chartLaborHours = new Chart(canvas, {
     type:'bar',
-    data:{ labels: months.map(monthLabel), datasets },
-    options:{ responsive:true, maintainAspectRatio:false,
-      // Dạng so sánh: mỗi dự án 1 cột riêng đứng CẠNH NHAU trong từng tháng (không chồng lên nhau)
-      // để dễ so sánh trực quan dự án nào chiếm nhiều giờ công hơn trong cùng 1 tháng.
-      scales:{
-        x:{ grid:{display:false} },
-        y:{ grid:{color:CHART_COLORS.grid}, ticks:{callback:v=>v+'h'} },
-      },
-      plugins:{
-        legend:{ display:true, position:'bottom', labels:{boxWidth:12, font:{size:11}} },
-        tooltip:{ callbacks:{ label:(ctx)=> `${ctx.dataset.label}: ${fmtNum(ctx.parsed.y)} giờ` } },
-      }}
+    data:{ labels: list.map(x=>x.name), datasets:[
+      {label:'Giờ công', data:list.map(x=>x.hours), backgroundColor:CHART_COLORS.purple, borderRadius:4}
+    ]},
+    options:{ indexAxis:'y', responsive:true, maintainAspectRatio:false,
+      scales:{ x:{grid:{color:CHART_COLORS.grid}, ticks:{callback:v=>v+'h'}}, y:{grid:{display:false}} },
+      plugins:{ legend:{display:false}, tooltip:{callbacks:{label:(ctx)=> `${fmtNum(ctx.parsed.x)} giờ`}} } }
   });
 }
+document.getElementById('labor-chart-month')?.addEventListener('change', renderLaborChart);
 
 // ---------- WELCOME CARD (lời chào real-time + thông tin người dùng) ----------
 function greetingByHour(){
