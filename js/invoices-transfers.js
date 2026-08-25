@@ -37,9 +37,12 @@ function renderInvoices(){
   rows = rows.slice().sort((a,b)=> (b.invoiceDate||b.date||'').localeCompare(a.invoiceDate||a.date||''));
   table.innerHTML = `<thead><tr>
     <th>Trạng thái</th><th>Số hóa đơn</th><th>Ngày HĐ</th><th>Dự án</th><th>Loại</th><th>Nội dung</th><th>Giá trị</th><th>Ảnh</th><th></th>
-  </tr></thead><tbody>${rows.map(t=>`
-    <tr>
-      <td>${(t.invoiceStatus||'pending')==='issued' ? '<span class="tag tag-gold">✅ Đã xuất</span>' : '<span class="tag tag-gray">⏳ Chưa xuất</span>'}</td>
+  </tr></thead><tbody>${rows.map(t=>{
+    // Quá hạn (>7 ngày kể từ ngày tạo) MÀ CHƯA có ảnh hóa đơn đính kèm -> tô đỏ để dễ nhận biết cần xử lý gấp.
+    const overdueNoImage = (typeof daysSince==='function' ? daysSince(t.createdAt) : null) >= (typeof NOTIF_INVOICE_OVERDUE_DAYS!=='undefined'?NOTIF_INVOICE_OVERDUE_DAYS:7) && !t.invoiceImage;
+    return `
+    <tr class="${overdueNoImage ? 'row-overdue-alert' : ''}">
+      <td>${(t.invoiceStatus||'pending')==='issued' ? '<span class="tag tag-gold">✅ Đã xuất</span>' : '<span class="tag tag-gray">⏳ Chưa xuất</span>'}${overdueNoImage ? ' <span class="tag tag-red" title="Quá 7 ngày vẫn chưa có ảnh hóa đơn">⚠️ Quá hạn</span>' : ''}</td>
       <td>${t.invoiceNumber ? '<span class="tag tag-gold">'+escapeHtml(t.invoiceNumber)+'</span>' : '—'}</td>
       <td>${fmtDate(t.invoiceDate || t.date)}</td>
       <td>${escapeHtml(t.projectName||'—')}</td>
@@ -48,7 +51,8 @@ function renderInvoices(){
       <td class="num"><strong>${fmtVND(t.amount)}</strong></td>
       <td>${t.invoiceImage ? `<img src="${t.invoiceImage}" class="thumb-img" data-view-img="${escapeHtml(t.invoiceImage)}" title="Bấm để xem ảnh gốc">` : '—'}</td>
       <td>${invTransRowActions(t.id)}</td>
-    </tr>`).join('')}</tbody>`;
+    </tr>`;
+  }).join('')}</tbody>`;
 }
 
 // Nút thao tác dùng chung cho cả Hóa đơn & Chuyển khoản — theo đúng ma trận quyền:
@@ -101,9 +105,11 @@ function renderTransfers(){
     const done = (t.transferStatus||'pending')==='done';
     const doneLabel = t.type==='IN' ? '✅ Đã nhận' : '✅ Đã CK';
     const pendingLabel = t.type==='IN' ? '⏳ Chưa nhận' : '⏳ Chưa CK';
+    // Quá hạn (>7 ngày kể từ ngày tạo) MÀ CHƯA có ảnh chuyển khoản đính kèm -> tô đỏ.
+    const overdueNoImage = (typeof daysSince==='function' ? daysSince(t.createdAt) : null) >= (typeof NOTIF_INVOICE_OVERDUE_DAYS!=='undefined'?NOTIF_INVOICE_OVERDUE_DAYS:7) && !t.transferImage;
     return `
-    <tr>
-      <td>${done ? '<span class="tag tag-gold">'+doneLabel+'</span>' : '<span class="tag tag-gray">'+pendingLabel+'</span>'}</td>
+    <tr class="${overdueNoImage ? 'row-overdue-alert' : ''}">
+      <td>${done ? '<span class="tag tag-gold">'+doneLabel+'</span>' : '<span class="tag tag-gray">'+pendingLabel+'</span>'}${overdueNoImage ? ' <span class="tag tag-red" title="Quá 7 ngày vẫn chưa có ảnh chuyển khoản">⚠️ Quá hạn</span>' : ''}</td>
       <td>${fmtDate(t.transferDate || t.date)}</td>
       <td><span class="tag tag-blue">${escapeHtml(t.bankName||'—')}</span></td>
       <td class="mono">${escapeHtml(t.bankAccount||'—')}</td>
