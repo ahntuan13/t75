@@ -126,43 +126,48 @@ function setTransferStatus(status){
 document.getElementById('seg-transfer-yes').addEventListener('click', ()=> setTransferStatus('done'));
 document.getElementById('seg-transfer-no').addEventListener('click', ()=> setTransferStatus('pending'));
 
+let currentInvoiceFileRaw = null; // File gốc (ảnh HOẶC pdf) — cần cho nút Quét hóa đơn (AI)
+
 function setImagePreview(kind, dataUrl){
-  const img = document.getElementById(`tx-${kind}-image-preview`);
-  const btn = document.getElementById(`tx-${kind}-image-remove`);
-  if(dataUrl){
-    img.src = dataUrl; img.style.display = 'block'; btn.style.display = 'inline-flex';
-  } else {
-    img.src = ''; img.style.display = 'none'; btn.style.display = 'none';
-  }
+  const wrap = document.getElementById(`tx-${kind}-image-preview-wrap`);
+  if(!wrap) return;
+  wrap.innerHTML = dataUrl
+    ? invoiceAttachmentPreviewHtml(dataUrl) + ` <button type="button" class="btn btn-ghost btn-sm" data-remove-tx-image="${kind}">Xóa file</button>`
+    : '';
 }
+document.getElementById('tx-invoice-image-preview-wrap')?.addEventListener('click', (e)=>{
+  if(e.target.closest('[data-remove-tx-image="invoice"]')){
+    currentInvoiceImage = ''; currentInvoiceFileRaw = null;
+    document.getElementById('tx-invoice-image').value = '';
+    setImagePreview('invoice', '');
+  }
+});
+document.getElementById('tx-transfer-image-preview-wrap')?.addEventListener('click', (e)=>{
+  if(e.target.closest('[data-remove-tx-image="transfer"]')){
+    currentTransferImage = '';
+    document.getElementById('tx-transfer-image').value = '';
+    setImagePreview('transfer', '');
+  }
+});
 
 document.getElementById('tx-invoice-image').addEventListener('change', async (e)=>{
   const file = e.target.files[0];
   if(!file) return;
-  toast('Đang nén ảnh...');
+  currentInvoiceFileRaw = file;
+  toast('Đang xử lý file...');
   try{
-    currentInvoiceImage = await compressImageFile(file, 900, 0.65);
+    currentInvoiceImage = await readInvoiceAttachmentFile(file, 900, 0.65);
     setImagePreview('invoice', currentInvoiceImage);
-  }catch(err){ toast('Không đọc được ảnh, thử ảnh khác'); }
-});
-document.getElementById('tx-invoice-image-remove').addEventListener('click', ()=>{
-  currentInvoiceImage = '';
-  document.getElementById('tx-invoice-image').value = '';
-  setImagePreview('invoice', '');
+  }catch(err){ toast(err.message || 'Không đọc được file, thử file khác'); }
 });
 document.getElementById('tx-transfer-image').addEventListener('change', async (e)=>{
   const file = e.target.files[0];
   if(!file) return;
-  toast('Đang nén ảnh...');
+  toast('Đang xử lý file...');
   try{
-    currentTransferImage = await compressImageFile(file, 900, 0.65);
+    currentTransferImage = await readInvoiceAttachmentFile(file, 900, 0.65);
     setImagePreview('transfer', currentTransferImage);
-  }catch(err){ toast('Không đọc được ảnh, thử ảnh khác'); }
-});
-document.getElementById('tx-transfer-image-remove').addEventListener('click', ()=>{
-  currentTransferImage = '';
-  document.getElementById('tx-transfer-image').value = '';
-  setImagePreview('transfer', '');
+  }catch(err){ toast(err.message || 'Không đọc được file, thử file khác'); }
 });
 
 // ---------------- Tự tính "Thành tiền sau thuế" = Thành tiền + Tiền thuế GTGT (Thu/Chi/Tạm ứng — không phải chế độ Hóa Đơn) ----------------
@@ -184,13 +189,13 @@ document.getElementById('tx-total-amount')?.addEventListener('input', ()=>{
 });
 
 // ---------------- AI quét hóa đơn (ảnh hoặc PDF) cho Thu/Chi/Tạm ứng — dùng chung engine với Hóa Đơn/Lệnh chi ----------------
-document.getElementById('tx-scan-invoice-btn')?.addEventListener('click', ()=>{
-  document.getElementById('tx-scan-invoice-input').click();
-});
-document.getElementById('tx-scan-invoice-input')?.addEventListener('change', async (e)=>{
-  const file = e.target.files[0];
-  e.target.value = '';
-  if(!file) return;
+// Dùng LUÔN file đã đính kèm ở ô "📎 Đính kèm hóa đơn" bên trên — không cần chọn file lần 2 nữa.
+document.getElementById('tx-scan-invoice-btn')?.addEventListener('click', async ()=>{
+  const file = currentInvoiceFileRaw;
+  if(!file){
+    toast('Vui lòng đính kèm file hóa đơn (ảnh hoặc PDF) ở ô bên trên trước khi quét.');
+    return;
+  }
   const btn = document.getElementById('tx-scan-invoice-btn');
   const isPdf = file.type === 'application/pdf' || /\.pdf$/i.test(file.name);
   btn.disabled = true; btn.textContent = '⏳ Đang đọc...';
@@ -210,9 +215,6 @@ document.getElementById('tx-scan-invoice-input')?.addEventListener('change', asy
         extracted = parseInvoiceText(rawText, OCR_SETTINGS.companyName);
       }
     } else if(file.type.startsWith('image/')){
-      const compressed = await compressImageFile(file, 900, 0.65);
-      currentInvoiceImage = compressed; // tiện thể dùng luôn làm "Ảnh hóa đơn" đính kèm, đỡ phải chọn lại file lần nữa
-      setImagePreview('invoice', compressed);
       const imgUrl = await compressImageFile(file, 1600, 0.85);
       const rawText = await runOcr(imgUrl, (pct)=> btn.textContent = `⏳ Đang đọc chữ... ${pct}%`);
       extracted = parseInvoiceText(rawText, OCR_SETTINGS.companyName);
@@ -381,6 +383,7 @@ function openTxModal(id, prefill, target, explainSourceId){
   document.getElementById('tx-transfer-date').value = t.transferDate || '';
   document.getElementById('tx-note').value = t.note || '';
   currentInvoiceImage = t.invoiceImage || '';
+  currentInvoiceFileRaw = null;
   currentTransferImage = t.transferImage || '';
   document.getElementById('tx-invoice-image').value = '';
   document.getElementById('tx-transfer-image').value = '';
@@ -757,7 +760,7 @@ function openTxViewModal(id, source){
     <dl class="tx-view-grid" style="margin-top:10px;">
       ${row('Số hóa đơn', escapeHtml(t.invoiceNumber||''))}
       ${row('Ngày hóa đơn', t.invoiceDate ? fmtDate(t.invoiceDate) : '')}
-    </dl>${t.invoiceImage ? `<div class="tx-view-images"><img src="${t.invoiceImage}" data-lightbox="${t.invoiceImage}"></div>` : ''}</div>`;
+    </dl>${t.invoiceImage ? `<div class="tx-view-images">${invoiceAttachmentPreviewHtml(t.invoiceImage, {clickable:true})}</div>` : ''}</div>`;
 
   // Trạng thái CK/nhận tiền — nhãn động theo Thu/Chi, ai cũng đổi được, TRỪ Sub-admin (GĐ chỉ xem)
   const transferDone = (t.transferStatus||'pending')==='done';
@@ -774,7 +777,7 @@ function openTxViewModal(id, source){
       ${row('Số tài khoản', escapeHtml(t.bankAccount||''))}
       ${row('Tên chủ TK', escapeHtml(t.bankHolder||''))}
       ${row('Ngày chuyển khoản', t.transferDate ? fmtDate(t.transferDate) : '')}
-    </dl>${t.transferImage ? `<div class="tx-view-images"><img src="${t.transferImage}" data-lightbox="${t.transferImage}"></div>` : ''}</div>`;
+    </dl>${t.transferImage ? `<div class="tx-view-images">${invoiceAttachmentPreviewHtml(t.transferImage, {clickable:true})}</div>` : ''}</div>`;
 
   if(t.type === 'OUT'){
     html += renderApprovalSectionHtml(t);
@@ -821,8 +824,12 @@ document.getElementById('tx-view-edit-btn').addEventListener('click', (e)=>{
 });
 
 document.getElementById('tx-view-body').addEventListener('click', async (e)=>{
-  const src = e.target.closest('[data-lightbox]')?.dataset.lightbox;
-  if(src){ window.open(src, '_blank'); return; }
+  const imgSrc = e.target.closest('[data-view-img]')?.dataset.viewImg;
+  if(imgSrc){ if(typeof openImageLightbox==='function') openImageLightbox(imgSrc); return; }
+  // Giữ tương thích với data-lightbox cũ (nếu còn sót ở đâu đó) — dùng cách mở Blob URL an toàn,
+  // KHÔNG dùng window.open(dataUri) trực tiếp nữa (Chrome chặn điều hướng tab mới tới link "data:...").
+  const legacySrc = e.target.closest('[data-lightbox]')?.dataset.lightbox;
+  if(legacySrc){ openAttachmentInNewTab(legacySrc); return; }
 
   const toggleBtn = e.target.closest('[data-status-toggle]');
   if(toggleBtn){
