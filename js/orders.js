@@ -101,7 +101,8 @@ function renderOrderAttachmentStatus(){
   const el = document.getElementById('order-attachment-status');
   if(!el) return;
   if(currentOrderAttachment){
-    el.innerHTML = `<a href="${currentOrderAttachment}" target="_blank" class="tag tag-blue">📎 ${escapeHtml(currentOrderAttachmentName||'Xem file')}</a> <button type="button" class="btn btn-ghost btn-sm" id="order-attachment-remove">Xóa file</button>`;
+    el.innerHTML = `<button type="button" class="tag tag-blue" id="order-attachment-view" style="cursor:pointer;border:none;">📎 ${escapeHtml(currentOrderAttachmentName||'Xem file')}</button> <button type="button" class="btn btn-ghost btn-sm" id="order-attachment-remove">Xóa file</button>`;
+    document.getElementById('order-attachment-view').addEventListener('click', ()=> openAttachmentInNewTab(currentOrderAttachment));
     document.getElementById('order-attachment-remove').addEventListener('click', ()=>{
       currentOrderAttachment = ''; currentOrderAttachmentName = '';
       document.getElementById('order-attachment-input').value = '';
@@ -200,6 +201,17 @@ document.getElementById('save-order-btn').addEventListener('click', async ()=>{
     data.approvalSubmittedAt = firebase.firestore.FieldValue.serverTimestamp();
     data.approvedBy = '';
     data.approvedAt = '';
+  } else if(id){
+    // Đang sửa 1 lệnh ĐÃ gửi duyệt trước đó nhưng còn "Đang chờ" (chưa ai quyết định) mà giờ chọn lại về
+    // "Chưa gửi duyệt" -> coi như KT thu hồi yêu cầu duyệt, xóa hẳn trạng thái pending cũ (không để sót lại
+    // ngầm khiến GĐ/PGĐ vẫn thấy thông báo dù KT tưởng đã hủy gửi). Lệnh ĐÃ có kết quả duyệt (approved/rejected)
+    // thì KHÔNG tự động xóa qua đường này, tránh vô tình xoá mất quyết định đã có.
+    const existing = ORDERS.find(o=>o.id===id);
+    if(existing && existing.approvalStatus === 'pending'){
+      data.approvalStatus = firebase.firestore.FieldValue.delete();
+      data.approverRole = firebase.firestore.FieldValue.delete();
+      data.approverEmail = firebase.firestore.FieldValue.delete();
+    }
   }
 
   try{
@@ -545,6 +557,7 @@ function orderRowHtml(o){
       <td class="num"><strong>${fmtVND(o.amount)}</strong></td>
       <td>${statusTag(o)}</td>
       <td class="order-approve-cell">${approveCell}</td>
+      <td>${o.attachment ? `<button class="icon-btn" data-view-order-attachment="${o.id}" title="Xem file đính kèm: ${escapeHtml(o.attachmentName||'')}">📎</button>` : '—'}</td>
       <td>
         <div class="row-actions">
           <button class="icon-btn" data-view-order="${o.id}" title="Xem chi tiết">👁</button>
@@ -558,7 +571,7 @@ function orderRowHtml(o){
     </tr>`;
 }
 const ORDER_THEAD = `<thead><tr>
-    <th></th><th>Ngày</th><th>Loại</th><th>Người nhận</th><th>Lý do</th><th>Dự án</th><th>Số tiền</th><th>Trạng thái</th><th>Duyệt</th><th></th>
+    <th></th><th>Ngày</th><th>Loại</th><th>Người nhận</th><th>Lý do</th><th>Dự án</th><th>Số tiền</th><th>Trạng thái</th><th>Duyệt</th><th>Đính kèm</th><th></th>
   </tr></thead>`;
 
 function renderOrdersTable(){
@@ -615,6 +628,12 @@ function handleOrderTableClick(e){
   const rejectId = e.target.closest('[data-reject-order]')?.dataset.rejectOrder;
   const explainId = e.target.closest('[data-explain-order]')?.dataset.explainOrder;
   const repairId = e.target.closest('[data-repair-order]')?.dataset.repairOrder;
+  const viewAttachmentId = e.target.closest('[data-view-order-attachment]')?.dataset.viewOrderAttachment;
+  if(viewAttachmentId){
+    const o = ORDERS.find(x=>x.id===viewAttachmentId);
+    if(o && o.attachment) openAttachmentInNewTab(o.attachment);
+    return;
+  }
   if(repairId) repairOrderLink(repairId);
   if(viewId){
     const o = ORDERS.find(x=>x.id===viewId);
