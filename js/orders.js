@@ -764,15 +764,23 @@ let currentExpInvoiceImages = ['', '', '', '', ''];
 let currentExpTransferImages = ['', '', '', '', ''];
 
 function setExpImagePreview(i, kind, dataUrl){
-  const img = document.getElementById(`exp${i}-${kind}-image-preview`);
-  const btn = document.getElementById(`exp${i}-${kind}-image-remove`);
-  if(!img || !btn) return;
-  if(dataUrl){
-    img.src = dataUrl; img.style.display = 'block'; btn.style.display = 'inline-flex';
-  } else {
-    img.src = ''; img.style.display = 'none'; btn.style.display = 'none';
-  }
+  const wrap = document.getElementById(`exp${i}-${kind}-image-preview-wrap`);
+  if(!wrap) return;
+  wrap.innerHTML = dataUrl
+    ? invoiceAttachmentPreviewHtml(dataUrl, {imgStyle:'max-width:100px;max-height:100px;border-radius:8px;border:1px solid var(--line);'}) + ` <button type="button" class="btn btn-ghost btn-sm" data-remove-exp-image="${i}:${kind}">Xóa file</button>`
+    : '';
 }
+document.addEventListener('click', (e)=>{
+  const target = e.target.closest('[data-remove-exp-image]')?.dataset.removeExpImage;
+  if(!target) return;
+  const [idxStr, kind] = target.split(':');
+  const idx = Number(idxStr);
+  if(kind==='invoice') currentExpInvoiceImages[idx-1] = '';
+  else currentExpTransferImages[idx-1] = '';
+  const input = document.getElementById(`exp${idx}-${kind}-image`);
+  if(input) input.value = '';
+  setExpImagePreview(idx, kind, '');
+});
 
 for(let i=1;i<=5;i++){
   const invoiceInput = document.getElementById(`exp${i}-invoice-image`);
@@ -780,30 +788,20 @@ for(let i=1;i<=5;i++){
   invoiceInput?.addEventListener('change', async (e)=>{
     const file = e.target.files[0];
     if(!file) return;
-    toast('Đang nén ảnh...');
+    toast('Đang xử lý file...');
     try{
-      currentExpInvoiceImages[i-1] = await compressImageFile(file, 900, 0.65);
+      currentExpInvoiceImages[i-1] = await readInvoiceAttachmentFile(file, 900, 0.65);
       setExpImagePreview(i, 'invoice', currentExpInvoiceImages[i-1]);
-    }catch(err){ toast('Không đọc được ảnh, thử ảnh khác'); }
-  });
-  document.getElementById(`exp${i}-invoice-image-remove`)?.addEventListener('click', ()=>{
-    currentExpInvoiceImages[i-1] = '';
-    if(invoiceInput) invoiceInput.value = '';
-    setExpImagePreview(i, 'invoice', '');
+    }catch(err){ toast(err.message || 'Không đọc được file, thử file khác'); }
   });
   transferInput?.addEventListener('change', async (e)=>{
     const file = e.target.files[0];
     if(!file) return;
-    toast('Đang nén ảnh...');
+    toast('Đang xử lý file...');
     try{
-      currentExpTransferImages[i-1] = await compressImageFile(file, 900, 0.65);
+      currentExpTransferImages[i-1] = await readInvoiceAttachmentFile(file, 900, 0.65);
       setExpImagePreview(i, 'transfer', currentExpTransferImages[i-1]);
-    }catch(err){ toast('Không đọc được ảnh, thử ảnh khác'); }
-  });
-  document.getElementById(`exp${i}-transfer-image-remove`)?.addEventListener('click', ()=>{
-    currentExpTransferImages[i-1] = '';
-    if(transferInput) transferInput.value = '';
-    setExpImagePreview(i, 'transfer', '');
+    }catch(err){ toast(err.message || 'Không đọc được file, thử file khác'); }
   });
 }
 
