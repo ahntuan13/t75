@@ -817,16 +817,12 @@
           </div>
         </div>
         <div class="field full">
-          <label>Ảnh hóa đơn (tùy chọn)</label>
-          <input type="file" id="tx-invoice-image" accept="image/*">
-          <div class="helper-text">Ảnh sẽ tự động được nén nhỏ lại trước khi lưu.</div>
-          <div style="margin-top:8px;">
-            <img id="tx-invoice-image-preview" style="display:none;max-width:150px;max-height:150px;border-radius:8px;border:1px solid var(--line);">
-            <button type="button" class="btn btn-ghost btn-sm" id="tx-invoice-image-remove" style="display:none;">Xóa ảnh</button>
-          </div>
-          <input type="file" id="tx-scan-invoice-input" accept="image/*,application/pdf,.pdf" style="display:none;">
+          <label>📎 Đính kèm hóa đơn (ảnh hoặc PDF)</label>
+          <input type="file" id="tx-invoice-image" accept="image/*,application/pdf,.pdf">
+          <div class="helper-text">Ảnh sẽ tự động được nén nhỏ lại trước khi lưu. PDF giữ nguyên (tối đa 4MB).</div>
+          <div style="margin-top:8px;" id="tx-invoice-image-preview-wrap"></div>
           <button type="button" class="btn btn-primary btn-sm" id="tx-scan-invoice-btn" style="margin-top:10px;">🔍 Quét hóa đơn (AI)</button>
-          <div class="helper-text" style="margin-top:6px;">Chọn file ảnh hoặc PDF hóa đơn — AI tự điền MST, Thành tiền, Tiền thuế GTGT, Thành tiền sau thuế, Số hóa đơn ở trên. Luôn kiểm tra lại trước khi lưu.</div>
+          <div class="helper-text" style="margin-top:6px;">Đính kèm file ở trên rồi bấm nút này — AI tự điền MST, Thành tiền, Tiền thuế GTGT, Thành tiền sau thuế, Số hóa đơn. Luôn kiểm tra lại trước khi lưu.</div>
         </div>
 
         <div class="field full" style="border-top:1px solid var(--line);padding-top:14px;margin-top:2px;">
@@ -844,13 +840,10 @@
         <div class="field"><label>Tên chủ TK</label><input id="tx-bank-holder"></div>
         <div class="field"><label>Ngày chuyển khoản</label><input type="date" id="tx-transfer-date"></div>
         <div class="field full">
-          <label>Ảnh chuyển khoản (tùy chọn)</label>
-          <input type="file" id="tx-transfer-image" accept="image/*">
-          <div class="helper-text">Ảnh sẽ tự động được nén nhỏ lại trước khi lưu.</div>
-          <div style="margin-top:8px;">
-            <img id="tx-transfer-image-preview" style="display:none;max-width:150px;max-height:150px;border-radius:8px;border:1px solid var(--line);">
-            <button type="button" class="btn btn-ghost btn-sm" id="tx-transfer-image-remove" style="display:none;">Xóa ảnh</button>
-          </div>
+          <label>📎 Đính kèm ảnh/PDF chuyển khoản (tùy chọn)</label>
+          <input type="file" id="tx-transfer-image" accept="image/*,application/pdf,.pdf">
+          <div class="helper-text">Ảnh sẽ tự động được nén nhỏ lại trước khi lưu. PDF giữ nguyên (tối đa 4MB).</div>
+          <div style="margin-top:8px;" id="tx-transfer-image-preview-wrap"></div>
         </div>
 
         <div class="field full" id="tx-approval-block" style="display:none;border-top:1px solid var(--line);padding-top:14px;margin-top:2px;">
@@ -907,20 +900,14 @@
           </div>
           <div class="exp-row exp-attach-row">
             <div class="field">
-              <label>📎 Ảnh hóa đơn (tùy chọn)</label>
-              <input type="file" id="exp1-invoice-image" accept="image/*">
-              <div style="margin-top:6px;">
-                <img id="exp1-invoice-image-preview" style="display:none;max-width:100px;max-height:100px;border-radius:8px;border:1px solid var(--line);">
-                <button type="button" class="btn btn-ghost btn-sm" id="exp1-invoice-image-remove" style="display:none;">Xóa ảnh</button>
-              </div>
+              <label>📎 Hóa đơn (ảnh/PDF, tùy chọn)</label>
+              <input type="file" id="exp1-invoice-image" accept="image/*,application/pdf,.pdf">
+              <div style="margin-top:6px;" id="exp1-invoice-image-preview-wrap"></div>
             </div>
             <div class="field">
-              <label>📎 Ảnh chuyển khoản (tùy chọn)</label>
-              <input type="file" id="exp1-transfer-image" accept="image/*">
-              <div style="margin-top:6px;">
-                <img id="exp1-transfer-image-preview" style="display:none;max-width:100px;max-height:100px;border-radius:8px;border:1px solid var(--line);">
-                <button type="button" class="btn btn-ghost btn-sm" id="exp1-transfer-image-remove" style="display:none;">Xóa ảnh</button>
-              </div>
+              <label>📎 Chuyển khoản (ảnh/PDF, tùy chọn)</label>
+              <input type="file" id="exp1-transfer-image" accept="image/*,application/pdf,.pdf">
+              <div style="margin-top:6px;" id="exp1-transfer-image-preview-wrap"></div>
             </div>
           </div>
         </div>
@@ -950,20 +937,14 @@
           </div>
           <div class="exp-row exp-attach-row">
             <div class="field">
-              <label>📎 Ảnh hóa đơn (tùy chọn)</label>
-              <input type="file" id="exp2-invoice-image" accept="image/*">
-              <div style="margin-top:6px;">
-                <img id="exp2-invoice-image-preview" style="display:none;max-width:100px;max-height:100px;border-radius:8px;border:1px solid var(--line);">
-                <button type="button" class="btn btn-ghost btn-sm" id="exp2-invoice-image-remove" style="display:none;">Xóa ảnh</button>
-              </div>
+              <label>📎 Hóa đơn (ảnh/PDF, tùy chọn)</label>
+              <input type="file" id="exp2-invoice-image" accept="image/*,application/pdf,.pdf">
+              <div style="margin-top:6px;" id="exp2-invoice-image-preview-wrap"></div>
             </div>
             <div class="field">
-              <label>📎 Ảnh chuyển khoản (tùy chọn)</label>
-              <input type="file" id="exp2-transfer-image" accept="image/*">
-              <div style="margin-top:6px;">
-                <img id="exp2-transfer-image-preview" style="display:none;max-width:100px;max-height:100px;border-radius:8px;border:1px solid var(--line);">
-                <button type="button" class="btn btn-ghost btn-sm" id="exp2-transfer-image-remove" style="display:none;">Xóa ảnh</button>
-              </div>
+              <label>📎 Chuyển khoản (ảnh/PDF, tùy chọn)</label>
+              <input type="file" id="exp2-transfer-image" accept="image/*,application/pdf,.pdf">
+              <div style="margin-top:6px;" id="exp2-transfer-image-preview-wrap"></div>
             </div>
           </div>
         </div>
@@ -993,20 +974,14 @@
           </div>
           <div class="exp-row exp-attach-row">
             <div class="field">
-              <label>📎 Ảnh hóa đơn (tùy chọn)</label>
-              <input type="file" id="exp3-invoice-image" accept="image/*">
-              <div style="margin-top:6px;">
-                <img id="exp3-invoice-image-preview" style="display:none;max-width:100px;max-height:100px;border-radius:8px;border:1px solid var(--line);">
-                <button type="button" class="btn btn-ghost btn-sm" id="exp3-invoice-image-remove" style="display:none;">Xóa ảnh</button>
-              </div>
+              <label>📎 Hóa đơn (ảnh/PDF, tùy chọn)</label>
+              <input type="file" id="exp3-invoice-image" accept="image/*,application/pdf,.pdf">
+              <div style="margin-top:6px;" id="exp3-invoice-image-preview-wrap"></div>
             </div>
             <div class="field">
-              <label>📎 Ảnh chuyển khoản (tùy chọn)</label>
-              <input type="file" id="exp3-transfer-image" accept="image/*">
-              <div style="margin-top:6px;">
-                <img id="exp3-transfer-image-preview" style="display:none;max-width:100px;max-height:100px;border-radius:8px;border:1px solid var(--line);">
-                <button type="button" class="btn btn-ghost btn-sm" id="exp3-transfer-image-remove" style="display:none;">Xóa ảnh</button>
-              </div>
+              <label>📎 Chuyển khoản (ảnh/PDF, tùy chọn)</label>
+              <input type="file" id="exp3-transfer-image" accept="image/*,application/pdf,.pdf">
+              <div style="margin-top:6px;" id="exp3-transfer-image-preview-wrap"></div>
             </div>
           </div>
         </div>
@@ -1036,20 +1011,14 @@
           </div>
           <div class="exp-row exp-attach-row">
             <div class="field">
-              <label>📎 Ảnh hóa đơn (tùy chọn)</label>
-              <input type="file" id="exp4-invoice-image" accept="image/*">
-              <div style="margin-top:6px;">
-                <img id="exp4-invoice-image-preview" style="display:none;max-width:100px;max-height:100px;border-radius:8px;border:1px solid var(--line);">
-                <button type="button" class="btn btn-ghost btn-sm" id="exp4-invoice-image-remove" style="display:none;">Xóa ảnh</button>
-              </div>
+              <label>📎 Hóa đơn (ảnh/PDF, tùy chọn)</label>
+              <input type="file" id="exp4-invoice-image" accept="image/*,application/pdf,.pdf">
+              <div style="margin-top:6px;" id="exp4-invoice-image-preview-wrap"></div>
             </div>
             <div class="field">
-              <label>📎 Ảnh chuyển khoản (tùy chọn)</label>
-              <input type="file" id="exp4-transfer-image" accept="image/*">
-              <div style="margin-top:6px;">
-                <img id="exp4-transfer-image-preview" style="display:none;max-width:100px;max-height:100px;border-radius:8px;border:1px solid var(--line);">
-                <button type="button" class="btn btn-ghost btn-sm" id="exp4-transfer-image-remove" style="display:none;">Xóa ảnh</button>
-              </div>
+              <label>📎 Chuyển khoản (ảnh/PDF, tùy chọn)</label>
+              <input type="file" id="exp4-transfer-image" accept="image/*,application/pdf,.pdf">
+              <div style="margin-top:6px;" id="exp4-transfer-image-preview-wrap"></div>
             </div>
           </div>
         </div>
@@ -1079,20 +1048,14 @@
           </div>
           <div class="exp-row exp-attach-row">
             <div class="field">
-              <label>📎 Ảnh hóa đơn (tùy chọn)</label>
-              <input type="file" id="exp5-invoice-image" accept="image/*">
-              <div style="margin-top:6px;">
-                <img id="exp5-invoice-image-preview" style="display:none;max-width:100px;max-height:100px;border-radius:8px;border:1px solid var(--line);">
-                <button type="button" class="btn btn-ghost btn-sm" id="exp5-invoice-image-remove" style="display:none;">Xóa ảnh</button>
-              </div>
+              <label>📎 Hóa đơn (ảnh/PDF, tùy chọn)</label>
+              <input type="file" id="exp5-invoice-image" accept="image/*,application/pdf,.pdf">
+              <div style="margin-top:6px;" id="exp5-invoice-image-preview-wrap"></div>
             </div>
             <div class="field">
-              <label>📎 Ảnh chuyển khoản (tùy chọn)</label>
-              <input type="file" id="exp5-transfer-image" accept="image/*">
-              <div style="margin-top:6px;">
-                <img id="exp5-transfer-image-preview" style="display:none;max-width:100px;max-height:100px;border-radius:8px;border:1px solid var(--line);">
-                <button type="button" class="btn btn-ghost btn-sm" id="exp5-transfer-image-remove" style="display:none;">Xóa ảnh</button>
-              </div>
+              <label>📎 Chuyển khoản (ảnh/PDF, tùy chọn)</label>
+              <input type="file" id="exp5-transfer-image" accept="image/*,application/pdf,.pdf">
+              <div style="margin-top:6px;" id="exp5-transfer-image-preview-wrap"></div>
             </div>
           </div>
         </div>
