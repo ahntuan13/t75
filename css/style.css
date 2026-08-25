@@ -170,7 +170,7 @@ input,select,textarea{font-family:inherit;}
 .logout-btn{background:none;border:none;color:var(--ink-faint);font-size:15px;padding:4px;}
 .logout-btn:hover{color:var(--red);}
 
-.main{padding:26px 32px 60px;max-width:1440px;min-width:0;overflow-x:hidden;}
+.main{padding:26px 32px 60px;max-width:1440px;min-width:0;overflow-x:hidden;margin:0 auto;}
 /* Laptop cỡ nhỏ - trung (vd 1280x800, 1366x768): bớt padding + thu gọn lưới KPI một chút
    để không bị chật, nhưng vẫn giữ sidebar đầy đủ 240px như màn hình lớn. */
 @media (max-width:1366px) and (min-width:1101px){
