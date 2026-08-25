@@ -15,41 +15,66 @@ function isLaborCountedEmployee(emp){
 function renderLaborChart(){
   const canvas = document.getElementById('chart-labor-hours');
   if(!canvas) return;
-  const monthFilter = document.getElementById('labor-chart-month')?.value || '';
   const emps = (typeof EMPLOYEES!=='undefined' ? EMPLOYEES : []);
   const countedEmpIds = new Set(emps.filter(isLaborCountedEmployee).map(e=>e.id));
-  const totals = {}; // projectName -> giờ công
+
+  // Gom giờ công theo CẢ Tháng và Dự án cùng lúc: totals[thang][tenDuAn] = tổng giờ công.
+  const totals = {};
+  const monthsSet = new Set();
+  const projectTotals = {}; // tổng giờ công theo dự án (dùng để chọn dự án nào hiện riêng, dự án nào gộp "Khác")
   (typeof TIMESHEETS!=='undefined' ? TIMESHEETS : []).forEach(t=>{
     if(!countedEmpIds.has(t.employeeId)) return;
-    if(monthFilter && monthKey(t.date)!==monthFilter) return;
+    const m = monthKey(t.date);
+    if(!m) return;
     Object.values(t.shifts||{}).forEach(s=>{
       if(s && s.hours && s.projectName){
-        totals[s.projectName] = (totals[s.projectName]||0) + Number(s.hours);
+        monthsSet.add(m);
+        totals[m] = totals[m] || {};
+        totals[m][s.projectName] = (totals[m][s.projectName]||0) + Number(s.hours);
+        projectTotals[s.projectName] = (projectTotals[s.projectName]||0) + Number(s.hours);
       }
     });
   });
-  const list = Object.entries(totals).map(([name,hours])=>({name,hours})).sort((a,b)=>b.hours-a.hours);
 
-  canvas.parentElement.style.height = Math.max(320, list.length*30+60) + 'px';
+  // Chỉ hiện 6 tháng GẦN NHẤT có dữ liệu, sắp theo thứ tự thời gian tăng dần (trái->phải).
+  const months = [...monthsSet].sort().slice(-6);
+  // Quá nhiều dự án sẽ rối biểu đồ -> chỉ tách riêng TOP 7 dự án nhiều giờ công nhất, còn lại gộp vào "Dự án khác".
+  const topProjects = Object.entries(projectTotals).sort((a,b)=>b[1]-a[1]).slice(0,7).map(([name])=>name);
+  const hasOthers = Object.keys(projectTotals).length > topProjects.length;
+  const seriesNames = hasOthers ? [...topProjects, 'Dự án khác'] : topProjects;
+
+  const palette = [CHART_COLORS.purple, CHART_COLORS.teal, CHART_COLORS.gold, CHART_COLORS.blue,
+    CHART_COLORS.red, '#EC4899', '#22C55E', '#94A3B8'];
+  const datasets = seriesNames.map((name, i)=> ({
+    label: name,
+    data: months.map(m=>{
+      if(name === 'Dự án khác'){
+        const known = new Set(topProjects);
+        return Object.entries(totals[m]||{}).filter(([p])=>!known.has(p)).reduce((s,[,h])=>s+h, 0);
+      }
+      return (totals[m]||{})[name] || 0;
+    }),
+    backgroundColor: palette[i % palette.length],
+    borderRadius: 3,
+  }));
+
+  const monthLabel = (m) => { const [y,mo] = m.split('-'); return `Th.${Number(mo)}/${y}`; };
+  canvas.parentElement.style.height = '380px';
   if(chartLaborHours) chartLaborHours.destroy();
   chartLaborHours = new Chart(canvas, {
     type:'bar',
-    data:{ labels: list.map(x=>x.name), datasets:[
-      {label:'Giờ công', data:list.map(x=>x.hours), backgroundColor:CHART_COLORS.purple, borderRadius:4}
-    ]},
-    options:{indexAxis:'y', responsive:true, maintainAspectRatio:false,
-      scales:{ x:{grid:{color:CHART_COLORS.grid}, ticks:{callback:v=>v+'h'}}, y:{grid:{display:false}} },
-      plugins:{legend:{display:false}, tooltip:{callbacks:{label:(ctx)=> `${fmtNum(ctx.parsed.x)} giờ`}}}}
+    data:{ labels: months.map(monthLabel), datasets },
+    options:{ responsive:true, maintainAspectRatio:false,
+      scales:{
+        x:{ stacked:true, grid:{display:false} },
+        y:{ stacked:true, grid:{color:CHART_COLORS.grid}, ticks:{callback:v=>v+'h'} },
+      },
+      plugins:{
+        legend:{ display:true, position:'bottom', labels:{boxWidth:12, font:{size:11}} },
+        tooltip:{ callbacks:{ label:(ctx)=> `${ctx.dataset.label}: ${fmtNum(ctx.parsed.y)} giờ` } },
+      }}
   });
 }
-document.getElementById('labor-chart-month')?.addEventListener('change', renderLaborChart);
-document.getElementById('labor-chart-alltime')?.addEventListener('click', ()=>{
-  const el = document.getElementById('labor-chart-month');
-  if(el) el.value = '';
-  renderLaborChart();
-});
-// Mặc định hiện TỔNG THỂ (mọi tháng, mọi dự án) — không lọc theo tháng hiện tại nữa,
-// tránh việc chỉ hiện đúng vài dự án có công trong tháng này mà ẩn mất các dự án khác.
 
 // ---------- WELCOME CARD (lời chào real-time + thông tin người dùng) ----------
 function greetingByHour(){
