@@ -51,7 +51,7 @@ function renderInvoices(){
       <td>${t.type==='IN' ? '<span class="tag tag-in">Thu</span>' : '<span class="tag tag-out">Chi</span>'}</td>
       <td>${escapeHtml(t.content)}</td>
       <td class="num"><strong>${fmtVND(t.amount)}</strong></td>
-      <td>${t.invoiceImage ? `<img src="${t.invoiceImage}" class="thumb-img" data-view-img="${escapeHtml(t.invoiceImage)}" title="Bấm để xem ảnh gốc">` : '—'}</td>
+      <td>${t.invoiceImage ? invoiceAttachmentPreviewHtml(t.invoiceImage, {imgStyle:'width:44px;height:44px;object-fit:cover;border-radius:6px;cursor:zoom-in;', clickable:true}) : '—'}</td>
       <td>${invTransRowActions(t.id)}</td>
     </tr>`;
   }).join('')}</tbody>`;
@@ -120,7 +120,7 @@ function renderTransfers(){
       <td>${escapeHtml(t.projectName||'—')}</td>
       <td>${t.type==='IN' ? '<span class="tag tag-in">Thu</span>' : '<span class="tag tag-out">Chi</span>'}</td>
       <td class="num"><strong>${fmtVND(t.amount)}</strong></td>
-      <td>${t.transferImage ? `<img src="${t.transferImage}" class="thumb-img" data-view-img="${escapeHtml(t.transferImage)}" title="Bấm để xem ảnh gốc">` : '—'}</td>
+      <td>${t.transferImage ? invoiceAttachmentPreviewHtml(t.transferImage, {imgStyle:'width:44px;height:44px;object-fit:cover;border-radius:6px;cursor:zoom-in;', clickable:true}) : '—'}</td>
       <td>${invTransRowActions(t.id)}</td>
     </tr>`;
   }).join('')}</tbody>`;
