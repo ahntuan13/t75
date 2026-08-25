@@ -59,15 +59,17 @@ function renderLaborChart(){
   }));
 
   const monthLabel = (m) => { const [y,mo] = m.split('-'); return `Th.${Number(mo)}/${y}`; };
-  canvas.parentElement.style.height = '380px';
+  canvas.parentElement.style.height = '400px';
   if(chartLaborHours) chartLaborHours.destroy();
   chartLaborHours = new Chart(canvas, {
     type:'bar',
     data:{ labels: months.map(monthLabel), datasets },
     options:{ responsive:true, maintainAspectRatio:false,
+      // Dạng so sánh: mỗi dự án 1 cột riêng đứng CẠNH NHAU trong từng tháng (không chồng lên nhau)
+      // để dễ so sánh trực quan dự án nào chiếm nhiều giờ công hơn trong cùng 1 tháng.
       scales:{
-        x:{ stacked:true, grid:{display:false} },
-        y:{ stacked:true, grid:{color:CHART_COLORS.grid}, ticks:{callback:v=>v+'h'} },
+        x:{ grid:{display:false} },
+        y:{ grid:{color:CHART_COLORS.grid}, ticks:{callback:v=>v+'h'} },
       },
       plugins:{
         legend:{ display:true, position:'bottom', labels:{boxWidth:12, font:{size:11}} },
