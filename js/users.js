@@ -80,6 +80,11 @@ function applyRolePermissions(){
     const stillAllowed = adminOnlyViews.includes(activeView.dataset.view) ? isAdmin() : canView();
     if(!stillAllowed) document.querySelector('[data-view="dashboard"]')?.click();
   }
+  // Kế toán (User) giờ CHỈ ĐƯỢC XEM ở mục "Dòng tiền" (Chi phí gián tiếp + Thu chi dự án) — không tạo/sửa/xóa/
+  // đổi trạng thái gì được nữa. Khoản Chi cần ghi nhận phải đi qua "Lệnh chi" (có luồng gửi duyệt riêng),
+  // hệ thống tự tạo Thu Chi khi GĐ duyệt xong — không tạo trực tiếp ở đây nữa.
+  const qcAddTx = document.getElementById('qc-add-tx');
+  if(qcAddTx) qcAddTx.style.display = isAdmin() ? '' : 'none';
   const btnUploadThu = document.getElementById('btn-upload-thu');
   if(btnUploadThu) btnUploadThu.style.display = isAdmin() ? '' : 'none';
   const btnUploadChi = document.getElementById('btn-upload-chi');
@@ -97,9 +102,10 @@ function applyRolePermissions(){
   if(btnExportTx) btnExportTx.style.display = isAdmin() ? '' : 'none';
   const btnExportFc = document.getElementById('btn-export-fc');
   if(btnExportFc) btnExportFc.style.display = isAdmin() ? '' : 'none';
-  // GĐ (Sub-admin) chỉ xem + duyệt -> ẩn 2 nút quét hóa đơn AI ngay tại trang Hóa đơn.
+  // Chỉ ADMIN mới tạo/sửa trực tiếp Thu Chi được nữa (Kế toán chỉ xem ở mục Dòng tiền) -> ẩn luôn nút quét
+  // hóa đơn AI ở trang Hóa đơn cho Kế toán, vì bấm vào cũng sẽ không lưu được (bị chặn ở Firestore Rules).
   document.querySelectorAll('label[for="ocr-invoice-pdf-input"]').forEach(el=>{
-    el.style.display = isSubAdmin() ? 'none' : '';
+    el.style.display = isAdmin() ? '' : 'none';
   });
   if(window.renderDashboard) renderDashboard();
   if(window.renderNotifications) renderNotifications();
