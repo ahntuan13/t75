@@ -102,10 +102,9 @@ function applyRolePermissions(){
   if(btnExportTx) btnExportTx.style.display = isAdmin() ? '' : 'none';
   const btnExportFc = document.getElementById('btn-export-fc');
   if(btnExportFc) btnExportFc.style.display = isAdmin() ? '' : 'none';
-  // Chỉ ADMIN mới tạo/sửa trực tiếp Thu Chi được nữa (Kế toán chỉ xem ở mục Dòng tiền) -> ẩn luôn nút quét
-  // hóa đơn AI ở trang Hóa đơn cho Kế toán, vì bấm vào cũng sẽ không lưu được (bị chặn ở Firestore Rules).
+  // GĐ (Sub-admin) chỉ xem + duyệt -> ẩn nút quét hóa đơn AI ngay tại trang Hóa đơn.
   document.querySelectorAll('label[for="ocr-invoice-pdf-input"]').forEach(el=>{
-    el.style.display = isAdmin() ? '' : 'none';
+    el.style.display = isSubAdmin() ? 'none' : '';
   });
   if(window.renderDashboard) renderDashboard();
   if(window.renderNotifications) renderNotifications();
