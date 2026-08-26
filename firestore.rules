@@ -94,8 +94,11 @@ service cloud.firestore {
       // User/Admin nhập mới tự do; Sub-admin (GĐ) CHỈ được phép tạo khi đây là giao dịch
       // hệ thống tự sinh ra do chính GĐ vừa Duyệt 1 lệnh (không được tự tay tạo/giải trình).
       allow create: if isSignedIn() && (isNotSubAdmin() || isSystemGeneratedFromApproval());
-      // riêng đổi trạng thái Hóa đơn/Chuyển khoản và luồng Gửi duyệt/Duyệt/Từ chối Chi: KHÔNG áp dụng cho Sub-admin (GĐ chỉ xem).
-      allow update: if isAdmin() || (isNotSubAdmin() && isSimpleStatusUpdate()) || (isNotSubAdmin() && isApprovalSubmit()) || isApprovalDecision() || (isNotSubAdmin() && isExplainUpdate());
+      // Kế toán (User)/Admin được SỬA TOÀN BỘ nội dung giao dịch của mình (kể cả sau khi đã lưu) —
+      // trước đây chỉ cho đổi 2 trạng thái Hóa đơn/Chuyển khoản, khiến không thể bổ sung MST/VAT/
+      // hàng hóa... vào 1 giao dịch đã tạo trước đó (lỗi "Missing or insufficient permissions").
+      // Sub-admin (GĐ) vẫn CHỈ được Duyệt/Từ chối qua isApprovalDecision(), không được sửa gì khác.
+      allow update: if isNotSubAdmin() || isApprovalDecision();
       allow delete: if isAdmin();
     }
 
@@ -103,8 +106,7 @@ service cloud.firestore {
     match /fixedCosts/{id} {
       allow read: if isSignedIn();
       allow create: if isSignedIn() && (isNotSubAdmin() || isSystemGeneratedFromApproval());
-      // isExplainUpdate (đánh dấu đã giải trình): CHỈ Kế toán (User)/Admin — GĐ không được quyền giải chi.
-      allow update: if isAdmin() || (isNotSubAdmin() && isSimpleStatusUpdate()) || (isNotSubAdmin() && isApprovalSubmit()) || isApprovalDecision() || (isNotSubAdmin() && isExplainUpdate());
+      allow update: if isNotSubAdmin() || isApprovalDecision();
       allow delete: if isAdmin();
     }
 
