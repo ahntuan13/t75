@@ -91,22 +91,20 @@ service cloud.firestore {
 
     match /transactions/{id} {
       allow read: if isSignedIn();
-      // User/Admin nhập mới tự do; Sub-admin (GĐ) CHỈ được phép tạo khi đây là giao dịch
-      // hệ thống tự sinh ra do chính GĐ vừa Duyệt 1 lệnh (không được tự tay tạo/giải trình).
-      allow create: if isSignedIn() && (isNotSubAdmin() || isSystemGeneratedFromApproval());
-      // Kế toán (User)/Admin được SỬA TOÀN BỘ nội dung giao dịch của mình (kể cả sau khi đã lưu) —
-      // trước đây chỉ cho đổi 2 trạng thái Hóa đơn/Chuyển khoản, khiến không thể bổ sung MST/VAT/
-      // hàng hóa... vào 1 giao dịch đã tạo trước đó (lỗi "Missing or insufficient permissions").
-      // Sub-admin (GĐ) vẫn CHỈ được Duyệt/Từ chối qua isApprovalDecision(), không được sửa gì khác.
-      allow update: if isNotSubAdmin() || isApprovalDecision();
+      // Chỉ ADMIN được tạo/sửa trực tiếp trong "Thu chi dự án" — Kế toán giờ CHỈ ĐƯỢC XEM ở mục này
+      // (mục "Dòng tiền": Chi phí gián tiếp + Thu chi dự án). Khoản Chi cần ghi phải đi qua "Lệnh chi"
+      // (paymentOrders) rồi được GĐ/PGĐ duyệt — lúc đó hệ thống TỰ ĐỘNG tạo bản ghi ở đây
+      // (isSystemGeneratedFromApproval), không cần và không cho Kế toán tự tay tạo/sửa nữa.
+      allow create: if isSignedIn() && (isAdmin() || isSystemGeneratedFromApproval());
+      allow update: if isAdmin() || isApprovalDecision();
       allow delete: if isAdmin();
     }
 
     // Chi phí gián tiếp (không gắn dự án cụ thể) — quyền y hệt transactions, thêm luồng "giải trình"
     match /fixedCosts/{id} {
       allow read: if isSignedIn();
-      allow create: if isSignedIn() && (isNotSubAdmin() || isSystemGeneratedFromApproval());
-      allow update: if isNotSubAdmin() || isApprovalDecision();
+      allow create: if isSignedIn() && (isAdmin() || isSystemGeneratedFromApproval());
+      allow update: if isAdmin() || isApprovalDecision();
       allow delete: if isAdmin();
     }
 
