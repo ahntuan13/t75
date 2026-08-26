@@ -585,7 +585,7 @@ function txRowHtml(t){
     : isExplained
       ? ' <span class="tag tag-gray" title="Đã giải trình, xem bản chính thức trong Thu Chi">✅ Đã giải trình → Thu Chi</span>'
       : '';
-  const explainBtn = isPendingExplain
+  const explainBtn = (isPendingExplain && isAdmin())
     ? `<button class="icon-btn" data-explain-tx="${t.id}" title="Giải trình: gán dự án + chứng từ, chuyển sang Thu Chi">🧾</button>`
     : '';
 
@@ -610,7 +610,58 @@ function txRowHtml(t){
     </tr>`;
 }
 
-// ---------------- Duyệt chi (GĐ/PGĐ) — dùng chung cho bảng + modal xem chi tiết ----------------
+// ---------------- Chuyển các khoản Chi "Chờ duyệt" (kiểu cũ, duyệt ngay trong Thu Chi) sang "Lệnh chi" ----------------
+// Dùng khi đổi quy trình: Kế toán không còn tự tạo/duyệt Chi ngay trong Thu Chi/Chi phí gián tiếp nữa,
+// mọi khoản Chi cần duyệt phải đi qua Lệnh chi. Hàm này dọn các khoản CŨ đã lỡ tạo theo kiểu cũ.
+async function migratePendingToOrders(source){
+  const coll = source === 'fc' ? 'fixedCosts' : 'transactions';
+  const arr = source === 'fc' ? (typeof FIXEDCOSTS!=='undefined'?FIXEDCOSTS:[]) : TRANSACTIONS;
+  const pending = arr.filter(t=> t.type==='OUT' && t.approvalStatus==='pending');
+  if(!pending.length){ toast('Không có khoản nào đang chờ duyệt để chuyển.'); return; }
+  if(!confirm(`Chuyển ${pending.length} khoản đang "Chờ duyệt" sang Lệnh chi?\n\nMỗi khoản sẽ tạo thành 1 Lệnh chi mới (giữ nguyên trạng thái đang chờ GĐ/PGĐ duyệt), và bị XÓA khỏi ${source==='fc'?'Chi phí gián tiếp':'Thu chi dự án'}.`)) return;
+
+  let done = 0, failed = 0;
+  for(const t of pending){
+    try{
+      const orderData = {
+        orderType: 'payment',
+        payee: t.bankHolder || t.projectName || 'Chưa rõ người nhận',
+        payeeBank: t.bankAccount || '',
+        payeeTaxCode: t.invoiceTaxCode || '',
+        invoiceNumber: t.invoiceNumber || '',
+        pretaxAmount: t.pretaxAmount || 0,
+        vatAmount: t.vatAmount || 0,
+        totalAmount: t.totalAmount || t.amount || 0,
+        date: t.date || todayISO(),
+        projectId: t.projectId || '',
+        projectName: t.projectName || '',
+        code: t.code || '',
+        reason: t.content || '(Chuyển từ Thu Chi cũ)',
+        amount: t.amount || 0,
+        requester: '',
+        attachment: t.invoiceImage || t.transferImage || '',
+        attachmentName: t.invoiceImage ? 'hoa-don.jpg' : (t.transferImage ? 'chuyen-khoan.jpg' : ''),
+        note: (t.description || '') + ' [Đã chuyển tự động từ Thu Chi ngày ' + todayISO() + ']',
+        approvalStatus: 'pending',
+        approverRole: t.approverRole || 'GD',
+        approverEmail: t.approverEmail || APPROVERS.gdEmail || '',
+        approvalSubmittedAt: firebase.firestore.FieldValue.serverTimestamp(),
+        approvedBy: '', approvedAt: '',
+        createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+        createdBy: t.createdBy || auth.currentUser.email,
+      };
+      await db.collection('paymentOrders').add(orderData);
+      await db.collection(coll).doc(t.id).delete();
+      done++;
+    }catch(err){ console.error('Lỗi chuyển khoản', t.id, err); failed++; }
+  }
+  toast(`✅ Đã chuyển ${done} khoản sang Lệnh chi${failed ? ` (${failed} khoản lỗi, xem Console)` : ''}.`);
+  logActivity('update', {projectName:'Chuyển sang Lệnh chi', content:`Chuyển ${done} khoản từ ${source==='fc'?'Chi phí gián tiếp':'Thu chi dự án'} sang Lệnh chi`, type:'OUT'});
+}
+document.addEventListener('click', (e)=>{
+  const source = e.target.closest('[data-migrate-to-order-source]')?.dataset.migrateToOrderSource;
+  if(source) migratePendingToOrders(source);
+});
 async function decideApproval(id, decision, source){
   const coll = source==='fc' ? 'fixedCosts' : 'transactions';
   const arr = source==='fc' ? (typeof FIXEDCOSTS!=='undefined'?FIXEDCOSTS:[]) : TRANSACTIONS;
@@ -668,11 +719,18 @@ function txTableBlockHtml(title, rows, theadHtml, opts={}){
   const bodyHtml = rows.length
     ? `<div class="table-wrap"><table class="data">${theadHtml}<tbody>${rows.map(txRowHtml).join('')}</tbody></table></div>`
     : `<div class="empty-state" style="padding:18px 0;">${opts.emptyText || 'Không có dòng nào.'}</div>`;
+  // Chỉ Admin thấy nút này: chuyển các khoản Chi đang "Chờ duyệt" (kiểu cũ, duyệt ngay trong Thu Chi)
+  // sang "Lệnh chi" (kiểu mới, có luồng gửi duyệt riêng) — dùng để dọn các khoản Chi tồn đọng từ trước
+  // khi đổi sang quy trình mới (Kế toán không còn tự tạo/duyệt Chi ngay trong Thu Chi nữa).
+  const migrateBtn = (opts.pendingBlock && rows.length && typeof isAdmin==='function' && isAdmin())
+    ? `<button type="button" class="btn btn-primary btn-sm" data-migrate-to-order-source="${opts.source||'tx'}">🔁 Chuyển sang Lệnh chi</button>`
+    : '';
   return `
     <div class="card tx-project-block${opts.pendingBlock ? ' tx-pending-block' : ''}">
       <div class="tx-project-head">
         <h4>${title}</h4>
         ${summaryHtml}
+        ${migrateBtn}
       </div>
       ${bodyHtml}
     </div>`;
@@ -702,7 +760,7 @@ function renderTxTable(){
 
   let html = '';
   if(pendingRows.length){
-    html += txTableBlockHtml(`🟡 Khung chờ duyệt (${pendingRows.length})`, pendingRows, theadHtml, {pendingBlock:true, showSummary:false});
+    html += txTableBlockHtml(`🟡 Khung chờ duyệt (${pendingRows.length})`, pendingRows, theadHtml, {pendingBlock:true, showSummary:false, source:'tx'});
   }
   html += txTableBlockHtml(`Thu Chi (${otherRows.length} giao dịch)`, otherRows, theadHtml, {emptyText:'Chưa có giao dịch nào khác ngoài các khoản đang chờ duyệt ở trên.'});
   wrap.innerHTML = html;
@@ -751,7 +809,7 @@ function openTxViewModal(id, source){
 
   // Trạng thái hóa đơn — ai đăng nhập cũng bấm đổi được, TRỪ Sub-admin (GĐ chỉ xem)
   const invoiceIssued = (t.invoiceStatus||'pending')==='issued';
-  const roDisabled = (typeof isSubAdmin==='function' && isSubAdmin()) ? 'disabled style="opacity:.5;cursor:not-allowed;"' : '';
+  const roDisabled = !isAdmin() ? 'disabled style="opacity:.5;cursor:not-allowed;"' : '';
   html += `<div class="tx-view-section"><h5>🧾 Thông tin hóa đơn</h5>
     <div class="seg tx-status-toggle" style="max-width:340px;">
       <button type="button" ${roDisabled} class="${invoiceIssued?'active-gold':''}" data-status-toggle="invoiceStatus" data-status-value="issued" data-tx-id="${t.id}">✅ Đã xuất hóa đơn</button>
