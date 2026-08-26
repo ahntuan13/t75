@@ -226,10 +226,11 @@ function parseInvoiceText(text, companyName){
   const get = (regex) => { const m = text.match(regex); return m ? m[1].trim() : ''; };
   const toNum = parseInvoiceNumber;
 
-  // Số hóa đơn: chấp nhận nhiều kiểu nhãn khác nhau tùy mẫu hóa đơn (Số/No/Ký hiệu/Mẫu số/mã tra cứu MCQT...)
-  const invoiceNumber = get(/S[ốôo]\s*h[óoôo][áa]?\s*[đd][ơo]n[\s\S]{0,30}?([A-Z0-9\-]{4,20})/i)
+  // Serial hóa đơn: ưu tiên "Ký hiệu (Serial)" trước — đây là trường app gọi là "Serial".
+  // Nếu hóa đơn không có "Ký hiệu" riêng thì mới rơi xuống dùng "Số (No.)" hoặc các nhãn khác thay thế.
+  const invoiceNumber = get(/K[ýy]\s*hi[ệe]u[\s\S]{0,40}?((?=[A-Za-z0-9\-]*\d)[A-Za-z0-9\-]{4,20})/i)
+    || get(/S[ốôo]\s*h[óoôo][áa]?\s*[đd][ơo]n[\s\S]{0,30}?([A-Z0-9\-]{4,20})/i)
     || get(/S[ốôo]\s*\(?\s*No\.?\s*\)?[\s\S]{0,40}?(\d{4,10})/i)
-    || get(/K[ýy]\s*hi[ệe]u[\s\S]{0,30}?([A-Z0-9\-]{4,20})/i)
     || get(/MCQT[\s:]*([A-Z0-9\-]{6,30})/i)
     || get(/No\.?\s*[:.\-]?[\s\S]{0,20}?(\d{4,10})/i);
 
