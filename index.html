@@ -806,14 +806,14 @@
             <button type="button" id="seg-invoice-no" data-invoice="pending">⏳ Chưa xuất hóa đơn</button>
           </div>
         </div>
-        <div class="field"><label>Số hóa đơn</label><input id="tx-invoice-number"></div>
+        <div class="field"><label>Serial</label><input id="tx-invoice-number"></div>
         <div class="field"><label>Ngày hóa đơn</label><input type="date" id="tx-invoice-date"></div>
         <div class="field full" id="tx-invoice-detail-fields">
           <div class="exp-row">
             <div class="field"><label>Mã số thuế (MST)</label><input id="tx-invoice-tax-code"></div>
-            <div class="field"><label>Thành tiền</label><input type="text" id="tx-pretax-amount" placeholder="0"></div>
-            <div class="field"><label>Tiền thuế GTGT</label><input type="text" id="tx-vat-amount" placeholder="0"></div>
-            <div class="field"><label>Thành tiền sau thuế</label><input type="text" id="tx-total-amount" placeholder="0"></div>
+            <div class="field"><label>Thành tiền trước VAT</label><input type="text" id="tx-pretax-amount" placeholder="0"></div>
+            <div class="field"><label>VAT</label><input type="text" id="tx-vat-amount" placeholder="0"></div>
+            <div class="field"><label>Thành tiền sau VAT</label><input type="text" id="tx-total-amount" placeholder="0"></div>
           </div>
         </div>
         <div class="field full">
@@ -822,7 +822,7 @@
           <div class="helper-text">Ảnh sẽ tự động được nén nhỏ lại trước khi lưu. PDF giữ nguyên (tối đa 4MB).</div>
           <div style="margin-top:8px;" id="tx-invoice-image-preview-wrap"></div>
           <button type="button" class="btn btn-primary btn-sm" id="tx-scan-invoice-btn" style="margin-top:10px;">🔍 Quét hóa đơn (AI)</button>
-          <div class="helper-text" style="margin-top:6px;">Đính kèm file ở trên rồi bấm nút này — AI tự điền MST, Thành tiền, Tiền thuế GTGT, Thành tiền sau thuế, Số hóa đơn. Luôn kiểm tra lại trước khi lưu.</div>
+          <div class="helper-text" style="margin-top:6px;">Đính kèm file ở trên rồi bấm nút này — AI tự điền MST, Thành tiền trước VAT, VAT, Thành tiền sau VAT, Serial. Luôn kiểm tra lại trước khi lưu.</div>
         </div>
 
         <div class="field full" style="border-top:1px solid var(--line);padding-top:14px;margin-top:2px;">
@@ -1113,10 +1113,10 @@
           <div class="helper-text" style="margin-bottom:8px;">Đính kèm hóa đơn (ảnh hoặc PDF) rồi bấm "Quét hóa đơn (AI)" để tự điền các ô bên dưới — luôn kiểm tra lại trước khi lưu.</div>
         </div>
         <div class="field"><label>Mã số thuế (MST)</label><input id="order-payee-tax"></div>
-        <div class="field"><label>Số hóa đơn</label><input id="order-invoice-number"></div>
-        <div class="field"><label>Thành tiền</label><input type="text" id="order-pretax-amount" placeholder="0"></div>
-        <div class="field"><label>Tiền thuế GTGT</label><input type="text" id="order-vat-amount" placeholder="0"></div>
-        <div class="field"><label>Thành tiền sau thuế</label><input type="text" id="order-total-amount" placeholder="0"></div>
+        <div class="field"><label>Serial</label><input id="order-invoice-number"></div>
+        <div class="field"><label>Thành tiền trước VAT</label><input type="text" id="order-pretax-amount" placeholder="0"></div>
+        <div class="field"><label>VAT</label><input type="text" id="order-vat-amount" placeholder="0"></div>
+        <div class="field"><label>Thành tiền sau VAT</label><input type="text" id="order-total-amount" placeholder="0"></div>
         <div class="field"><label>Số tiền (dùng để chi/ghi Thu Chi) *</label><input type="text" id="order-amount" required placeholder="0"></div>
         <div class="field"><label>Người đề nghị</label><input id="order-requester"></div>
         <div class="field full" style="border-top:1px solid var(--line);padding-top:14px;margin-top:2px;">
