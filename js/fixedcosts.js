@@ -66,7 +66,7 @@ function renderFixedCostsTable(){
 
   let html = '';
   if(pendingRows.length){
-    html += txTableBlockHtml(`🟡 Khung chờ duyệt (${pendingRows.length})`, pendingRows, theadHtml, {pendingBlock:true, showSummary:false});
+    html += txTableBlockHtml(`🟡 Khung chờ duyệt (${pendingRows.length})`, pendingRows, theadHtml, {pendingBlock:true, showSummary:false, source:'fc'});
   }
   html += txTableBlockHtml(`Chi phí gián tiếp (${otherRows.length})`, otherRows, theadHtml, {emptyText:'Chưa có khoản nào khác ngoài các khoản đang chờ duyệt ở trên.'});
   wrap.innerHTML = html;
