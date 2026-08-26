@@ -94,10 +94,12 @@ service cloud.firestore {
       // Kế toán KHÔNG tự tạo mới trực tiếp — khoản Chi mới phải đi qua "Lệnh chi" rồi được GĐ/PGĐ duyệt,
       // hệ thống tự tạo bản ghi ở đây (isSystemGeneratedFromApproval). Chỉ Admin được tự tay tạo mới.
       allow create: if isSignedIn() && (isAdmin() || isSystemGeneratedFromApproval());
-      // Kế toán CHỈ ĐƯỢC XEM ở "Thu chi dự án"/"Chi phí gián tiếp" — không sửa nội dung, không đổi trạng
-      // thái Hóa đơn/CK. Ngoại lệ DUY NHẤT: "Giải trình" (gán dự án cho khoản tạm ứng) vẫn cho Kế toán làm,
-      // vì đây là bước bắt buộc trong quy trình tạm ứng, chỉ đổi đúng 4 field hẹp (isExplainUpdate).
-      allow update: if isAdmin() || isApprovalDecision() || (isNotSubAdmin() && isExplainUpdate());
+      // LƯU Ý: Chứng từ (Hóa đơn/Chuyển khoản) VÀ Dòng tiền (Thu chi dự án/Chi phí gián tiếp) đều đọc/sửa
+      // CHUNG 1 collection này — Kế toán được SỬA ở mục Chứng từ, nên rule ở đây phải mở cho Kế toán.
+      // Việc "chỉ xem, không sửa" ở Thu chi dự án/Chi phí gián tiếp CHỈ thực hiện được bằng cách ẩn nút Sửa/
+      // đổi trạng thái ở đúng 2 trang đó (xem js/transactions.js) — Firestore Rules không phân biệt được
+      // request đến từ trang nào, chỉ phân biệt được ai và sửa field gì.
+      allow update: if isNotSubAdmin() || isApprovalDecision();
       allow delete: if isAdmin();
     }
 
@@ -105,7 +107,7 @@ service cloud.firestore {
     match /fixedCosts/{id} {
       allow read: if isSignedIn();
       allow create: if isSignedIn() && (isAdmin() || isSystemGeneratedFromApproval());
-      allow update: if isAdmin() || isApprovalDecision() || (isNotSubAdmin() && isExplainUpdate());
+      allow update: if isNotSubAdmin() || isApprovalDecision();
       allow delete: if isAdmin();
     }
 
