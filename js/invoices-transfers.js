@@ -62,7 +62,7 @@ function renderInvoices(){
 function invTransRowActions(id){
   return `<div class="row-actions">
     <button class="icon-btn" data-it-view="${id}" title="Xem chi tiết">👁</button>
-    ${isAdmin() ? `<button class="icon-btn" data-it-edit="${id}" title="Sửa">✎</button>` : ''}
+    ${!isSubAdmin() ? `<button class="icon-btn" data-it-edit="${id}" title="Sửa">✎</button>` : ''}
     ${isAdmin() ? `<button class="icon-btn" data-it-del="${id}" title="Xóa">🗑</button>` : ''}
   </div>`;
 }
