@@ -585,7 +585,7 @@ function txRowHtml(t){
     : isExplained
       ? ' <span class="tag tag-gray" title="Đã giải trình, xem bản chính thức trong Thu Chi">✅ Đã giải trình → Thu Chi</span>'
       : '';
-  const explainBtn = (isPendingExplain && isAdmin())
+  const explainBtn = isPendingExplain
     ? `<button class="icon-btn" data-explain-tx="${t.id}" title="Giải trình: gán dự án + chứng từ, chuyển sang Thu Chi">🧾</button>`
     : '';
 
