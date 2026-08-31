@@ -116,21 +116,24 @@ function renderContractInfoStatus(i){
 // Tổng Chi phí dự toán / Doanh thu dự toán của cả dự án LUÔN bằng tổng cộng của 5 khung "Thông tin HĐ" —
 // gọi lại mỗi khi 1 trong 5 khung thay đổi, và cả khi vừa mở modal (để hiện đúng ngay từ đầu).
 function recalcProjectBudgetTotals(){
-  let totalCost = 0, totalRevenue = 0;
+  let totalCost = 0, totalRevenue = 0, totalContractValue = 0;
   for(let i=1;i<=5;i++){
     totalCost += parseMoneyInput(document.getElementById(`proj-hd${i}-cost-budget`));
     totalRevenue += parseMoneyInput(document.getElementById(`proj-hd${i}-revenue-budget`));
+    totalContractValue += parseMoneyInput(document.getElementById(`proj-hd${i}-value`));
   }
   setMoneyInputValue(document.getElementById('project-cost-budget'), totalCost);
   setMoneyInputValue(document.getElementById('project-revenue-budget'), totalRevenue);
+  setMoneyInputValue(document.getElementById('project-contract-value'), totalContractValue);
 }
 
 for(let i=1;i<=5;i++){
   bindMoneyInput(`proj-hd${i}-value`);
   bindMoneyInput(`proj-hd${i}-cost-budget`);
   bindMoneyInput(`proj-hd${i}-revenue-budget`);
-  // Chi phí dự toán / Doanh thu dự toán của DỰ ÁN luôn bằng TỔNG của cả 5 khung HĐ cộng lại — không cho
-  // gõ tay lệch đi, để tránh 2 nơi hiện 2 số khác nhau.
+  // Giá trị hợp đồng / Chi phí dự toán / Doanh thu dự toán của DỰ ÁN luôn bằng TỔNG của cả 5 khung HĐ
+  // cộng lại — không cho gõ tay lệch đi, để tránh 2 nơi hiện 2 số khác nhau.
+  document.getElementById(`proj-hd${i}-value`)?.addEventListener('input', recalcProjectBudgetTotals);
   document.getElementById(`proj-hd${i}-cost-budget`)?.addEventListener('input', recalcProjectBudgetTotals);
   document.getElementById(`proj-hd${i}-revenue-budget`)?.addEventListener('input', recalcProjectBudgetTotals);
   document.getElementById(`proj-hd${i}-file`)?.addEventListener('change', async (e)=>{
@@ -144,7 +147,6 @@ for(let i=1;i<=5;i++){
       const result = await msUploadFile(file, folder);
       currentContractInfo[i-1] = {
         name: document.getElementById(`proj-hd${i}-name`).value.trim(),
-        customer: document.getElementById(`proj-hd${i}-customer`).value.trim(),
         value: parseMoneyInput(document.getElementById(`proj-hd${i}-value`)),
         costBudget: parseMoneyInput(document.getElementById(`proj-hd${i}-cost-budget`)),
         revenueBudget: parseMoneyInput(document.getElementById(`proj-hd${i}-revenue-budget`)),
@@ -234,7 +236,6 @@ function openProjectModal(id){
   for(let i=1;i<=5;i++){
     const info = currentContractInfo[i-1];
     document.getElementById(`proj-hd${i}-name`).value = info ? (info.name||'') : '';
-    document.getElementById(`proj-hd${i}-customer`).value = info ? (info.customer||'') : '';
     setMoneyInputValue(document.getElementById(`proj-hd${i}-value`), info ? info.value : '');
     setMoneyInputValue(document.getElementById(`proj-hd${i}-cost-budget`), info ? info.costBudget : '');
     setMoneyInputValue(document.getElementById(`proj-hd${i}-revenue-budget`), info ? info.revenueBudget : '');
@@ -281,14 +282,13 @@ document.getElementById('save-project-btn').addEventListener('click', async ()=>
     contractFiles: currentContractFiles,
     contractInfo: [1,2,3,4,5].map(i=>{
       const name = document.getElementById(`proj-hd${i}-name`).value.trim();
-      const customer = document.getElementById(`proj-hd${i}-customer`).value.trim();
       const value = parseMoneyInput(document.getElementById(`proj-hd${i}-value`));
       const costBudget = parseMoneyInput(document.getElementById(`proj-hd${i}-cost-budget`));
       const revenueBudget = parseMoneyInput(document.getElementById(`proj-hd${i}-revenue-budget`));
       const signDate = document.getElementById(`proj-hd${i}-date`).value;
       const info = currentContractInfo[i-1];
-      if(!name && !customer && !value && !costBudget && !revenueBudget && !signDate && !(info && info.fileUrl)) return null;
-      return { name, customer, value, costBudget, revenueBudget, signDate, fileUrl: info ? (info.fileUrl||'') : '', fileName: info ? (info.fileName||'') : '' };
+      if(!name && !value && !costBudget && !revenueBudget && !signDate && !(info && info.fileUrl)) return null;
+      return { name, value, costBudget, revenueBudget, signDate, fileUrl: info ? (info.fileUrl||'') : '', fileName: info ? (info.fileName||'') : '' };
     }),
     // xóa field cũ (single-file) để tránh dữ liệu thừa/nhầm lẫn khi đọc lại
     contractFileUrl: firebase.firestore.FieldValue.delete(),
