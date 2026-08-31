@@ -85,7 +85,12 @@ service cloud.firestore {
 
     match /projects/{id} {
       allow read: if isSignedIn();
-      allow create, update: if isSignedIn() && isNotSubAdmin();
+      // Chỉ Admin được TẠO dự án mới. Kế toán vẫn được phép "update" (cần thiết để sửa Ghi chú/đính kèm
+      // file HĐ/file khác) — việc giới hạn Kế toán chỉ sửa "thông tin phụ" chứ không sửa tên/mã/giá trị hợp
+      // đồng... được thực hiện ở GIAO DIỆN (khóa các ô, xem js/projects.js), không chặn được field-cụ-thể
+      // ở Rules vì contractInfo là mảng lồng nhau phức tạp, khó validate chi tiết ở đây.
+      allow create: if isSignedIn() && isAdmin();
+      allow update: if isSignedIn() && isNotSubAdmin();
       allow delete: if isAdmin();
     }
 
