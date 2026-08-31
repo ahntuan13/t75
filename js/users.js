@@ -61,11 +61,12 @@ const ROLE_LABELS = {
 function applyRolePermissions(){
   const label = document.getElementById('user-role-label');
   if(label) label.textContent = ROLE_LABELS[CURRENT_ROLE] || 'Thành viên';
-  // Admin và Sub-admin (GĐ) đều được XEM: Dự án, Báo cáo (dòng tiền theo kỳ, lãi lỗ).
+  // Admin và Sub-admin (GĐ) được XEM: Báo cáo (dòng tiền theo kỳ, lãi lỗ). "Dự án" thì AI CŨNG xem được
+  // (kể cả Kế toán) — Kế toán chỉ bị chặn riêng khoản TẠO MỚI dự án (xem thêm bên dưới), không phải ẩn cả trang.
   // Quản trị người dùng & Lịch sử chỉnh sửa: CHỈ Admin.
   // "Tổng quan thu chi", "Hóa đơn", "Chuyển khoản": User VẪN xem được (chỉ không sửa/xóa — đã chặn ở nút + Firestore rules).
   const adminOnlyViews = ['users','activitylog'];           // chỉ Admin
-  const viewOnlyForSubAdmin = ['projects','reports','pnl'];  // Admin + Sub-admin (GĐ) xem được
+  const viewOnlyForSubAdmin = ['reports','pnl'];  // Admin + Sub-admin (GĐ) xem được
   adminOnlyViews.forEach(view=>{
     const nav = document.querySelector(`[data-view="${view}"]`);
     if(nav) nav.style.display = isAdmin() ? '' : 'none';
