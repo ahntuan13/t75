@@ -595,7 +595,7 @@
         <div class="field"><label>Khách hàng</label><input id="project-customer"></div>
         <div class="field"><label>MST (Mã số thuế)</label><input id="project-tax-code" placeholder="VD: 0312345678"></div>
         <div class="field"><label>Số hợp đồng</label><input id="project-contract-number" placeholder="VD: 12/2026/HĐKT-XYZ"></div>
-        <div class="field"><label>Giá trị hợp đồng (đã VAT)</label><input type="text" id="project-contract-value" placeholder="0"></div>
+        <div class="field"><label>Giá trị hợp đồng (đã VAT) <span style="font-weight:400;color:var(--ink-faint);">(tự tính = tổng HĐ 1-5)</span></label><input type="text" id="project-contract-value" placeholder="0" readonly style="background:var(--bg-soft);"></div>
         <div class="field"><label>Chi phí dự toán <span style="font-weight:400;color:var(--ink-faint);">(tự tính = tổng HĐ 1-5)</span></label><input type="text" id="project-cost-budget" placeholder="0" readonly style="background:var(--bg-soft);"></div>
         <div class="field"><label>Doanh thu dự toán <span style="font-weight:400;color:var(--ink-faint);">(tự tính = tổng HĐ 1-5)</span></label><input type="text" id="project-revenue-budget" placeholder="0" readonly style="background:var(--bg-soft);"></div>
         <div class="field"><label>Ngày ký hợp đồng</label><input type="date" id="project-sign-date"></div>
@@ -624,7 +624,6 @@
           <label class="exp-block-title">Thông tin HĐ 1</label>
           <div class="exp-row">
             <div class="field grow2"><label>Tên/Số hợp đồng</label><input id="proj-hd1-name" placeholder="VD: HĐ đợt 1 - ..."></div>
-            <div class="field grow2"><label>Khách hàng</label><input id="proj-hd1-customer" placeholder="Tên khách hàng của HĐ này"></div>
             <div class="field"><label>Giá trị HĐ</label><input type="text" id="proj-hd1-value" placeholder="0"></div>
           </div>
           <div class="exp-row">
@@ -641,7 +640,6 @@
           <label class="exp-block-title">Thông tin HĐ 2</label>
           <div class="exp-row">
             <div class="field grow2"><label>Tên/Số hợp đồng</label><input id="proj-hd2-name" placeholder="VD: HĐ đợt 2 - ..."></div>
-            <div class="field grow2"><label>Khách hàng</label><input id="proj-hd2-customer" placeholder="Tên khách hàng của HĐ này"></div>
             <div class="field"><label>Giá trị HĐ</label><input type="text" id="proj-hd2-value" placeholder="0"></div>
           </div>
           <div class="exp-row">
@@ -658,7 +656,6 @@
           <label class="exp-block-title">Thông tin HĐ 3</label>
           <div class="exp-row">
             <div class="field grow2"><label>Tên/Số hợp đồng</label><input id="proj-hd3-name" placeholder="VD: HĐ đợt 3 - ..."></div>
-            <div class="field grow2"><label>Khách hàng</label><input id="proj-hd3-customer" placeholder="Tên khách hàng của HĐ này"></div>
             <div class="field"><label>Giá trị HĐ</label><input type="text" id="proj-hd3-value" placeholder="0"></div>
           </div>
           <div class="exp-row">
@@ -675,7 +672,6 @@
           <label class="exp-block-title">Thông tin HĐ 4</label>
           <div class="exp-row">
             <div class="field grow2"><label>Tên/Số hợp đồng</label><input id="proj-hd4-name" placeholder="VD: HĐ đợt 4 - ..."></div>
-            <div class="field grow2"><label>Khách hàng</label><input id="proj-hd4-customer" placeholder="Tên khách hàng của HĐ này"></div>
             <div class="field"><label>Giá trị HĐ</label><input type="text" id="proj-hd4-value" placeholder="0"></div>
           </div>
           <div class="exp-row">
@@ -692,7 +688,6 @@
           <label class="exp-block-title">Thông tin HĐ 5</label>
           <div class="exp-row">
             <div class="field grow2"><label>Tên/Số hợp đồng</label><input id="proj-hd5-name" placeholder="VD: HĐ đợt 5 - ..."></div>
-            <div class="field grow2"><label>Khách hàng</label><input id="proj-hd5-customer" placeholder="Tên khách hàng của HĐ này"></div>
             <div class="field"><label>Giá trị HĐ</label><input type="text" id="proj-hd5-value" placeholder="0"></div>
           </div>
           <div class="exp-row">
