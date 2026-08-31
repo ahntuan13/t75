@@ -340,6 +340,13 @@ async function decideOrderApproval(id, decision){
         invoiceStatus: o.invoiceNumber ? 'issued' : 'pending',
         bankName:'', bankAccount: o.payeeBank||'', bankHolder: o.payee||'', transferDate:'',
         note:`Tự động tạo từ ${isAdvance ? 'Lệnh tạm ứng' : 'Lệnh chi'} (${o.payee})${o.payeeTaxCode ? ' — MST: '+o.payeeTaxCode : ''}`,
+        // QUAN TRỌNG: khoản Chi này đã được duyệt xong bên Lệnh chi rồi — gán rõ "approved" ở ngay đây,
+        // KHÔNG để trống, để tránh trường hợp giao dịch (khi update lại 1 giao dịch đã có sẵn qua o.transactionId)
+        // còn sót approvalStatus='pending' từ trước, khiến nó hiện lại "Khung chờ duyệt" trong Thu chi dự án/
+        // Chi phí gián tiếp — theo đúng yêu cầu: "Duyệt chỉ duyệt tại Lệnh thu/chi", không duyệt lại lần 2.
+        approvalStatus: 'approved',
+        approvedBy: auth.currentUser.email,
+        approvedAt: firebase.firestore.FieldValue.serverTimestamp(),
       };
       // Tạm ứng (dù CÓ hay KHÔNG có dự án lúc duyệt) đều gắn tag "Chờ giải chi" — số tiền ban đầu chỉ là
       // TẠM (dự kiến), phải chờ KT bấm Giải chi ghi rõ dự án/số tiền chính thức mới coi là số liệu cuối cùng.
