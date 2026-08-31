@@ -80,6 +80,8 @@ function applyRolePermissions(){
     const stillAllowed = adminOnlyViews.includes(activeView.dataset.view) ? isAdmin() : canView();
     if(!stillAllowed) document.querySelector('[data-view="dashboard"]')?.click();
   }
+  const qcAddProject = document.getElementById('qc-add-project');
+  if(qcAddProject) qcAddProject.style.display = isAdmin() ? '' : 'none';
   // Kế toán (User) giờ CHỈ ĐƯỢC XEM ở mục "Dòng tiền" (Chi phí gián tiếp + Thu chi dự án) — không tạo/sửa/xóa/
   // đổi trạng thái gì được nữa. Khoản Chi cần ghi nhận phải đi qua "Lệnh chi" (có luồng gửi duyệt riêng),
   // hệ thống tự tạo Thu Chi khi GĐ duyệt xong — không tạo trực tiếp ở đây nữa.
