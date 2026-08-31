@@ -504,6 +504,17 @@ document.getElementById('save-tx-btn').addEventListener('click', async ()=>{
       data.approvalSubmittedAt = firebase.firestore.FieldValue.serverTimestamp();
       data.approvedBy = '';
       data.approvedAt = '';
+    } else if(id){
+      // Đang sửa 1 giao dịch ĐÃ từng gửi duyệt trước đó nhưng còn "Đang chờ" (chưa ai quyết định) mà giờ
+      // chọn lại về "Chưa gửi duyệt" -> thu hồi yêu cầu duyệt, xóa hẳn approvalStatus cũ (không để sót lại
+      // ngầm khiến giao dịch vẫn hiện trong Khung chờ duyệt dù người dùng tưởng đã hủy gửi). Giao dịch ĐÃ có
+      // kết quả (approved/rejected — vd đã tự động duyệt từ Lệnh chi) thì KHÔNG đụng vào qua đường này.
+      const existing = (isFc ? (typeof FIXEDCOSTS!=='undefined'?FIXEDCOSTS:[]) : TRANSACTIONS).find(t=>t.id===id);
+      if(existing && existing.approvalStatus === 'pending'){
+        data.approvalStatus = firebase.firestore.FieldValue.delete();
+        data.approverRole = firebase.firestore.FieldValue.delete();
+        data.approverEmail = firebase.firestore.FieldValue.delete();
+      }
     }
   }
 
