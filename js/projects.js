@@ -197,6 +197,11 @@ document.getElementById('project-file-input')?.addEventListener('change', async 
 });
 
 function openProjectModal(id){
+  // Chỉ Admin được TẠO MỚI dự án — Kế toán chỉ xem/sửa thông tin phụ + đính kèm file của dự án đã có.
+  if(!id && !isAdmin()){
+    toast('Chỉ Admin mới được tạo dự án mới.');
+    return;
+  }
   document.getElementById('project-modal-title').textContent = id ? 'Sửa dự án' : 'Thêm dự án';
   document.getElementById('project-id').value = id || '';
   const p = id ? projectById(id) : {};
