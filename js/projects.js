@@ -96,6 +96,7 @@ function renderProjectsTable(){
 }
 
 let currentContractFiles = []; // [{url, name, uploadedAt}]
+let currentPaymentDossierFiles = []; // [{url, name, uploadedAt}] — hồ sơ thanh toán, tách riêng khỏi "file đính kèm khác"
 let currentContractInfo = [null,null,null,null,null]; // 5 slot: {name, fileUrl, fileName} | null — ứng với "Thông tin HĐ 1..5"
 
 function renderContractInfoStatus(i){
@@ -198,6 +199,45 @@ document.getElementById('project-file-input')?.addEventListener('change', async 
   renderContractFileStatus();
 });
 
+function renderPaymentDossierStatus(){
+  const el = document.getElementById('project-payment-files-list');
+  if(!el) return;
+  if(currentPaymentDossierFiles.length === 0){
+    el.innerHTML = `<span class="helper-text">Chưa có file hồ sơ thanh toán nào.</span>`;
+    return;
+  }
+  el.innerHTML = currentPaymentDossierFiles.map((f, idx)=>
+    `<div style="display:flex;align-items:center;gap:8px;margin-bottom:6px;">
+      <a href="${f.url}" target="_blank" class="tag tag-blue">📎 Hồ sơ ${idx+1}: ${escapeHtml(f.name || 'Xem file')}</a>
+      <button type="button" class="btn btn-ghost btn-sm" data-remove-payment-file="${idx}">Xóa</button>
+    </div>`
+  ).join('');
+  el.querySelectorAll('[data-remove-payment-file]').forEach(btn=>{
+    btn.addEventListener('click', ()=>{
+      currentPaymentDossierFiles.splice(Number(btn.dataset.removePaymentFile), 1);
+      renderPaymentDossierStatus();
+    });
+  });
+}
+
+document.getElementById('project-add-payment-file-btn')?.addEventListener('click', ()=> document.getElementById('project-payment-file-input').click());
+document.getElementById('project-payment-file-input')?.addEventListener('change', async (e)=>{
+  const file = e.target.files[0];
+  e.target.value = '';
+  if(!file) return;
+  toast(`⏳ Đang tải "${file.name}" lên OneDrive công ty... (có thể hiện popup đăng nhập Microsoft 365 lần đầu)`);
+  try{
+    const projName = document.getElementById('project-name').value.trim() || 'KhongTenDuAn';
+    const folder = 'Projects/' + projName.replace(/[^\w\-]+/g, '_') + '/HoSoThanhToan';
+    const result = await msUploadFile(file, folder);
+    currentPaymentDossierFiles.push({ url: result.webUrl, name: result.name, uploadedAt: new Date().toISOString() });
+    toast('Đã thêm hồ sơ thanh toán — bấm vào tên file để xem lại');
+  }catch(err){
+    toast('Lỗi tải lên OneDrive: ' + err.message);
+  }
+  renderPaymentDossierStatus();
+});
+
 function openProjectModal(id){
   // Chỉ Admin được TẠO MỚI dự án — Kế toán chỉ xem/sửa thông tin phụ + đính kèm file của dự án đã có.
   if(!id && !isAdmin()){
@@ -231,6 +271,8 @@ function openProjectModal(id){
     currentContractFiles = [];
   }
   document.getElementById('project-file-input').value = '';
+  currentPaymentDossierFiles = Array.isArray(p.paymentDossierFiles) ? p.paymentDossierFiles.slice() : [];
+  document.getElementById('project-payment-file-input').value = '';
   currentContractInfo = Array.isArray(p.contractInfo) ? p.contractInfo.slice(0,5) : [];
   while(currentContractInfo.length < 5) currentContractInfo.push(null);
   for(let i=1;i<=5;i++){
@@ -245,6 +287,7 @@ function openProjectModal(id){
   }
   recalcProjectBudgetTotals();
   renderContractFileStatus();
+  renderPaymentDossierStatus();
   openModal('modal-project');
 }
 
@@ -280,6 +323,7 @@ document.getElementById('save-project-btn').addEventListener('click', async ()=>
     warrantyStartDate: document.getElementById('project-warranty-start').value,
     note: document.getElementById('project-note').value.trim(),
     contractFiles: currentContractFiles,
+    paymentDossierFiles: currentPaymentDossierFiles,
     contractInfo: [1,2,3,4,5].map(i=>{
       const name = document.getElementById(`proj-hd${i}-name`).value.trim();
       const value = parseMoneyInput(document.getElementById(`proj-hd${i}-value`));
