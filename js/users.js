@@ -81,13 +81,13 @@ function applyRolePermissions(){
     const stillAllowed = adminOnlyViews.includes(activeView.dataset.view) ? isAdmin() : canView();
     if(!stillAllowed) document.querySelector('[data-view="dashboard"]')?.click();
   }
-  const qcAddProject = document.getElementById('qc-add-project');
-  if(qcAddProject) qcAddProject.style.display = isAdmin() ? '' : 'none';
+  const btnAddProject = document.getElementById('btn-add-project');
+  if(btnAddProject) btnAddProject.style.display = isAdmin() ? '' : 'none';
   // Kế toán (User) giờ CHỈ ĐƯỢC XEM ở mục "Dòng tiền" (Chi phí gián tiếp + Thu chi dự án) — không tạo/sửa/xóa/
   // đổi trạng thái gì được nữa. Khoản Chi cần ghi nhận phải đi qua "Lệnh chi" (có luồng gửi duyệt riêng),
   // hệ thống tự tạo Thu Chi khi GĐ duyệt xong — không tạo trực tiếp ở đây nữa.
-  const qcAddTx = document.getElementById('qc-add-tx');
-  if(qcAddTx) qcAddTx.style.display = isAdmin() ? '' : 'none';
+  const btnAddTx = document.getElementById('btn-add-tx');
+  if(btnAddTx) btnAddTx.style.display = isAdmin() ? '' : 'none';
   const btnUploadThu = document.getElementById('btn-upload-thu');
   if(btnUploadThu) btnUploadThu.style.display = isAdmin() ? '' : 'none';
   const btnUploadChi = document.getElementById('btn-upload-chi');
@@ -96,11 +96,17 @@ function applyRolePermissions(){
   if(btnUploadFcThu) btnUploadFcThu.style.display = isAdmin() ? '' : 'none';
   const btnUploadFcChi = document.getElementById('btn-upload-fc-chi');
   if(btnUploadFcChi) btnUploadFcChi.style.display = isAdmin() ? '' : 'none';
-  // Sub-admin (GĐ) chỉ xem + duyệt, không có quyền tạo mới bất cứ gì -> ẩn cả 2 điểm vào "Tạo nhanh".
-  const fabBtn = document.getElementById('fab-quick-create');
-  if(fabBtn) fabBtn.style.display = isSubAdmin() ? 'none' : '';
-  const dashQcBtn = document.getElementById('btn-dash-quick-create');
-  if(dashQcBtn) dashQcBtn.style.display = isSubAdmin() ? 'none' : '';
+  // Sub-admin (GĐ) chỉ xem + duyệt, không có quyền tạo mới bất cứ gì -> ẩn các nút "+ Tạo mới" ở mọi trang.
+  const btnAddOrder = document.getElementById('btn-add-order');
+  if(btnAddOrder) btnAddOrder.style.display = isSubAdmin() ? 'none' : '';
+  const btnAddIncome = document.getElementById('btn-add-income');
+  if(btnAddIncome) btnAddIncome.style.display = isSubAdmin() ? 'none' : '';
+  const btnAddAdvance = document.getElementById('btn-add-advance');
+  if(btnAddAdvance) btnAddAdvance.style.display = isSubAdmin() ? 'none' : '';
+  const btnAddEmployee = document.getElementById('btn-add-employee');
+  if(btnAddEmployee) btnAddEmployee.style.display = isSubAdmin() ? 'none' : '';
+  const btnAddTimesheet = document.getElementById('btn-add-timesheet');
+  if(btnAddTimesheet) btnAddTimesheet.style.display = isSubAdmin() ? 'none' : '';
   const btnExportTx = document.getElementById('btn-export-tx');
   if(btnExportTx) btnExportTx.style.display = isAdmin() ? '' : 'none';
   const btnExportFc = document.getElementById('btn-export-fc');
