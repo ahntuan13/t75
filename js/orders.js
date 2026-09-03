@@ -26,41 +26,53 @@ function listenOrders(){
 
 const ORDER_TYPE_LABELS = {
   payment: 'Thanh toán chi phí',
+  income: 'Thu tiền dự án',
   advance_purchase: 'Tạm ứng thanh toán',
   advance_salary: 'Tạm ứng lương',
 };
 const ADVANCE_TYPES = ['advance_purchase', 'advance_salary'];
 function isAdvanceOrder(o){ return ADVANCE_TYPES.includes(o.orderType); }
+function isIncomeOrder(o){ return o.orderType === 'income'; }
 
-// context: 'payment' (mở từ trang Lệnh chi) | 'advance' (mở từ trang Lệnh tạm ứng)
+// context: 'payment' (mở từ trang Lệnh chi) | 'income' (mở từ trang Lệnh thu) | 'advance' (mở từ trang Lệnh tạm ứng)
 function openOrderModal(id, context, presetType){
   const o = id ? ORDERS.find(x=>x.id===id) : {};
-  const effectiveContext = context || (id ? (isAdvanceOrder(o) ? 'advance' : 'payment') : 'payment');
+  const effectiveContext = context || (id ? (isAdvanceOrder(o) ? 'advance' : (isIncomeOrder(o) ? 'income' : 'payment')) : 'payment');
+  const isIncome = effectiveContext === 'income';
 
-  // Giới hạn lựa chọn "Loại lệnh chi" theo đúng trang đang mở — Lệnh chi không hiện 2 mục tạm ứng nữa.
+  // Giới hạn lựa chọn "Loại lệnh" theo đúng trang đang mở.
   const typeSelect = document.getElementById('order-type');
   if(effectiveContext === 'advance'){
     typeSelect.innerHTML = `
       <option value="advance_purchase">Tạm ứng thanh toán</option>
       <option value="advance_salary">Tạm ứng lương</option>`;
+  } else if(isIncome){
+    typeSelect.innerHTML = `<option value="income">Thu tiền dự án</option>`;
   } else {
     typeSelect.innerHTML = `<option value="payment">Thanh toán chi phí</option>`;
   }
-  // Lệnh chi (Thanh toán chi phí) không cần chọn Loại lệnh chi (chỉ 1 lựa chọn); Đính kèm chỉ dành cho Lệnh chi;
+  // Lệnh chi/Lệnh thu (chỉ 1 lựa chọn) không cần chọn Loại lệnh; Đính kèm dành cho Lệnh chi/Lệnh thu;
   // Giải chi + đính kèm không cần nữa ở Lệnh tạm ứng vì đã có luồng "🧾 Giải chi" riêng (5 khung, đầy đủ hơn).
   document.getElementById('order-type-field').style.display = effectiveContext === 'advance' ? '' : 'none';
   document.getElementById('order-explanation-field').style.display = 'none';
   document.getElementById('order-attachment-field').style.display = effectiveContext === 'advance' ? 'none' : '';
 
+  // Đổi nhãn cho đúng ngữ cảnh Thu/Chi — Lệnh thu nói về "nhận tiền vào", Lệnh chi nói về "chi tiền ra".
+  document.getElementById('order-payer-label').textContent = isIncome ? 'Người/đơn vị nộp tiền' : 'Người/đơn vị chi';
+  document.getElementById('order-payee-label').textContent = isIncome ? 'Người/đơn vị nhận tiền (bên mình) *' : 'Người/đơn vị nhận chi *';
+  document.getElementById('order-reason-label').textContent = isIncome ? 'Lý do thu *' : 'Lý do chi *';
+  document.getElementById('order-payer').placeholder = isIncome ? 'VD: Chủ đầu tư XYZ' : 'VD: Công ty TNHH DVKT Cách Nhiệt Tuấn 75';
+  document.getElementById('order-reason').placeholder = isIncome ? 'VD: Thu tiền nghiệm thu đợt 2' : 'VD: Thanh toán vật tư đợt 2';
+
   document.getElementById('order-modal-title').textContent = id
-    ? (effectiveContext === 'advance' ? 'Sửa lệnh tạm ứng' : 'Sửa lệnh chi')
-    : (effectiveContext === 'advance' ? 'Tạo lệnh tạm ứng' : 'Tạo lệnh chi');
+    ? (effectiveContext === 'advance' ? 'Sửa lệnh tạm ứng' : (isIncome ? 'Sửa lệnh thu' : 'Sửa lệnh chi'))
+    : (effectiveContext === 'advance' ? 'Tạo lệnh tạm ứng' : (isIncome ? 'Tạo lệnh thu' : 'Tạo lệnh chi'));
   document.getElementById('order-id').value = id || '';
   document.getElementById('order-date').value = o.date || todayISO();
   document.getElementById('order-project').value = o.projectId || '';
   document.getElementById('order-code').value = o.code || '';
-  typeSelect.value = o.orderType || presetType || (effectiveContext === 'advance' ? 'advance_purchase' : 'payment');
-  document.getElementById('order-payer').value = o.payer || (id ? '' : 'Công ty TNHH DVKT Cách Nhiệt Tuấn 75');
+  typeSelect.value = o.orderType || presetType || (effectiveContext === 'advance' ? 'advance_purchase' : (isIncome ? 'income' : 'payment'));
+  document.getElementById('order-payer').value = o.payer || (id || isIncome ? '' : 'Công ty TNHH DVKT Cách Nhiệt Tuấn 75');
   document.getElementById('order-payee').value = o.payee || '';
   document.getElementById('order-payee-bank').value = o.payeeBank || '';
   document.getElementById('order-payee-tax').value = o.payeeTaxCode || '';
@@ -73,10 +85,6 @@ function openOrderModal(id, context, presetType){
   currentOrderAttachmentFile = null;
   document.getElementById('order-attachment-input').value = '';
   renderOrderAttachmentStatus();
-  document.getElementById('order-invoice-number').value = o.invoiceNumber || '';
-  setMoneyInputValue(document.getElementById('order-pretax-amount'), o.pretaxAmount);
-  setMoneyInputValue(document.getElementById('order-vat-amount'), o.vatAmount);
-  setMoneyInputValue(document.getElementById('order-total-amount'), o.totalAmount);
   document.getElementById('order-note').value = o.note || '';
   document.getElementById('order-approval-target').value = o.approvalStatus==='pending' ? (o.approverRole||'') : '';
   renderOrderApprovalCurrentStatus(o);
@@ -137,76 +145,6 @@ document.getElementById('order-attachment-input')?.addEventListener('change', (e
   reader.readAsDataURL(file);
 });
 
-// ---------------- Tự tính "Thành tiền sau thuế" = Thành tiền + Tiền thuế GTGT, và đồng bộ vào "Số tiền" ----------------
-function recalcOrderInvoiceTotal(){
-  const pretax = parseMoneyInput(document.getElementById('order-pretax-amount'));
-  const vat = parseMoneyInput(document.getElementById('order-vat-amount'));
-  if(pretax || vat){
-    setMoneyInputValue(document.getElementById('order-total-amount'), pretax + vat);
-  }
-}
-['order-pretax-amount','order-vat-amount'].forEach(id=>{
-  document.getElementById(id)?.addEventListener('input', recalcOrderInvoiceTotal);
-});
-document.getElementById('order-total-amount')?.addEventListener('input', ()=>{
-  // Đồng bộ 1 chiều: Thành tiền sau thuế -> Số tiền (số tiền thực tế dùng để ghi Thu Chi khi duyệt).
-  // Vẫn có thể tự sửa tay "Số tiền" riêng sau đó nếu cần khác đi.
-  const total = parseMoneyInput(document.getElementById('order-total-amount'));
-  if(total) setMoneyInputValue(document.getElementById('order-amount'), total);
-});
-
-// ---------------- AI quét hóa đơn từ file đính kèm (ảnh hoặc PDF) — dùng chung engine với mục Hóa đơn ----------------
-document.getElementById('order-scan-invoice-btn')?.addEventListener('click', async ()=>{
-  if(!currentOrderAttachmentFile){
-    toast('Vui lòng chọn file đính kèm (ảnh hoặc PDF) trước khi quét.');
-    return;
-  }
-  const btn = document.getElementById('order-scan-invoice-btn');
-  const file = currentOrderAttachmentFile;
-  const isPdf = file.type === 'application/pdf' || /\.pdf$/i.test(file.name);
-  btn.disabled = true; btn.textContent = '⏳ Đang đọc...';
-  try{
-    let extracted;
-    if(isPdf){
-      const pdfData = await pdfExtractRows(file);
-      if(pdfData){
-        const rawText = pdfRowsToText(pdfData.rows);
-        extracted = parseInvoiceText(rawText, OCR_SETTINGS.companyName);
-        const columnItems = parseItemTableByColumns(pdfData.rows);
-        if(columnItems) extracted.items = columnItems;
-      } else {
-        toast('File PDF này không có lớp chữ thật (dạng scan) — đang đọc bằng OCR...');
-        const imgUrl = await pdfFirstPageToImage(file);
-        const rawText = await runOcr(imgUrl, (pct)=> btn.textContent = `⏳ Đang đọc chữ... ${pct}%`);
-        extracted = parseInvoiceText(rawText, OCR_SETTINGS.companyName);
-      }
-    } else if(file.type.startsWith('image/')){
-      const imgUrl = await compressImageFile(file, 1600, 0.85);
-      const rawText = await runOcr(imgUrl, (pct)=> btn.textContent = `⏳ Đang đọc chữ... ${pct}%`);
-      extracted = parseInvoiceText(rawText, OCR_SETTINGS.companyName);
-    } else {
-      toast('Chỉ quét được file ảnh hoặc PDF — file này (Word/Excel...) không đọc được bằng AI.');
-      return;
-    }
-
-    if(extracted.sellerTaxCode) document.getElementById('order-payee-tax').value = extracted.sellerTaxCode;
-    if(extracted.invoiceNumber) document.getElementById('order-invoice-number').value = extracted.invoiceNumber;
-    const items = extracted.items || [];
-    const pretax = items.reduce((s,it)=> s + (it.amount||0), 0);
-    const vat = items.reduce((s,it)=> s + (it.vatAmount||0), 0);
-    const total = items.reduce((s,it)=> s + (it.amountAfterTax || it.amount || 0), 0) || extracted.totalAmount || 0;
-    if(pretax) setMoneyInputValue(document.getElementById('order-pretax-amount'), pretax);
-    if(vat) setMoneyInputValue(document.getElementById('order-vat-amount'), vat);
-    if(total) setMoneyInputValue(document.getElementById('order-total-amount'), total);
-    if(total) setMoneyInputValue(document.getElementById('order-amount'), total);
-    toast('✅ Đã đọc xong — kiểm tra KỸ lại thông tin (MST, số tiền, số hóa đơn) trước khi lưu.');
-  }catch(err){
-    toast('Lỗi đọc file: ' + err.message);
-  }finally{
-    btn.disabled = false; btn.textContent = '🔍 Quét hóa đơn (AI)';
-  }
-});
-
 document.getElementById('btn-add-order')?.addEventListener('click', ()=> openOrderModal(null, 'payment'));
 document.getElementById('btn-add-advance')?.addEventListener('click', ()=> openOrderModal(null, 'advance'));
 
@@ -258,10 +196,6 @@ document.getElementById('save-order-btn').addEventListener('click', async ()=>{
     payee, reason, amount,
     payeeBank: document.getElementById('order-payee-bank').value.trim(),
     payeeTaxCode: document.getElementById('order-payee-tax').value.trim(),
-    invoiceNumber: document.getElementById('order-invoice-number').value.trim(),
-    pretaxAmount: parseMoneyInput(document.getElementById('order-pretax-amount')),
-    vatAmount: parseMoneyInput(document.getElementById('order-vat-amount')),
-    totalAmount: parseMoneyInput(document.getElementById('order-total-amount')),
     requester: document.getElementById('order-requester').value.trim(),
     explanation: document.getElementById('order-explanation').value.trim(),
     attachment: currentOrderAttachment,
@@ -296,17 +230,17 @@ document.getElementById('save-order-btn').addEventListener('click', async ()=>{
   }
 
   try{
-    const label = isAdvanceOrder(data) ? (ORDER_TYPE_LABELS[data.orderType]||'Lệnh tạm ứng') : 'Lệnh chi';
+    const label = isAdvanceOrder(data) ? (ORDER_TYPE_LABELS[data.orderType]||'Lệnh tạm ứng') : (isIncomeOrder(data) ? 'Lệnh thu' : 'Lệnh chi');
     if(id){
       await db.collection('paymentOrders').doc(id).update(data);
       toast('Đã cập nhật');
-      logActivity('update', {projectName: label, content: data.reason, amount: data.amount, type: 'OUT'});
+      logActivity('update', {projectName: label, content: data.reason, amount: data.amount, type: isIncomeOrder(data)?'IN':'OUT'});
     } else {
       data.createdAt = firebase.firestore.FieldValue.serverTimestamp();
       data.createdBy = auth.currentUser.email;
       await db.collection('paymentOrders').add(data);
-      toast(isAdvanceOrder(data) ? 'Đã tạo lệnh tạm ứng' : 'Đã tạo lệnh chi');
-      logActivity('create', {projectName: label, content: data.reason, amount: data.amount, type: 'OUT'});
+      toast(isAdvanceOrder(data) ? 'Đã tạo lệnh tạm ứng' : (isIncomeOrder(data) ? 'Đã tạo lệnh thu' : 'Đã tạo lệnh chi'));
+      logActivity('create', {projectName: label, content: data.reason, amount: data.amount, type: isIncomeOrder(data)?'IN':'OUT'});
     }
     closeModal('modal-order');
   }catch(err){ toast('Lỗi: '+err.message); }
@@ -328,19 +262,22 @@ async function decideOrderApproval(id, decision){
     if(decision === 'approved'){
       const hasProject = !!o.projectId;
       const isAdvance = isAdvanceOrder(o);
+      const isIncome = isIncomeOrder(o);
       const targetCollection = hasProject ? 'transactions' : 'fixedCosts';
       const txData = {
-        type:'OUT',
+        type: isIncome ? 'IN' : 'OUT',
         projectId: hasProject ? o.projectId : '', projectName: hasProject ? (o.projectName || '') : '',
         date: o.date, code: hasProject ? (o.code || '') : (o.code || 'INDIRECT'),
         content: o.reason,
-        description: `Chi cho ${o.payee}` + (o.payer ? ` (từ ${o.payer})` : '') + (o.note ? ' — '+o.note : ''),
+        description: isIncome
+          ? `Thu từ ${o.payer || o.payee}` + (o.note ? ' — '+o.note : '')
+          : `Chi cho ${o.payee}` + (o.payer ? ` (từ ${o.payer})` : '') + (o.note ? ' — '+o.note : ''),
         unit:'', qty:0, unitPrice:0, amount: o.amount,
-        invoiceNumber: o.invoiceNumber || '', invoiceDate: '',
-        invoiceStatus: o.invoiceNumber ? 'issued' : 'pending',
+        invoiceNumber: '', invoiceDate: '',
+        invoiceStatus: 'pending',
         bankName:'', bankAccount: o.payeeBank||'', bankHolder: o.payee||'', transferDate:'',
-        note:`Tự động tạo từ ${isAdvance ? 'Lệnh tạm ứng' : 'Lệnh chi'} (${o.payee})${o.payeeTaxCode ? ' — MST: '+o.payeeTaxCode : ''}`,
-        // QUAN TRỌNG: khoản Chi này đã được duyệt xong bên Lệnh chi rồi — gán rõ "approved" ở ngay đây,
+        note:`Tự động tạo từ ${isAdvance ? 'Lệnh tạm ứng' : (isIncome ? 'Lệnh thu' : 'Lệnh chi')} (${o.payee})${o.payeeTaxCode ? ' — MST: '+o.payeeTaxCode : ''}`,
+        // QUAN TRỌNG: khoản này đã được duyệt xong bên Lệnh thu/chi rồi — gán rõ "approved" ở ngay đây,
         // KHÔNG để trống, để tránh trường hợp giao dịch (khi update lại 1 giao dịch đã có sẵn qua o.transactionId)
         // còn sót approvalStatus='pending' từ trước, khiến nó hiện lại "Khung chờ duyệt" trong Thu chi dự án/
         // Chi phí gián tiếp — theo đúng yêu cầu: "Duyệt chỉ duyệt tại Lệnh thu/chi", không duyệt lại lần 2.
@@ -649,7 +586,7 @@ function orderRowHtml(o){
   return `<tr${isExplainedOrDone ? ' class="tx-row-explained"' : ''}>
       <td><input type="checkbox" class="order-select-cb" data-order-id="${o.id}"></td>
       <td>${fmtDate(o.date)}</td>
-      <td>${escapeHtml(ORDER_TYPE_LABELS[o.orderType] || 'Thanh toán chi phí')}</td>
+      <td>${isIncomeOrder(o) ? '<span class="tag tag-in">Thu</span>' : '<span class="tag tag-out">Chi</span>'} ${escapeHtml(ORDER_TYPE_LABELS[o.orderType] || 'Thanh toán chi phí')}</td>
       <td><strong>${escapeHtml(o.payee)}</strong></td>
       <td>${escapeHtml(o.reason)}</td>
       <td>${escapeHtml(o.projectName||'—')}</td>
@@ -734,14 +671,8 @@ function handleOrderTableClick(e){
     return;
   }
   if(repairId) repairOrderLink(repairId);
-  if(viewId){
-    const o = ORDERS.find(x=>x.id===viewId);
-    openOrderModal(viewId, o && isAdvanceOrder(o) ? 'advance' : 'payment');
-  }
-  if(editId){
-    const o = ORDERS.find(x=>x.id===editId);
-    openOrderModal(editId, o && isAdvanceOrder(o) ? 'advance' : 'payment');
-  }
+  if(viewId) openOrderModal(viewId);
+  if(editId) openOrderModal(editId);
   if(printId) printOrder(printId);
   if(explainId) openOrderExplainModal(explainId);
   if(approveId) decideOrderApproval(approveId, 'approved');
