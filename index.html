@@ -120,7 +120,6 @@
     <div class="main">
       <button id="menu-toggle">☰</button>
       <div id="approval-banner" style="display:none;"></div>
-      <button id="fab-quick-create" class="fab-btn" title="Tạo nhanh">+</button>
 
       <!-- DASHBOARD -->
       <div class="view active" id="view-dashboard">
@@ -129,7 +128,6 @@
             <h2>Tổng quan</h2>
             <div class="sub">Bức tranh dòng tiền toàn công ty</div>
           </div>
-          <div class="topbar-actions"><button class="btn btn-primary" id="btn-dash-quick-create">⚡ Tạo mới</button></div>
         </div>
         <div class="welcome-card" id="welcome-card">
           <div class="welcome-left">
@@ -191,6 +189,7 @@
       <div class="view" id="view-projects">
         <div class="topbar">
           <div><h2>Dự án</h2><div class="sub">Danh sách dự án & giá trị hợp đồng dự toán</div></div>
+          <div class="topbar-actions"><button class="btn btn-primary" id="btn-add-project">+ Thêm dự án</button></div>
         </div>
         <div class="card"><div class="table-wrap"><table class="data" id="projects-table"></table></div></div>
       </div>
@@ -234,6 +233,7 @@
         <div class="topbar">
           <div><h2>Thu chi dự án</h2><div class="sub">Ghi nhận dòng tiền vào/ra theo dự án</div></div>
           <div class="topbar-actions">
+            <button class="btn btn-primary" id="btn-add-tx" style="display:none;">+ Nhập giao dịch</button>
             <button class="btn btn-ghost" id="btn-export-tx" style="display:none;">⬇ Xuất Excel (theo bộ lọc)</button>
             <button class="btn btn-ghost" id="btn-upload-thu" style="display:none;">⬆ Upload Thu (Excel)</button>
             <button class="btn btn-ghost" id="btn-upload-chi" style="display:none;">⬆ Upload Chi (Excel)</button>
@@ -350,6 +350,7 @@
           <div><h2>Lệnh thu / chi</h2><div class="sub">Đề nghị & duyệt chi tiền</div></div>
           <div class="topbar-actions">
             <button class="btn btn-ghost" id="btn-print-orders-selected">🖨 In các lệnh đã chọn</button>
+            <button class="btn btn-ghost" id="btn-add-income">+ Tạo lệnh thu</button>
             <button class="btn btn-primary" id="btn-add-order">+ Tạo lệnh chi</button>
           </div>
         </div>
@@ -392,6 +393,7 @@
       <div class="view" id="view-payroll">
         <div class="topbar">
           <div><h2>Bảng lương</h2><div class="sub">Tổng hợp lương theo tháng & danh sách nhân viên</div></div>
+          <div class="topbar-actions"><button class="btn btn-primary" id="btn-add-employee">+ Thêm nhân viên</button></div>
         </div>
         <div class="filters-bar">
           <input type="month" id="payroll-filter-month">
@@ -434,6 +436,7 @@
         <div class="topbar">
           <div><h2>Chấm công</h2><div class="sub">3 ca Sáng / Chiều / Tối mỗi ngày — ca Tối (từ 17:01) tự tính là giờ tăng ca</div></div>
           <div class="topbar-actions">
+            <button class="btn btn-primary" id="btn-add-timesheet">+ Chấm công</button>
             <button class="btn btn-ghost" id="btn-upload-timesheet">⬆ Upload bảng chấm công (Excel)</button>
           </div>
           <input type="file" id="upload-timesheet-input" accept=".xlsx,.xls" style="display:none">
@@ -553,35 +556,6 @@
 <div class="notif-panel" id="notif-panel" style="display:none;"></div>
 
 <!-- ================= MODALS ================= -->
-<div class="modal-backdrop" id="modal-quickcreate">
-  <div class="modal" style="max-width:560px;">
-    <div class="modal-head"><h3>⚡ Tạo nhanh</h3><button class="modal-close" data-close>✕</button></div>
-    <div class="modal-body">
-      <div class="qc-grid">
-        <button class="qc-item" id="qc-add-project">
-          <span class="qc-icon" style="background:var(--primary-dim);color:var(--primary);">▣</span>
-          <span class="qc-text"><strong>Thêm dự án</strong><span class="helper-text">Tạo hồ sơ dự án mới</span></span>
-        </button>
-        <button class="qc-item" id="qc-add-tx">
-          <span class="qc-icon" style="background:var(--teal-dim);color:var(--teal);">⇄</span>
-          <span class="qc-text"><strong>Nhập giao dịch</strong><span class="helper-text">Ghi nhận Thu / Chi</span></span>
-        </button>
-        <button class="qc-item" id="qc-add-timesheet">
-          <span class="qc-icon" style="background:var(--gold-dim);color:var(--gold);">🗓</span>
-          <span class="qc-text"><strong>Chấm công</strong><span class="helper-text">Ghi công theo ngày</span></span>
-        </button>
-        <button class="qc-item" id="qc-add-employee">
-          <span class="qc-icon" style="background:var(--purple-dim);color:var(--purple);">👤</span>
-          <span class="qc-text"><strong>Thêm nhân viên</strong><span class="helper-text">Thêm hồ sơ nhân viên</span></span>
-        </button>
-        <label class="qc-item" for="ocr-invoice-pdf-input" id="qc-upload-invoice-pdf">
-          <span class="qc-icon" style="background:var(--blue-dim, var(--primary-dim));color:var(--primary);">📄</span>
-          <span class="qc-text"><strong>Upload hóa đơn (PDF)</strong><span class="helper-text">AI tự đọc thông tin từ file PDF</span></span>
-        </label>
-      </div>
-    </div>
-  </div>
-</div>
 <input type="file" id="ocr-invoice-pdf-input" accept="application/pdf,.pdf" style="display:none">
 
 <div class="modal-backdrop" id="modal-project">
@@ -740,13 +714,12 @@
       <input type="hidden" id="tx-id">
       <div class="field full" style="margin-bottom:14px;">
         <label>Loại giao dịch *</label>
-        <div class="seg seg-4">
+        <div class="seg">
           <button type="button" id="seg-in" data-type="IN">↓ Thu (IN)</button>
           <button type="button" id="seg-out" data-type="OUT">↑ Chi (OUT)</button>
-          <button type="button" id="seg-invoice-type">🧾 Hóa Đơn</button>
           <button type="button" id="seg-advance">💳 Tạm ứng</button>
         </div>
-        <div class="helper-text" id="tx-type-hint">Chọn Thu, Chi, Hóa Đơn hoặc Tạm ứng để tiếp tục.</div>
+        <div class="helper-text" id="tx-type-hint">Chọn Thu, Chi hoặc Tạm ứng để tiếp tục.</div>
       </div>
       <div class="form-grid" id="tx-form-fields" style="display:none;">
         <div class="field full" id="tx-project-field"><label id="tx-project-label">Dự án (tùy chọn)</label><select id="tx-project"></select></div>
@@ -1101,24 +1074,16 @@
             <option value="advance_salary">Tạm ứng lương</option>
           </select>
         </div>
-        <div class="field full"><label>Người/đơn vị chi</label><input id="order-payer" placeholder="VD: Công ty TNHH DVKT Cách Nhiệt Tuấn 75"></div>
+        <div class="field full"><label id="order-payer-label">Người/đơn vị chi</label><input id="order-payer" placeholder="VD: Công ty TNHH DVKT Cách Nhiệt Tuấn 75"></div>
         <div class="field full">
-          <label>Người/đơn vị nhận chi *</label>
+          <label id="order-payee-label">Người/đơn vị nhận chi *</label>
           <input id="order-payee" list="order-payee-employees" required autocomplete="off">
           <datalist id="order-payee-employees"></datalist>
         </div>
         <div class="field"><label>Số tài khoản nhận (STK)</label><input id="order-payee-bank"></div>
-        <div class="field full"><label>Lý do chi *</label><input id="order-reason" required placeholder="VD: Thanh toán vật tư đợt 2"></div>
-        <div class="field full" style="border-top:1px solid var(--line);padding-top:14px;margin-top:2px;">
-          <label style="font-size:13px;font-weight:700;color:var(--ink);">🧾 Thông tin hóa đơn (nếu thanh toán theo hóa đơn)</label>
-          <div class="helper-text" style="margin-bottom:8px;">Đính kèm hóa đơn (ảnh hoặc PDF) rồi bấm "Quét hóa đơn (AI)" để tự điền các ô bên dưới — luôn kiểm tra lại trước khi lưu.</div>
-        </div>
-        <div class="field"><label>Mã số thuế (MST)</label><input id="order-payee-tax"></div>
-        <div class="field"><label>Serial</label><input id="order-invoice-number"></div>
-        <div class="field"><label>Thành tiền trước VAT</label><input type="text" id="order-pretax-amount" placeholder="0"></div>
-        <div class="field"><label>VAT</label><input type="text" id="order-vat-amount" placeholder="0"></div>
-        <div class="field"><label>Thành tiền sau VAT</label><input type="text" id="order-total-amount" placeholder="0"></div>
-        <div class="field"><label>Số tiền (dùng để chi/ghi Thu Chi) *</label><input type="text" id="order-amount" required placeholder="0"></div>
+        <div class="field"><label>MST</label><input id="order-payee-tax"></div>
+        <div class="field full"><label id="order-reason-label">Lý do chi *</label><input id="order-reason" required placeholder="VD: Thanh toán vật tư đợt 2"></div>
+        <div class="field"><label>Số tiền *</label><input type="text" id="order-amount" required placeholder="0"></div>
         <div class="field"><label>Người đề nghị</label><input id="order-requester"></div>
         <div class="field full" style="border-top:1px solid var(--line);padding-top:14px;margin-top:2px;">
           <label style="font-size:13px;font-weight:700;color:var(--ink);">✅ Phê duyệt Giám đốc</label>
@@ -1134,7 +1099,6 @@
           <div class="helper-text" style="margin-bottom:6px;">Chọn tối đa 1 file (ảnh, PDF, Word, Excel...), tối đa ~2MB.</div>
           <input type="file" id="order-attachment-input" accept="image/*,application/pdf,.pdf,.doc,.docx,.xls,.xlsx">
           <div id="order-attachment-status" style="margin-top:8px;"></div>
-          <button type="button" class="btn btn-primary btn-sm" id="order-scan-invoice-btn" style="margin-top:10px;">🔍 Quét hóa đơn (AI)</button>
         </div>
         <div class="field full" id="order-explanation-field">
           <label>📝 Giải chi</label>
