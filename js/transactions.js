@@ -158,6 +158,7 @@ document.getElementById('tx-invoice-image').addEventListener('change', async (e)
   try{
     currentInvoiceImage = await readInvoiceAttachmentFile(file, 900, 0.65);
     setImagePreview('invoice', currentInvoiceImage);
+    setInvoiceStatus('issued'); // có ảnh hóa đơn -> tự động coi là "Đã xuất hóa đơn", không cần bấm tay
   }catch(err){ toast(err.message || 'Không đọc được file, thử file khác'); }
 });
 document.getElementById('tx-transfer-image').addEventListener('change', async (e)=>{
@@ -167,6 +168,7 @@ document.getElementById('tx-transfer-image').addEventListener('change', async (e
   try{
     currentTransferImage = await readInvoiceAttachmentFile(file, 900, 0.65);
     setImagePreview('transfer', currentTransferImage);
+    setTransferStatus('done'); // có ảnh chuyển khoản -> tự động coi là "Đã CK", không cần bấm tay
   }catch(err){ toast(err.message || 'Không đọc được file, thử file khác'); }
 });
 
@@ -301,7 +303,7 @@ function setTxType(type){
   currentTxType = type;
   document.getElementById('seg-in').className = type==='IN' ? 'active-in' : '';
   document.getElementById('seg-out').className = (type==='OUT' && !isInvoiceTxMode) ? 'active-out' : '';
-  document.getElementById('seg-invoice-type').className = (type==='OUT' && isInvoiceTxMode) ? 'active-gold' : '';
+  // (Tab "Hóa Đơn" đã bỏ khỏi bộ chọn loại — isInvoiceTxMode giờ luôn false, không cần cập nhật class nút đó nữa)
   const fields = document.getElementById('tx-form-fields');
   const hint = document.getElementById('tx-type-hint');
   if(!type){
@@ -334,7 +336,6 @@ function setTxType(type){
 }
 document.getElementById('seg-in').addEventListener('click', ()=>{ setInvoiceTxMode(false); setTxType('IN'); });
 document.getElementById('seg-out').addEventListener('click', ()=>{ setInvoiceTxMode(false); setTxType('OUT'); });
-document.getElementById('seg-invoice-type').addEventListener('click', ()=>{ setInvoiceTxMode(true); setTxType('OUT'); });
 document.getElementById('seg-advance')?.addEventListener('click', ()=>{
   closeModal('modal-tx');
   openOrderModal(null, 'advance');
