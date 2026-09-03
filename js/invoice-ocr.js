@@ -418,34 +418,39 @@ async function handleInvoiceUpload(file){
       extracted = parseInvoiceText(rawText, OCR_SETTINGS.companyName);
     }
 
+    const items = extracted.items || [];
+    const pretax = items.reduce((s,it)=> s + (it.amount||0), 0);
+    const vat = items.reduce((s,it)=> s + (it.vatAmount||0), 0);
+    const total = items.reduce((s,it)=> s + (it.amountAfterTax || it.amount || 0), 0) || extracted.totalAmount || 0;
+    const firstItemName = items.find(it=>it.name && it.name.trim())?.name || '';
+
     const prefill = {
       type: extracted.direction,
       projectId: '',
       date: extracted.invoiceDate || '', // để trống nếu không đọc được ngày trên hóa đơn — KHÔNG tự điền ngày hôm nay
                                           // (trước đây điền sẵn ngày hôm nay khiến người dùng tưởng nhầm là ngày hóa đơn thật)
-      content: extracted.sellerName ? `Hóa đơn ${extracted.sellerName}` : 'Hóa đơn (OCR tự động — cần kiểm tra lại)',
+      content: firstItemName || (extracted.sellerName ? `Hóa đơn ${extracted.sellerName}` : 'Hóa đơn (OCR tự động — cần kiểm tra lại)'),
       description: '', // để trống theo yêu cầu — không tự điền tên bên bán/MST vào đây nữa
-      amount: extracted.totalAmount || 0,
+      unit: items[0]?.unit || '', qty: items[0]?.qty || 1, unitPrice: pretax || extracted.totalAmount || 0,
+      amount: total || extracted.totalAmount || 0,
       invoiceNumber: extracted.invoiceNumber || '',
       invoiceDate: extracted.invoiceDate || '',
+      invoiceTaxCode: extracted.sellerTaxCode || '',
+      pretaxAmount: pretax, vatAmount: vat, totalAmount: total,
       invoiceStatus: 'issued',
       bankAccount: extracted.bankAccount || '',
       bankName: extracted.bankName || '',
       invoiceImage: imageDataUrl || '',
-      invoiceItems: extracted.items || [],
       note: '', // để trống theo yêu cầu — không dán nguyên văn chữ OCR vào Ghi chú nữa
     };
     openTxModal(null, prefill);
-    toast('✅ Đọc xong — kiểm tra KỸ lại thông tin (đặc biệt số tiền, tên hàng hóa, MST) trước khi lưu. Nếu hóa đơn có nhiều dòng hàng hóa, bấm "+ Thêm dòng" để nhập đủ.');
+    toast('✅ Đọc xong — kiểm tra KỸ lại thông tin (đặc biệt số tiền, tên hàng hóa, MST) trước khi lưu.');
   }catch(err){
     toast('Lỗi đọc hóa đơn');
     alert('Lỗi đọc hóa đơn:\n\n' + err.message);
   }
 }
 
-document.getElementById('qc-upload-invoice-pdf')?.addEventListener('click', ()=>{
-  closeModal('modal-quickcreate');
-});
 document.getElementById('ocr-invoice-pdf-input')?.addEventListener('change', (e)=>{
   const file = e.target.files[0];
   e.target.value = '';
