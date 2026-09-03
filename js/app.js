@@ -31,17 +31,12 @@ document.getElementById('menu-toggle').addEventListener('click', ()=>{
 });
 document.getElementById('sidebar-backdrop')?.addEventListener('click', closeMobileSidebar);
 
-// ---------------- Modal "Tạo nhanh" (nút + nổi, dùng chung cho MỌI trang) ----------------
-document.getElementById('fab-quick-create')?.addEventListener('click', ()=> openModal('modal-quickcreate'));
-document.getElementById('btn-dash-quick-create')?.addEventListener('click', ()=> openModal('modal-quickcreate'));
-
-document.getElementById('qc-add-project')?.addEventListener('click', ()=>{ closeModal('modal-quickcreate'); openProjectModal(null); });
-document.getElementById('qc-add-tx')?.addEventListener('click', ()=>{ closeModal('modal-quickcreate'); openTxModal(null); });
-// Lệnh chi/Tạm ứng giờ được tạo trực tiếp từ trang Lệnh chi/Lệnh tạm ứng (xem js/orders.js), không còn trong Tạo nhanh nữa.
-document.getElementById('qc-add-employee')?.addEventListener('click', ()=>{ closeModal('modal-quickcreate'); openEmployeeModal(); });
-document.getElementById('qc-add-timesheet')?.addEventListener('click', ()=>{ closeModal('modal-quickcreate'); openTimesheetModal(); });
-// Đã bỏ lối tắt "Chi phí gián tiếp" khỏi Tạo nhanh — mục này giờ chỉ được tạo tự động
-// (từ Lệnh tạm ứng không gắn dự án khi Duyệt, hoặc Upload Excel), không tạo tay trực tiếp nữa.
+// ---------------- Các nút "+ Tạo mới" — mỗi trang có nút riêng, không còn dùng chung 1 nút "+" nổi nữa ----------------
+document.getElementById('btn-add-tx')?.addEventListener('click', ()=> openTxModal(null));
+document.getElementById('btn-add-employee')?.addEventListener('click', ()=> openEmployeeModal());
+document.getElementById('btn-add-timesheet')?.addEventListener('click', ()=> openTimesheetModal());
+document.getElementById('btn-add-income')?.addEventListener('click', ()=> openOrderModal(null, 'income'));
+// "+ Thêm dự án" (js/projects.js), "+ Tạo lệnh chi"/"+ Tạo lệnh tạm ứng" (js/orders.js) đã tự gắn sự kiện ở file riêng.
 
 // ---------------- Định dạng các ô nhập tiền có dấu phẩy ----------------
 ['project-contract-value','project-cost-budget','project-revenue-budget',
