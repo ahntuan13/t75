@@ -87,6 +87,11 @@ function openOrderModal(id, context, presetType){
   renderOrderAttachmentStatus();
   document.getElementById('order-note').value = o.note || '';
   document.getElementById('order-approval-target').value = o.approvalStatus==='pending' ? (o.approverRole||'') : '';
+  // Đã CÓ KẾT QUẢ duyệt rồi (approved/rejected) -> ẩn hẳn dropdown "Gửi duyệt", chỉ hiện dòng trạng thái.
+  // Tránh trường hợp KT bổ sung chứng từ/sửa lại lệnh đã xong việc mà tưởng nhầm là còn phải gửi duyệt lại.
+  const alreadyDecided = o.approvalStatus === 'approved' || o.approvalStatus === 'rejected';
+  document.getElementById('order-approval-select-wrap').style.display = alreadyDecided ? 'none' : '';
+  document.getElementById('order-approval-helper').style.display = alreadyDecided ? 'none' : '';
   renderOrderApprovalCurrentStatus(o);
   fillOrderPayeeDatalist();
   applyAdvanceSalaryDefaults(!id); // chỉ tự gợi ý khi TẠO MỚI, không ghi đè khi đang sửa
@@ -554,15 +559,28 @@ document.getElementById('btn-print-orders-selected')?.addEventListener('click', 
 document.getElementById('btn-print-advance-selected')?.addEventListener('click', ()=> printSelectedOrders('advance-table'));
 
 // ---------------- LỆNH CHI (chỉ orderType='payment') ----------------
+// Sắp xếp dùng chung cho cả Lệnh chi (payment) và Lệnh tạm ứng (advance): các lệnh CHƯA DUYỆT (chưa gửi/
+// đang chờ/bị từ chối) luôn nằm TRÊN — cần chú ý xử lý trước; lệnh ĐÃ DUYỆT xong việc rồi thì đẩy XUỐNG DƯỚI.
+// Trong cùng 1 nhóm, sắp theo ngày mới nhất lên trước.
+function sortOrdersByStatusThenDate(rows){
+  return rows.slice().sort((a,b)=>{
+    const aDone = a.approvalStatus==='approved' ? 1 : 0;
+    const bDone = b.approvalStatus==='approved' ? 1 : 0;
+    if(aDone !== bDone) return aDone - bDone; // chưa duyệt (0) lên trước, đã duyệt (1) xuống sau
+    return (b.date||'').localeCompare(a.date||'');
+  });
+}
+
 function getFilteredOrders(){
   const status = document.getElementById('ord-filter-status').value;
   const project = document.getElementById('ord-filter-project').value;
-  return ORDERS.filter(o=>{
+  const rows = ORDERS.filter(o=>{
     if(isAdvanceOrder(o)) return false;
     if(status && (o.approvalStatus||'none')!==status) return false;
     if(project && o.projectId!==project) return false;
     return true;
   });
+  return sortOrdersByStatusThenDate(rows);
 }
 
 function orderRowHtml(o){
@@ -630,12 +648,13 @@ document.getElementById('orders-table')?.addEventListener('click', handleOrderTa
 function getFilteredAdvances(){
   const status = document.getElementById('adv-filter-status').value;
   const project = document.getElementById('adv-filter-project').value;
-  return ORDERS.filter(o=>{
+  const rows = ORDERS.filter(o=>{
     if(!isAdvanceOrder(o)) return false;
     if(status && (o.approvalStatus||'none')!==status) return false;
     if(project && o.projectId!==project) return false;
     return true;
   });
+  return sortOrdersByStatusThenDate(rows);
 }
 
 function renderAdvanceTable(){
