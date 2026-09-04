@@ -394,6 +394,11 @@ function openTxModal(id, prefill, target, explainSourceId){
   setTransferStatus(t.transferStatus || 'pending');
   // Khối gửi duyệt: chỉ để trống chọn khi CHƯA đang chờ duyệt — tránh vô tình gửi lại/resét khi chỉ sửa field khác
   document.getElementById('tx-approval-target').value = t.approvalStatus==='pending' ? (t.approverRole||'') : '';
+  // Đã CÓ KẾT QUẢ duyệt rồi (approved/rejected — vd tự động approved khi tạo từ Lệnh chi) -> ẩn hẳn dropdown
+  // "Gửi duyệt", chỉ hiện dòng trạng thái. Tránh KT bổ sung ảnh hóa đơn/CK mà tưởng nhầm vẫn cần gửi duyệt lại.
+  const alreadyDecidedTx = t.approvalStatus === 'approved' || t.approvalStatus === 'rejected';
+  document.getElementById('tx-approval-select-wrap').style.display = alreadyDecidedTx ? 'none' : '';
+  document.getElementById('tx-approval-helper').style.display = alreadyDecidedTx ? 'none' : '';
   renderApprovalCurrentStatus(t);
   openModal('modal-tx');
 }
