@@ -822,11 +822,13 @@
 
         <div class="field full" id="tx-approval-block" style="display:none;border-top:1px solid var(--line);padding-top:14px;margin-top:2px;">
           <label style="font-size:13px;font-weight:700;color:var(--ink);">✅ Phê duyệt Giám đốc</label>
-          <div class="helper-text" style="margin-bottom:8px;">Gửi khoản Chi này cho Giám đốc duyệt (đăng nhập đúng email đã cài đặt mới thấy nút duyệt).</div>
-          <select id="tx-approval-target">
-            <option value="">-- Chưa gửi duyệt --</option>
-            <option value="GD">Gửi duyệt (GĐ/Người duyệt phụ)</option>
-          </select>
+          <div class="helper-text" id="tx-approval-helper" style="margin-bottom:8px;">Gửi khoản Chi này cho Giám đốc duyệt (đăng nhập đúng email đã cài đặt mới thấy nút duyệt).</div>
+          <div id="tx-approval-select-wrap">
+            <select id="tx-approval-target">
+              <option value="">-- Chưa gửi duyệt --</option>
+              <option value="GD">Gửi duyệt (GĐ/Người duyệt phụ)</option>
+            </select>
+          </div>
           <div class="helper-text" id="tx-approval-current-status" style="margin-top:8px;"></div>
         </div>
 
@@ -1085,13 +1087,15 @@
         <div class="field full"><label id="order-reason-label">Lý do chi *</label><input id="order-reason" required placeholder="VD: Thanh toán vật tư đợt 2"></div>
         <div class="field"><label>Số tiền *</label><input type="text" id="order-amount" required placeholder="0"></div>
         <div class="field"><label>Người đề nghị</label><input id="order-requester"></div>
-        <div class="field full" style="border-top:1px solid var(--line);padding-top:14px;margin-top:2px;">
+        <div class="field full" id="order-approval-block" style="border-top:1px solid var(--line);padding-top:14px;margin-top:2px;">
           <label style="font-size:13px;font-weight:700;color:var(--ink);">✅ Phê duyệt Giám đốc</label>
-          <div class="helper-text" style="margin-bottom:8px;">Gửi lệnh chi này cho Giám đốc duyệt (đăng nhập đúng email đã cài đặt mới thấy nút duyệt). Khi được Duyệt, hệ thống tự động ghi khoản chi này vào mục Thu chi.</div>
-          <select id="order-approval-target">
-            <option value="">-- Chưa gửi duyệt --</option>
-            <option value="GD">Gửi duyệt (GĐ/Người duyệt phụ)</option>
-          </select>
+          <div class="helper-text" id="order-approval-helper" style="margin-bottom:8px;">Gửi lệnh chi này cho Giám đốc duyệt (đăng nhập đúng email đã cài đặt mới thấy nút duyệt). Khi được Duyệt, hệ thống tự động ghi khoản chi này vào mục Thu chi.</div>
+          <div id="order-approval-select-wrap">
+            <select id="order-approval-target">
+              <option value="">-- Chưa gửi duyệt --</option>
+              <option value="GD">Gửi duyệt (GĐ/Người duyệt phụ)</option>
+            </select>
+          </div>
           <div class="helper-text" id="order-approval-current-status" style="margin-top:8px;"></div>
         </div>
         <div class="field full" id="order-attachment-field">
