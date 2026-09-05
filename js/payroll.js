@@ -689,8 +689,10 @@ function renderPayrollSummary(){
   const results = EMPLOYEES.map(e=> computeEmployeeSalary(e, month));
   const rowHtml = (r)=>{
     const otherDeduct = r.tamUng + r.ungTuan + r.thuong + r.khacTamUng + r.khauNghi;
+    const days = Math.round((r.weightedHours/8)*10)/10;
     return `<tr>
       <td><a href="#" class="tag tag-blue" data-open-adjust="${r.emp.id}" style="text-decoration:none;"><strong>${escapeHtml(r.emp.name)}</strong></a><div class="helper-text">${escapeHtml(r.emp.position||'')}</div></td>
+      <td class="num">${r.emp.payType==='daily' ? `${days} công` : '—'}</td>
       <td class="num">${fmtVND(r.totalIncome)}</td>
       <td class="num" style="color:var(--red);">${fmtVND(r.bhxh)}</td>
       <td class="num" style="color:var(--red);">${fmtVND(otherDeduct)}</td>
@@ -703,12 +705,12 @@ function renderPayrollSummary(){
       </td>
     </tr>`;
   };
-  const groupHeaderRow = (label, count)=> `<tr class="tx-subhead"><td colspan="6"><strong>${label}</strong> <span class="helper-text">(${count} người)</span></td></tr>`;
+  const groupHeaderRow = (label, count)=> `<tr class="tx-subhead"><td colspan="7"><strong>${label}</strong> <span class="helper-text">(${count} người)</span></td></tr>`;
   const managers = results.filter(r=>r.emp.payType!=='daily').sort((a,b)=> positionRank(a.emp.position)-positionRank(b.emp.position) || a.emp.name.localeCompare(b.emp.name,'vi'));
   const workers = results.filter(r=>r.emp.payType==='daily').sort((a,b)=> a.emp.name.localeCompare(b.emp.name,'vi'));
 
   table.innerHTML = `<thead><tr>
-    <th>Nhân viên</th><th>Tổng thu nhập</th><th>BHXH</th><th>Tạm ứng/Khấu trừ</th><th>Thực nhận</th><th></th>
+    <th>Nhân viên</th><th>Ngày công</th><th>Tổng thu nhập</th><th>BHXH</th><th>Tạm ứng/Khấu trừ</th><th>Thực nhận</th><th></th>
   </tr></thead><tbody>
     ${managers.length ? groupHeaderRow('🔷 QUẢN LÝ', managers.length) + managers.map(rowHtml).join('') : ''}
     ${workers.length ? groupHeaderRow('🔶 CÔNG NHÂN', workers.length) + workers.map(rowHtml).join('') : ''}
@@ -859,8 +861,10 @@ function openPayrollAdjustModal(employeeId){
   document.getElementById('pa-modal-title').textContent = `Điều chỉnh lương — ${emp.name} (${month})`;
   document.getElementById('pa-employee-id').value = employeeId;
   document.getElementById('pa-month').value = month;
-  document.getElementById('pa-summary').innerHTML =
-    `Tổng giờ công: <strong>${r.totalHours}h</strong> · Tổng thu nhập (trước khấu trừ): <strong>${fmtVND(r.totalIncome)}</strong>`;
+  const days = Math.round((r.weightedHours/8)*1000)/1000;
+  document.getElementById('pa-summary').innerHTML = emp.payType==='daily'
+    ? `Ngày công quy đổi: <strong>${days} công</strong> (từ ${r.totalHours}h giờ công thực tế, đã tính hệ số Lễ/CN/ca Tối) × Đơn giá/ngày: <strong>${fmtVND(emp.effectiveRate||0)}</strong> = Tổng thu nhập (trước khấu trừ): <strong>${fmtVND(r.totalIncome)}</strong>`
+    : `Tổng giờ công: <strong>${r.totalHours}h</strong> · Tổng thu nhập (trước khấu trừ): <strong>${fmtVND(r.totalIncome)}</strong>`;
   setMoneyInputValue(document.getElementById('pa-bhxh'), r.adj.bhxhOverride ?? Math.round(Number(emp.contractSalary||0)*0.105));
   setMoneyInputValue(document.getElementById('pa-tamung'), r.adj.tamUngCuoiThang);
   setMoneyInputValue(document.getElementById('pa-ungtuan'), r.adj.tienUngMrTuan);
@@ -916,7 +920,7 @@ function buildPayslipHtml(employeeId){
   const empIndex = EMPLOYEES.findIndex(x=>x.id===employeeId) + 1;
   const preparer = payslipPreparerInfo();
   const accountant = payslipAccountantInfo();
-  const days = Math.round((r.totalHours/8)*1000)/1000;
+  const days = Math.round((r.weightedHours/8)*1000)/1000;
   const dayRate = emp.payType==='daily' ? emp.effectiveRate : Math.round(r.totalIncome/30);
 
   // Đúng 15 dòng khoản mục theo mẫu Excel gốc công ty (STT | KHOẢN MỤC | SỐ TIỀN)
