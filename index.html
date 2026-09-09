@@ -402,11 +402,16 @@
           <div class="card-head">
             <h3>Tổng hợp lương theo tháng</h3>
             <div class="actions">
+              <button class="btn btn-ghost btn-sm" id="btn-upload-employees">⬆ Upload danh sách NV (Excel)</button>
               <button class="btn btn-primary btn-sm" id="btn-export-all-payslips">🗜 In tất cả phiếu lương (.zip)</button>
             </div>
           </div>
-          <div class="helper-text" style="margin-bottom:10px;">Bấm vào tên nhân viên để chỉnh các khoản tạm ứng/thưởng/khấu trừ riêng tháng này, hoặc bấm 🖨 để xuất phiếu lương PDF từng người. Bấm nút trên để xuất TOÀN BỘ phiếu lương tháng này thành 1 file nén .zip (đặt tên "Phieu luong Thang ...").</div>
-          <div class="table-wrap"><table class="data" id="payroll-summary-table"></table></div>
+          <input type="file" id="upload-employees-input" accept=".xlsx,.xls" style="display:none">
+          <div class="helper-text" style="margin-bottom:10px;">Bấm vào tên nhân viên để sửa thông tin, bấm ✎ để chỉnh tạm ứng/thưởng/khấu trừ riêng tháng này, hoặc bấm 🖨 để xuất phiếu lương PDF từng người. Bấm nút trên để xuất TOÀN BỘ phiếu lương tháng này thành 1 file nén .zip (đặt tên "Phieu luong Thang ...").</div>
+          <h4 style="margin:4px 0 8px;">🔷 Quản lý</h4>
+          <div class="table-wrap"><table class="data" id="payroll-summary-table-managers"></table></div>
+          <h4 style="margin:20px 0 8px;">🔶 Công nhân</h4>
+          <div class="table-wrap"><table class="data" id="payroll-summary-table-workers"></table></div>
         </div>
         <div class="card">
           <div class="card-head">
@@ -418,16 +423,6 @@
           </div>
           <p class="helper-text" style="margin-bottom:10px;">Tổng tiền lương quy đổi theo tỉ lệ giờ công mỗi nhân viên làm cho từng dự án trong tháng. Bấm nút trên để chủ động ghi các khoản này vào Thu Chi ngay (không cần đợi tự động ngày 15) — hệ thống sẽ hỏi lại nếu tháng này đã phân bổ rồi để tránh tạo trùng.</p>
           <div class="table-wrap"><table class="data" id="payroll-project-cost-table"></table></div>
-        </div>
-        <div class="card">
-          <div class="card-head">
-            <h3>Danh sách nhân viên</h3>
-            <div class="actions">
-              <button class="btn btn-ghost btn-sm" id="btn-upload-employees">⬆ Upload danh sách NV (Excel)</button>
-            </div>
-          </div>
-          <input type="file" id="upload-employees-input" accept=".xlsx,.xls" style="display:none">
-          <div class="table-wrap"><table class="data" id="employees-table"></table></div>
         </div>
       </div>
 
@@ -1123,7 +1118,12 @@
       <input type="hidden" id="emp-id">
       <div class="form-grid">
         <div class="field full"><label>Họ tên *</label><input id="emp-name" required></div>
-        <div class="field"><label>Chức vụ</label><input id="emp-position" placeholder="VD: Giám sát, Công nhân..."></div>
+        <div class="field"><label>Chức vụ</label>
+          <select id="emp-position">
+            <option value="Quản lý">Quản lý</option>
+            <option value="Công nhân">Công nhân</option>
+          </select>
+        </div>
         <div class="field"><label>Nhóm lương *</label>
           <select id="emp-paytype">
             <option value="monthly">Quản lý (lương tháng cố định)</option>
