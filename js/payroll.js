@@ -25,7 +25,6 @@ function listenPayroll(){
   db.collection('employees').orderBy('createdAt','asc').onSnapshot((snap)=>{
     EMPLOYEES = snap.docs.map(d=> ({id:d.id, ...d.data()}));
     fillEmployeeSelects();
-    renderEmployeesTable();
     renderPayrollSummary();
     renderTimesheetGrid();
     if(window.renderLaborChart) renderLaborChart();
@@ -45,6 +44,7 @@ function listenPayroll(){
   db.collection('payrollAdjustments').onSnapshot((snap)=>{
     PAYROLL_ADJUSTMENTS = snap.docs.map(d=> ({id:d.id, ...d.data()}));
     renderPayrollSummary();
+    renderTimesheetGrid();
   }, (err)=> console.error('payrollAdjustments listen error', err));
 
   // Chỉ kiểm tra phân bổ lương tự động 1 LẦN mỗi phiên, và chỉ khi CẢ Nhân viên lẫn Chấm công
@@ -139,50 +139,6 @@ function positionRank(position){
   return idx === -1 ? 999 : idx;
 }
 
-function renderEmployeesTable(){
-  const table = document.getElementById('employees-table');
-  if(!table) return;
-  if(EMPLOYEES.length===0){
-    table.innerHTML = `<tr><td><div class="empty-state"><div class="big">👥</div>Chưa có nhân viên nào. Bấm "+ Tạo mới" hoặc Upload Excel để thêm.</div></td></tr>`;
-    return;
-  }
-  const empRow = (e)=>`
-    <tr>
-      <td><strong>${escapeHtml(e.name)}</strong></td>
-      <td>${escapeHtml(e.position||'—')}</td>
-      <td class="num">${fmtVND(e.contractSalary)}</td>
-      <td class="num">${fmtVND(e.effectiveRate)}${e.payType==='daily'?'/ngày':'/tháng'}</td>
-      <td>
-        <div class="row-actions">
-          ${!isSubAdmin() ? `<button class="icon-btn" data-edit-emp="${e.id}" title="Sửa">✎</button>` : ''}
-          ${!isSubAdmin() ? `<button class="icon-btn" data-del-emp="${e.id}" title="Xóa">🗑</button>` : ''}
-        </div>
-      </td>
-    </tr>`;
-  const groupHeaderRow = (label, count)=> `<tr class="tx-subhead"><td colspan="5"><strong>${label}</strong> <span class="helper-text">(${count} người)</span></td></tr>`;
-
-  const managers = EMPLOYEES.filter(e=>e.payType!=='daily').sort((a,b)=> positionRank(a.position)-positionRank(b.position) || a.name.localeCompare(b.name,'vi'));
-  const workers = EMPLOYEES.filter(e=>e.payType==='daily').sort((a,b)=> a.name.localeCompare(b.name,'vi'));
-
-  table.innerHTML = `<thead><tr>
-    <th>Họ tên</th><th>Chức vụ</th><th>Lương HĐLĐ/BHXH</th><th>Lương hiệu quả</th><th></th>
-  </tr></thead><tbody>
-    ${managers.length ? groupHeaderRow('🔷 QUẢN LÝ', managers.length) + managers.map(empRow).join('') : ''}
-    ${workers.length ? groupHeaderRow('🔶 CÔNG NHÂN', workers.length) + workers.map(empRow).join('') : ''}
-  </tbody>`;
-}
-document.getElementById('employees-table')?.addEventListener('click', (e)=>{
-  const editId = e.target.closest('[data-edit-emp]')?.dataset.editEmp;
-  const delId = e.target.closest('[data-del-emp]')?.dataset.delEmp;
-  if(editId) openEmployeeModal(editId);
-  if(delId && confirmDelete('Xóa nhân viên này? Dữ liệu chấm công cũ vẫn được giữ lại.')){
-    const emp = EMPLOYEES.find(x=>x.id===delId);
-    db.collection('employees').doc(delId).delete().then(()=>{
-      toast('Đã xóa nhân viên');
-      if(emp) logActivity('delete', {projectName:'Nhân viên', content: emp.name, type:'OUT'});
-    });
-  }
-});
 
 // ---------------- Upload danh sách nhân viên (Excel) ----------------
 document.getElementById('btn-upload-employees')?.addEventListener('click', ()=> document.getElementById('upload-employees-input').click());
@@ -575,19 +531,41 @@ function renderTimesheetGrid(){
       const cellBg = dm.isHoliday ? 'background:var(--red-dim);' : dm.isSunday ? 'background:var(--gold-dim);' : (dm.isWeekend && !dm.isSunday) ? 'background:var(--blue-dim);' : '';
       return `<td class="num" style="cursor:pointer;padding:4px;${cellBg}${h.total>0?'':'color:var(--ink-faint);'}" data-grid-cell="${e.id}|${dateStr}">${label}${otMark}</td>`;
     }).join('');
-    return `<tr><td style="position:sticky;left:0;background:var(--card);white-space:nowrap;"><strong>${escapeHtml(e.name)}</strong></td>${cells}<td class="num" style="font-weight:800;">${monthTotal}h</td></tr>`;
+    // "Tiền công" (đơn giá/ngày) — CHỈ áp dụng cho Công nhân (payType=daily); Kế toán tự nhập, lưu theo
+    // từng người + từng tháng (payrollAdjustments), dùng để tính Tổng thu nhập = Tiền công x Ngày công
+    // ở trang Bảng lương thay vì phải cài sẵn "Lương hiệu quả" cố định trong hồ sơ nhân viên.
+    const adj = PAYROLL_ADJUSTMENTS.find(a=> a.employeeId===e.id && a.month===month);
+    const tienCongCell = e.payType==='daily'
+      ? `<td style="position:sticky;left:150px;background:var(--card);"><input type="text" class="money-input" style="width:100px;" data-tiencong-emp="${e.id}" value="${adj && adj.tienCongNgay ? fmtNum(adj.tienCongNgay) : ''}" placeholder="0"></td>`
+      : `<td style="position:sticky;left:150px;background:var(--card);color:var(--ink-faint);">—</td>`;
+    return `<tr><td style="position:sticky;left:0;background:var(--card);white-space:nowrap;"><strong>${escapeHtml(e.name)}</strong></td>${tienCongCell}${cells}<td class="num" style="font-weight:800;">${monthTotal}h</td></tr>`;
   };
-  const groupHeaderRow = (label)=> `<tr class="tx-subhead"><td colspan="${days.length+2}"><strong>${label}</strong></td></tr>`;
+  const groupHeaderRow = (label)=> `<tr class="tx-subhead"><td colspan="${days.length+3}"><strong>${label}</strong></td></tr>`;
   const managers = emps.filter(e=>e.payType!=='daily').sort((a,b)=> positionRank(a.position)-positionRank(b.position) || a.name.localeCompare(b.name,'vi'));
   const workers = emps.filter(e=>e.payType==='daily').sort((a,b)=> a.name.localeCompare(b.name,'vi'));
 
   table.innerHTML = `<thead><tr>
-    <th style="position:sticky;left:0;background:var(--bg-soft);">Nhân viên</th>${dayHeaderCells}<th>Tổng giờ</th>
+    <th style="position:sticky;left:0;background:var(--bg-soft);">Nhân viên</th><th style="position:sticky;left:150px;background:var(--bg-soft);">Tiền công</th>${dayHeaderCells}<th>Tổng giờ</th>
   </tr></thead><tbody>
     ${managers.length ? groupHeaderRow('🔷 QUẢN LÝ') + managers.map(empRow).join('') : ''}
     ${workers.length ? groupHeaderRow('🔶 CÔNG NHÂN') + workers.map(empRow).join('') : ''}
   </tbody>`;
 }
+document.getElementById('ts-grid-table')?.addEventListener('change', async (e)=>{
+  const empId = e.target.closest('[data-tiencong-emp]')?.dataset.tiencongEmp;
+  if(!empId) return;
+  formatMoneyInput(e.target);
+  const month = document.getElementById('ts-filter-month').value || todayISO().slice(0,7);
+  const tienCongNgay = parseMoneyInput(e.target);
+  try{
+    await db.collection('payrollAdjustments').doc(`${empId}_${month}`).set({
+      employeeId: empId, month, tienCongNgay,
+      updatedAt: firebase.firestore.FieldValue.serverTimestamp(),
+      updatedBy: auth.currentUser.email,
+    }, {merge:true});
+    toast('Đã lưu Tiền công');
+  }catch(err){ toast('Lỗi lưu Tiền công: ' + err.message); }
+});
 document.getElementById('ts-grid-table')?.addEventListener('click', (e)=>{
   const cell = e.target.closest('[data-grid-cell]');
   if(!cell) return;
@@ -656,11 +634,17 @@ function computeEmployeeSalary(emp, month){
     });
   });
 
+  const adj = PAYROLL_ADJUSTMENTS.find(a=> a.employeeId===emp.id && a.month===month) || {};
+  // "Ngày công" luôn lấy từ bảng Chấm công (giờ công đã quy đổi hệ số Lễ/CN/ca Tối) — không đổi.
+  // "Tiền công" (đơn giá/ngày) giờ có thể do Kế toán TỰ NHẬP trực tiếp ở trang Chấm công (ô mới) —
+  // nếu có nhập thì Tổng thu nhập = Tiền công x Ngày công; nếu chưa nhập thì dùng tạm "Lương hiệu quả"
+  // đã cài trong hồ sơ nhân viên như trước (để không phá vỡ dữ liệu cũ khi chưa ai nhập Tiền công).
+  const ngayCong = Math.round((weightedHours/8)*100)/100;
+  const tienCongNgay = Number(adj.tienCongNgay || 0);
   const totalIncome = emp.payType === 'daily'
-    ? Math.round((weightedHours/8) * Number(emp.effectiveRate||0))
+    ? Math.round(ngayCong * (tienCongNgay > 0 ? tienCongNgay : Number(emp.effectiveRate||0)))
     : Math.round(Number(emp.contractSalary||0) + Number(emp.effectiveRate||0));
 
-  const adj = PAYROLL_ADJUSTMENTS.find(a=> a.employeeId===emp.id && a.month===month) || {};
   const bhxh = (adj.bhxhOverride !== undefined && adj.bhxhOverride !== null && adj.bhxhOverride !== '')
     ? Number(adj.bhxhOverride) : Math.round(Number(emp.contractSalary||0) * 0.105);
   const tamUng = Number(adj.tamUngCuoiThang||0);
@@ -670,7 +654,7 @@ function computeEmployeeSalary(emp, month){
   const khauNghi = Number(adj.khauTruNgayNghi||0);
   const thucNhan = totalIncome - bhxh - tamUng - ungTuan - thuong - khacTamUng - khauNghi;
 
-  return { emp, month, totalHours, weightedHours, projectHours, totalIncome, bhxh, tamUng, ungTuan, thuong, khacTamUng, khauNghi, thucNhan, adj };
+  return { emp, month, totalHours, weightedHours, ngayCong, tienCongNgay, projectHours, totalIncome, bhxh, tamUng, ungTuan, thuong, khacTamUng, khauNghi, thucNhan, adj };
 }
 
 function currentPayrollMonth(){
@@ -678,46 +662,87 @@ function currentPayrollMonth(){
 }
 
 function renderPayrollSummary(){
-  const table = document.getElementById('payroll-summary-table');
-  if(!table) return;
+  const tblM = document.getElementById('payroll-summary-table-managers');
+  const tblW = document.getElementById('payroll-summary-table-workers');
+  if(!tblM || !tblW) return;
   const month = currentPayrollMonth();
   if(EMPLOYEES.length===0){
-    table.innerHTML = `<tr><td><div class="empty-state"><div class="big">💵</div>Chưa có nhân viên nào.</div></td></tr>`;
+    tblM.innerHTML = `<tr><td><div class="empty-state"><div class="big">💵</div>Chưa có nhân viên nào. Bấm "+ Thêm nhân viên" hoặc Upload Excel để thêm.</div></td></tr>`;
+    tblW.innerHTML = '';
     renderPayrollProjectCost(month, []);
     return;
   }
   const results = EMPLOYEES.map(e=> computeEmployeeSalary(e, month));
-  const rowHtml = (r)=>{
+
+  const empActions = (r)=> `
+      ${!isSubAdmin() ? `<button class="icon-btn" data-edit-emp="${r.emp.id}" title="Sửa thông tin nhân viên">👤</button>` : ''}
+      <button class="icon-btn" data-open-adjust="${r.emp.id}" title="Điều chỉnh tháng này">✎</button>
+      <button class="icon-btn" data-print-payslip="${r.emp.id}" title="Xuất phiếu lương PDF">🖨</button>
+      ${isAdmin() ? `<button class="icon-btn" data-del-emp="${r.emp.id}" title="Xóa nhân viên">🗑</button>` : ''}`;
+
+  // Bảng QUẢN LÝ — không có cột Tiền công/Ngày công (lương tháng cố định, không tính theo ngày công).
+  const managerRow = (r)=>{
     const otherDeduct = r.tamUng + r.ungTuan + r.thuong + r.khacTamUng + r.khauNghi;
-    const days = Math.round((r.weightedHours/8)*10)/10;
     return `<tr>
-      <td><a href="#" class="tag tag-blue" data-open-adjust="${r.emp.id}" style="text-decoration:none;"><strong>${escapeHtml(r.emp.name)}</strong></a><div class="helper-text">${escapeHtml(r.emp.position||'')}</div></td>
-      <td class="num">${r.emp.payType==='daily' ? `${days} công` : '—'}</td>
+      <td><strong>${escapeHtml(r.emp.name)}</strong><div class="helper-text">${escapeHtml(r.emp.position||'')}</div></td>
       <td class="num">${fmtVND(r.totalIncome)}</td>
       <td class="num" style="color:var(--red);">${fmtVND(r.bhxh)}</td>
       <td class="num" style="color:var(--red);">${fmtVND(otherDeduct)}</td>
       <td class="num"><strong style="color:var(--teal);">${fmtVND(r.thucNhan)}</strong></td>
-      <td>
-        <div class="row-actions">
-          <button class="icon-btn" data-open-adjust="${r.emp.id}" title="Điều chỉnh tháng này">✎</button>
-          <button class="icon-btn" data-print-payslip="${r.emp.id}" title="Xuất phiếu lương PDF">🖨</button>
-        </div>
-      </td>
+      <td><div class="row-actions">${empActions(r)}</div></td>
     </tr>`;
   };
-  const groupHeaderRow = (label, count)=> `<tr class="tx-subhead"><td colspan="7"><strong>${label}</strong> <span class="helper-text">(${count} người)</span></td></tr>`;
+  // Bảng CÔNG NHÂN — có thêm cột Tiền công (đơn giá/ngày, KT nhập ở Chấm công) và Ngày công.
+  const workerRow = (r)=>{
+    const otherDeduct = r.tamUng + r.ungTuan + r.thuong + r.khacTamUng + r.khauNghi;
+    return `<tr>
+      <td><strong>${escapeHtml(r.emp.name)}</strong><div class="helper-text">${escapeHtml(r.emp.position||'')}</div></td>
+      <td class="num">${r.tienCongNgay > 0 ? fmtVND(r.tienCongNgay) : '<span class="helper-text">Chưa nhập</span>'}</td>
+      <td class="num">${r.ngayCong} công</td>
+      <td class="num">${fmtVND(r.totalIncome)}</td>
+      <td class="num" style="color:var(--red);">${fmtVND(r.bhxh)}</td>
+      <td class="num" style="color:var(--red);">${fmtVND(otherDeduct)}</td>
+      <td class="num"><strong style="color:var(--teal);">${fmtVND(r.thucNhan)}</strong></td>
+      <td><div class="row-actions">${empActions(r)}</div></td>
+    </tr>`;
+  };
+
   const managers = results.filter(r=>r.emp.payType!=='daily').sort((a,b)=> positionRank(a.emp.position)-positionRank(b.emp.position) || a.emp.name.localeCompare(b.emp.name,'vi'));
   const workers = results.filter(r=>r.emp.payType==='daily').sort((a,b)=> a.emp.name.localeCompare(b.emp.name,'vi'));
+  const sumThucNhan = (arr)=> arr.reduce((s,r)=> s+r.thucNhan, 0);
 
-  table.innerHTML = `<thead><tr>
-    <th>Nhân viên</th><th>Ngày công</th><th>Tổng thu nhập</th><th>BHXH</th><th>Tạm ứng/Khấu trừ</th><th>Thực nhận</th><th></th>
-  </tr></thead><tbody>
-    ${managers.length ? groupHeaderRow('🔷 QUẢN LÝ', managers.length) + managers.map(rowHtml).join('') : ''}
-    ${workers.length ? groupHeaderRow('🔶 CÔNG NHÂN', workers.length) + workers.map(rowHtml).join('') : ''}
-  </tbody>`;
+  tblM.innerHTML = managers.length ? `<thead><tr>
+      <th>Nhân viên</th><th>Tổng thu nhập</th><th>BHXH</th><th>Tạm ứng/Khấu trừ</th><th>Thực nhận</th><th></th>
+    </tr></thead><tbody>${managers.map(managerRow).join('')}</tbody>
+    <tfoot><tr><td colspan="4" style="text-align:right;font-weight:700;">Tổng thực nhận (Quản lý)</td><td class="num"><strong style="color:var(--teal);">${fmtVND(sumThucNhan(managers))}</strong></td><td></td></tr></tfoot>`
+    : `<tr><td><div class="empty-state">Chưa có Quản lý nào.</div></td></tr>`;
+
+  tblW.innerHTML = workers.length ? `<thead><tr>
+      <th>Nhân viên</th><th>Tiền công</th><th>Ngày công</th><th>Tổng thu nhập</th><th>BHXH</th><th>Tạm ứng/Khấu trừ</th><th>Thực nhận</th><th></th>
+    </tr></thead><tbody>${workers.map(workerRow).join('')}</tbody>
+    <tfoot><tr><td colspan="6" style="text-align:right;font-weight:700;">Tổng thực nhận (Công nhân)</td><td class="num"><strong style="color:var(--teal);">${fmtVND(sumThucNhan(workers))}</strong></td><td></td></tr></tfoot>`
+    : `<tr><td><div class="empty-state">Chưa có Công nhân nào.</div></td></tr>`;
 
   renderPayrollProjectCost(month, results);
 }
+function payrollSummaryTableClick(e){
+  const editId = e.target.closest('[data-edit-emp]')?.dataset.editEmp;
+  const delId = e.target.closest('[data-del-emp]')?.dataset.delEmp;
+  const adjId = e.target.closest('[data-open-adjust]')?.dataset.openAdjust;
+  const printId = e.target.closest('[data-print-payslip]')?.dataset.printPayslip;
+  if(editId) openEmployeeModal(editId);
+  if(adjId) openPayrollAdjustModal(adjId);
+  if(printId) printPayslip(printId);
+  if(delId && confirmDelete('Xóa nhân viên này? Dữ liệu chấm công cũ vẫn được giữ lại.')){
+    const emp = EMPLOYEES.find(x=>x.id===delId);
+    db.collection('employees').doc(delId).delete().then(()=>{
+      toast('Đã xóa nhân viên');
+      if(emp) logActivity('delete', {projectName:'Nhân viên', content: emp.name, type:'OUT'});
+    });
+  }
+}
+document.getElementById('payroll-summary-table-managers')?.addEventListener('click', payrollSummaryTableClick);
+document.getElementById('payroll-summary-table-workers')?.addEventListener('click', payrollSummaryTableClick);
 
 // Phân bổ chi phí lương theo dự án: mỗi NV chia Tổng thu nhập theo TỈ LỆ giờ công của từng dự án trong tháng
 function renderPayrollProjectCost(month, results){
@@ -845,13 +870,6 @@ document.getElementById('btn-undo-payroll-allocation')?.addEventListener('click'
     logActivity('delete', {projectName:'Phân bổ lương tự động', content:`Xóa ${total} khoản tháng ${month}`, type:'OUT'});
   }catch(err){ toast('Lỗi: '+err.message); }
 });
-document.getElementById('payroll-summary-table')?.addEventListener('click', (e)=>{
-  const adjId = e.target.closest('[data-open-adjust]')?.dataset.openAdjust;
-  const printId = e.target.closest('[data-print-payslip]')?.dataset.printPayslip;
-  if(adjId){ e.preventDefault(); openPayrollAdjustModal(adjId); }
-  if(printId) printPayslip(printId);
-});
-
 // ---------------- Điều chỉnh lương riêng từng tháng ----------------
 function openPayrollAdjustModal(employeeId){
   const emp = EMPLOYEES.find(x=>x.id===employeeId);
@@ -861,9 +879,8 @@ function openPayrollAdjustModal(employeeId){
   document.getElementById('pa-modal-title').textContent = `Điều chỉnh lương — ${emp.name} (${month})`;
   document.getElementById('pa-employee-id').value = employeeId;
   document.getElementById('pa-month').value = month;
-  const days = Math.round((r.weightedHours/8)*1000)/1000;
   document.getElementById('pa-summary').innerHTML = emp.payType==='daily'
-    ? `Ngày công quy đổi: <strong>${days} công</strong> (từ ${r.totalHours}h giờ công thực tế, đã tính hệ số Lễ/CN/ca Tối) × Đơn giá/ngày: <strong>${fmtVND(emp.effectiveRate||0)}</strong> = Tổng thu nhập (trước khấu trừ): <strong>${fmtVND(r.totalIncome)}</strong>`
+    ? `Ngày công quy đổi: <strong>${r.ngayCong} công</strong> (từ ${r.totalHours}h giờ công thực tế, đã tính hệ số Lễ/CN/ca Tối) × Tiền công/ngày: <strong>${fmtVND(r.tienCongNgay > 0 ? r.tienCongNgay : (emp.effectiveRate||0))}</strong>${r.tienCongNgay>0 ? '' : ' (chưa nhập ở Chấm công, đang tạm dùng Lương hiệu quả)'} = Tổng thu nhập (trước khấu trừ): <strong>${fmtVND(r.totalIncome)}</strong>`
     : `Tổng giờ công: <strong>${r.totalHours}h</strong> · Tổng thu nhập (trước khấu trừ): <strong>${fmtVND(r.totalIncome)}</strong>`;
   setMoneyInputValue(document.getElementById('pa-bhxh'), r.adj.bhxhOverride ?? Math.round(Number(emp.contractSalary||0)*0.105));
   setMoneyInputValue(document.getElementById('pa-tamung'), r.adj.tamUngCuoiThang);
@@ -920,8 +937,8 @@ function buildPayslipHtml(employeeId){
   const empIndex = EMPLOYEES.findIndex(x=>x.id===employeeId) + 1;
   const preparer = payslipPreparerInfo();
   const accountant = payslipAccountantInfo();
-  const days = Math.round((r.weightedHours/8)*1000)/1000;
-  const dayRate = emp.payType==='daily' ? emp.effectiveRate : Math.round(r.totalIncome/30);
+  const days = r.ngayCong;
+  const dayRate = emp.payType==='daily' ? (r.tienCongNgay > 0 ? r.tienCongNgay : emp.effectiveRate) : Math.round(r.totalIncome/30);
 
   // Đúng 15 dòng khoản mục theo mẫu Excel gốc công ty (STT | KHOẢN MỤC | SỐ TIỀN)
   const rows = [
