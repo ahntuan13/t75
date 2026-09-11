@@ -92,6 +92,30 @@ function openEmployeeModal(id){
   setMoneyInputValue(document.getElementById('emp-effective-rate'), e.effectiveRate);
   document.getElementById('emp-note').value = e.note || '';
   updateEmployeeEffectiveLabel();
+
+  // Khối "Điều chỉnh lương tháng" chỉ có ý nghĩa khi SỬA 1 nhân viên ĐÃ CÓ SẴN (cần dữ liệu chấm công
+  // thực tế để tính) — nhân viên MỚI (chưa lưu, chưa có id) thì ẩn hẳn khối này đi.
+  const adjSection = document.getElementById('emp-payroll-adjust-section');
+  if(id){
+    adjSection.style.display = '';
+    const month = currentPayrollMonth();
+    const r = computeEmployeeSalary(e, month);
+    document.getElementById('pa-employee-id').value = id;
+    document.getElementById('pa-month').value = month;
+    document.getElementById('pa-modal-title').textContent = `Điều chỉnh lương tháng ${month}`;
+    document.getElementById('pa-summary').innerHTML = e.payType==='daily'
+      ? `Ngày công quy đổi: <strong>${r.ngayCong} công</strong> (từ ${r.totalHours}h giờ công thực tế, đã tính hệ số Lễ/CN/ca Tối) × Tiền công/ngày: <strong>${fmtVND(r.tienCongNgay > 0 ? r.tienCongNgay : (e.effectiveRate||0))}</strong>${r.tienCongNgay>0 ? '' : ' (chưa nhập ở Chấm công, đang tạm dùng Lương hiệu quả)'} = Tổng thu nhập (trước khấu trừ): <strong>${fmtVND(r.totalIncome)}</strong>`
+      : `Tổng giờ công: <strong>${r.totalHours}h</strong> · Tổng thu nhập (trước khấu trừ): <strong>${fmtVND(r.totalIncome)}</strong>`;
+    setMoneyInputValue(document.getElementById('pa-bhxh'), r.adj.bhxhOverride ?? Math.round(Number(e.contractSalary||0)*0.105));
+    setMoneyInputValue(document.getElementById('pa-tamung'), r.adj.tamUngCuoiThang);
+    setMoneyInputValue(document.getElementById('pa-ungtuan'), r.adj.tienUngMrTuan);
+    setMoneyInputValue(document.getElementById('pa-thuong'), r.adj.thuongChuyenCan);
+    setMoneyInputValue(document.getElementById('pa-khactamung'), r.adj.khauTruTamUngKhac);
+    setMoneyInputValue(document.getElementById('pa-khaunghi'), r.adj.khauTruNgayNghi);
+    document.getElementById('pa-note').value = r.adj.note || '';
+  } else {
+    adjSection.style.display = 'none';
+  }
   openModal('modal-employee');
 }
 function updateEmployeeEffectiveLabel(){
@@ -116,6 +140,23 @@ document.getElementById('save-emp-btn').addEventListener('click', async ()=>{
   try{
     if(id){
       await db.collection('employees').doc(id).update(data);
+      // Lưu luôn "Điều chỉnh lương tháng" cùng lúc — chỉ áp dụng khi khối này đang hiện (đang sửa NV có sẵn).
+      if(document.getElementById('emp-payroll-adjust-section').style.display !== 'none'){
+        const month = document.getElementById('pa-month').value;
+        const adjData = {
+          employeeId: id, month, employeeName: name,
+          bhxhOverride: parseMoneyInput(document.getElementById('pa-bhxh')),
+          tamUngCuoiThang: parseMoneyInput(document.getElementById('pa-tamung')),
+          tienUngMrTuan: parseMoneyInput(document.getElementById('pa-ungtuan')),
+          thuongChuyenCan: parseMoneyInput(document.getElementById('pa-thuong')),
+          khauTruTamUngKhac: parseMoneyInput(document.getElementById('pa-khactamung')),
+          khauTruNgayNghi: parseMoneyInput(document.getElementById('pa-khaunghi')),
+          note: document.getElementById('pa-note').value.trim(),
+          updatedAt: firebase.firestore.FieldValue.serverTimestamp(),
+          updatedBy: auth.currentUser.email,
+        };
+        await db.collection('payrollAdjustments').doc(`${id}_${month}`).set(adjData, {merge:true});
+      }
       toast('Đã cập nhật nhân viên');
       logActivity('update', {projectName:'Nhân viên', content: data.name, type:'OUT'});
     } else {
@@ -675,8 +716,7 @@ function renderPayrollSummary(){
   const results = EMPLOYEES.map(e=> computeEmployeeSalary(e, month));
 
   const empActions = (r)=> `
-      ${!isSubAdmin() ? `<button class="icon-btn" data-edit-emp="${r.emp.id}" title="Sửa thông tin nhân viên">👤</button>` : ''}
-      <button class="icon-btn" data-open-adjust="${r.emp.id}" title="Điều chỉnh tháng này">✎</button>
+      ${!isSubAdmin() ? `<button class="icon-btn" data-edit-emp="${r.emp.id}" title="Sửa thông tin nhân viên & điều chỉnh lương tháng">✎</button>` : ''}
       <button class="icon-btn" data-print-payslip="${r.emp.id}" title="Xuất phiếu lương PDF">🖨</button>
       ${!isSubAdmin() ? `<button class="icon-btn" data-del-emp="${r.emp.id}" title="Xóa nhân viên">🗑</button>` : ''}`;
 
@@ -728,10 +768,8 @@ function renderPayrollSummary(){
 function payrollSummaryTableClick(e){
   const editId = e.target.closest('[data-edit-emp]')?.dataset.editEmp;
   const delId = e.target.closest('[data-del-emp]')?.dataset.delEmp;
-  const adjId = e.target.closest('[data-open-adjust]')?.dataset.openAdjust;
   const printId = e.target.closest('[data-print-payslip]')?.dataset.printPayslip;
   if(editId) openEmployeeModal(editId);
-  if(adjId) openPayrollAdjustModal(adjId);
   if(printId) printPayslip(printId);
   if(delId && confirmDelete('Xóa nhân viên này? Dữ liệu chấm công cũ vẫn được giữ lại.')){
     const emp = EMPLOYEES.find(x=>x.id===delId);
@@ -868,51 +906,6 @@ document.getElementById('btn-undo-payroll-allocation')?.addEventListener('click'
     await db.collection('settings').doc('payrollAllocationMeta').set({ lastAllocatedMonth: firebase.firestore.FieldValue.delete() }, {merge:true});
     toast(`✅ Đã xóa ${total} khoản phân bổ lương tháng ${month}`);
     logActivity('delete', {projectName:'Phân bổ lương tự động', content:`Xóa ${total} khoản tháng ${month}`, type:'OUT'});
-  }catch(err){ toast('Lỗi: '+err.message); }
-});
-// ---------------- Điều chỉnh lương riêng từng tháng ----------------
-function openPayrollAdjustModal(employeeId){
-  const emp = EMPLOYEES.find(x=>x.id===employeeId);
-  if(!emp) return;
-  const month = currentPayrollMonth();
-  const r = computeEmployeeSalary(emp, month);
-  document.getElementById('pa-modal-title').textContent = `Điều chỉnh lương — ${emp.name} (${month})`;
-  document.getElementById('pa-employee-id').value = employeeId;
-  document.getElementById('pa-month').value = month;
-  document.getElementById('pa-summary').innerHTML = emp.payType==='daily'
-    ? `Ngày công quy đổi: <strong>${r.ngayCong} công</strong> (từ ${r.totalHours}h giờ công thực tế, đã tính hệ số Lễ/CN/ca Tối) × Tiền công/ngày: <strong>${fmtVND(r.tienCongNgay > 0 ? r.tienCongNgay : (emp.effectiveRate||0))}</strong>${r.tienCongNgay>0 ? '' : ' (chưa nhập ở Chấm công, đang tạm dùng Lương hiệu quả)'} = Tổng thu nhập (trước khấu trừ): <strong>${fmtVND(r.totalIncome)}</strong>`
-    : `Tổng giờ công: <strong>${r.totalHours}h</strong> · Tổng thu nhập (trước khấu trừ): <strong>${fmtVND(r.totalIncome)}</strong>`;
-  setMoneyInputValue(document.getElementById('pa-bhxh'), r.adj.bhxhOverride ?? Math.round(Number(emp.contractSalary||0)*0.105));
-  setMoneyInputValue(document.getElementById('pa-tamung'), r.adj.tamUngCuoiThang);
-  setMoneyInputValue(document.getElementById('pa-ungtuan'), r.adj.tienUngMrTuan);
-  setMoneyInputValue(document.getElementById('pa-thuong'), r.adj.thuongChuyenCan);
-  setMoneyInputValue(document.getElementById('pa-khactamung'), r.adj.khauTruTamUngKhac);
-  setMoneyInputValue(document.getElementById('pa-khaunghi'), r.adj.khauTruNgayNghi);
-  document.getElementById('pa-note').value = r.adj.note || '';
-  openModal('modal-payroll-adjust');
-}
-
-document.getElementById('save-pa-btn')?.addEventListener('click', async ()=>{
-  const employeeId = document.getElementById('pa-employee-id').value;
-  const month = document.getElementById('pa-month').value;
-  const emp = EMPLOYEES.find(x=>x.id===employeeId);
-  const data = {
-    employeeId, month, employeeName: emp ? emp.name : '',
-    bhxhOverride: parseMoneyInput(document.getElementById('pa-bhxh')),
-    tamUngCuoiThang: parseMoneyInput(document.getElementById('pa-tamung')),
-    tienUngMrTuan: parseMoneyInput(document.getElementById('pa-ungtuan')),
-    thuongChuyenCan: parseMoneyInput(document.getElementById('pa-thuong')),
-    khauTruTamUngKhac: parseMoneyInput(document.getElementById('pa-khactamung')),
-    khauTruNgayNghi: parseMoneyInput(document.getElementById('pa-khaunghi')),
-    note: document.getElementById('pa-note').value.trim(),
-    updatedAt: firebase.firestore.FieldValue.serverTimestamp(),
-    updatedBy: auth.currentUser.email,
-  };
-  try{
-    await db.collection('payrollAdjustments').doc(`${employeeId}_${month}`).set(data, {merge:true});
-    toast('Đã lưu điều chỉnh lương');
-    logActivity('update', {projectName:'Điều chỉnh lương', content: data.employeeName+' - '+month, type:'OUT'});
-    closeModal('modal-payroll-adjust');
   }catch(err){ toast('Lỗi: '+err.message); }
 });
 
