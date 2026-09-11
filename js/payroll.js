@@ -678,7 +678,7 @@ function renderPayrollSummary(){
       ${!isSubAdmin() ? `<button class="icon-btn" data-edit-emp="${r.emp.id}" title="Sửa thông tin nhân viên">👤</button>` : ''}
       <button class="icon-btn" data-open-adjust="${r.emp.id}" title="Điều chỉnh tháng này">✎</button>
       <button class="icon-btn" data-print-payslip="${r.emp.id}" title="Xuất phiếu lương PDF">🖨</button>
-      ${isAdmin() ? `<button class="icon-btn" data-del-emp="${r.emp.id}" title="Xóa nhân viên">🗑</button>` : ''}`;
+      ${!isSubAdmin() ? `<button class="icon-btn" data-del-emp="${r.emp.id}" title="Xóa nhân viên">🗑</button>` : ''}`;
 
   // Bảng QUẢN LÝ — không có cột Tiền công/Ngày công (lương tháng cố định, không tính theo ngày công).
   const managerRow = (r)=>{
