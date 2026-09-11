@@ -1112,10 +1112,12 @@
 </div>
 
 <div class="modal-backdrop" id="modal-employee">
-  <div class="modal">
+  <div class="modal" style="max-width:640px;width:100%;">
     <div class="modal-head"><h3 id="emp-modal-title">Thêm nhân viên</h3><button class="modal-close" data-close>✕</button></div>
     <div class="modal-body">
       <input type="hidden" id="emp-id">
+      <input type="hidden" id="pa-employee-id">
+      <input type="hidden" id="pa-month">
       <div class="form-grid">
         <div class="field full"><label>Họ tên *</label><input id="emp-name" required></div>
         <div class="field"><label>Chức vụ</label>
@@ -1133,6 +1135,20 @@
         <div class="field"><label>Lương theo HĐLĐ/BHXH (VNĐ/tháng)</label><input type="text" id="emp-contract-salary" placeholder="0"></div>
         <div class="field" id="emp-effective-field"><label id="emp-effective-label">Lương hiệu quả (VNĐ/tháng)</label><input type="text" id="emp-effective-rate" placeholder="0"></div>
         <div class="field full"><label>Ghi chú</label><textarea id="emp-note" rows="2"></textarea></div>
+      </div>
+
+      <div id="emp-payroll-adjust-section" style="display:none;border-top:1px solid var(--line);margin-top:16px;padding-top:14px;">
+        <h4 id="pa-modal-title" style="margin:0 0 10px;">Điều chỉnh lương tháng</h4>
+        <div id="pa-summary" class="tx-view-note" style="margin-bottom:14px;"></div>
+        <div class="form-grid">
+          <div class="field"><label>Khấu trừ BHXH</label><input type="text" id="pa-bhxh" placeholder="Tự tính 10.5% lương HĐLĐ"></div>
+          <div class="field"><label>Tiền tạm ứng cuối tháng</label><input type="text" id="pa-tamung" placeholder="0"></div>
+          <div class="field"><label>Tiền ứng Mr.Tuấn</label><input type="text" id="pa-ungtuan" placeholder="0"></div>
+          <div class="field"><label>Thưởng chuyên cần / Điều chỉnh khác</label><input type="text" id="pa-thuong" placeholder="0"></div>
+          <div class="field"><label>Khấu trừ tạm ứng khác</label><input type="text" id="pa-khactamung" placeholder="0"></div>
+          <div class="field"><label>Khấu trừ ngày nghỉ</label><input type="text" id="pa-khaunghi" placeholder="0"></div>
+          <div class="field full"><label>Ghi chú riêng tháng này</label><textarea id="pa-note" rows="2"></textarea></div>
+        </div>
       </div>
     </div>
     <div class="modal-foot"><button class="btn btn-ghost" data-close>Hủy</button><button class="btn btn-primary" id="save-emp-btn">Lưu nhân viên</button></div>
@@ -1174,27 +1190,6 @@
       </div>
     </div>
     <div class="modal-foot"><button class="btn btn-ghost" data-close>Hủy</button><button class="btn btn-primary" id="save-ts-btn">Lưu chấm công</button></div>
-  </div>
-</div>
-
-<div class="modal-backdrop" id="modal-payroll-adjust">
-  <div class="modal">
-    <div class="modal-head"><h3 id="pa-modal-title">Điều chỉnh lương tháng</h3><button class="modal-close" data-close>✕</button></div>
-    <div class="modal-body">
-      <input type="hidden" id="pa-employee-id">
-      <input type="hidden" id="pa-month">
-      <div id="pa-summary" class="tx-view-note" style="margin-bottom:14px;"></div>
-      <div class="form-grid">
-        <div class="field"><label>Khấu trừ BHXH</label><input type="text" id="pa-bhxh" placeholder="Tự tính 10.5% lương HĐLĐ"></div>
-        <div class="field"><label>Tiền tạm ứng cuối tháng</label><input type="text" id="pa-tamung" placeholder="0"></div>
-        <div class="field"><label>Tiền ứng Mr.Tuấn</label><input type="text" id="pa-ungtuan" placeholder="0"></div>
-        <div class="field"><label>Thưởng chuyên cần / Điều chỉnh khác</label><input type="text" id="pa-thuong" placeholder="0"></div>
-        <div class="field"><label>Khấu trừ tạm ứng khác</label><input type="text" id="pa-khactamung" placeholder="0"></div>
-        <div class="field"><label>Khấu trừ ngày nghỉ</label><input type="text" id="pa-khaunghi" placeholder="0"></div>
-        <div class="field full"><label>Ghi chú</label><textarea id="pa-note" rows="2"></textarea></div>
-      </div>
-    </div>
-    <div class="modal-foot"><button class="btn btn-ghost" data-close>Hủy</button><button class="btn btn-primary" id="save-pa-btn">Lưu điều chỉnh</button></div>
   </div>
 </div>
 
