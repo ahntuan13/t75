@@ -897,7 +897,7 @@ document.getElementById('save-explain-btn')?.addEventListener('click', async ()=
         date, code: b.code, content: b.content, description: b.description,
         unit: b.unit, qty: b.qty, unitPrice: b.unitPrice, amount: b.amount,
         invoiceNumber:'', invoiceDate:'', bankName:'', bankAccount:'', bankHolder:'', transferDate:'',
-        note: `Giải chi từ Lệnh tạm ứng (${o.payee}) — ${o.reason}`,
+        note: `Tự động tạo từ Giải chi Lệnh tạm ứng (${o.payee}) — ${o.reason}`,
         invoiceImage: b.invoiceImage || '', transferImage: b.transferImage || '',
         invoiceStatus: b.invoiceImage ? 'issued' : 'pending',
         transferStatus: b.transferImage ? 'done' : 'pending',
