@@ -1048,40 +1048,38 @@ async function exportAllPayslipsZip(){
   const [y,m] = month.split('-');
   const btn = document.getElementById('btn-export-all-payslips');
   if(btn){ btn.disabled = true; btn.textContent = '⏳ Đang xuất phiếu lương...'; }
-  let overlay = null, container = null;
+  let overlay = null, frame = null;
 
   try{
     const zip = new JSZip();
-    // Container phải nằm TRONG vùng nhìn thấy của trang (không đặt left:-9999px) — html2canvas (bên trong
-    // html2pdf) hay chụp ra ẢNH TRẮNG nếu phần tử nằm ngoài khung nhìn của trình duyệt. Để người dùng không
-    // thấy nội dung nháy qua màn hình, phủ 1 lớp che kín phía TRÊN (z-index cao hơn) trong lúc xuất.
+    // Dùng THẬT 1 iframe rồi doc.write() y hệt cách "In từng người" (printPayslip) đang chạy đúng — vì lúc đó
+    // trang phiếu lương có 1 thẻ <body> THẬT, các quy tắc CSS kiểu "body{...}" trong <style> mới áp dụng được.
+    // Cách cũ (nhét thẳng HTML vào 1 <div> thường) khiến quy tắc "body{...}" không tác dụng lên nội dung nào cả
+    // (vì <div> không phải là <body>) — đây là lý do file xuất ra bị mất hết định dạng/trông như trắng trơn.
     overlay = document.createElement('div');
     overlay.style.cssText = 'position:fixed;inset:0;background:#fff;z-index:99998;display:flex;align-items:center;justify-content:center;font-size:15px;color:#555;';
     overlay.textContent = 'Đang xuất phiếu lương, vui lòng đợi...';
     document.body.appendChild(overlay);
 
-    container = document.createElement('div');
-    container.style.cssText = 'position:fixed;top:0;left:0;width:420px;z-index:1;background:#fff;';
-    document.body.appendChild(container);
+    frame = document.createElement('iframe');
+    frame.style.cssText = 'position:fixed;top:0;left:0;width:480px;height:680px;border:0;z-index:1;background:#fff;';
+    document.body.appendChild(frame);
 
     let done = 0;
     for(const emp of EMPLOYEES){
       const html = buildPayslipHtml(emp.id);
       if(!html) continue;
-      // Lấy CẢ phần <style> lẫn <body> — trước đây chỉ lấy <body>, làm mất hết CSS định dạng
-      // (bảng, chữ ký, căn lề...) khiến html2canvas chụp ra gần như trắng trơn.
-      const styleMatch = html.match(/<style>([\s\S]*?)<\/style>/);
-      const bodyMatch = html.match(/<body>([\s\S]*)<\/body>/);
-      container.innerHTML = `<style>${styleMatch ? styleMatch[1] : ''}</style>${bodyMatch ? bodyMatch[1] : html}`;
-      // Đợi 1 nhịp để trình duyệt render xong nội dung mới trước khi html2canvas chụp lại.
-      await new Promise(r=> setTimeout(r, 60));
+      const doc = frame.contentWindow.document;
+      doc.open(); doc.write(html); doc.close();
+      // Đợi trình duyệt render xong hẳn (kể cả ảnh chữ ký base64 bên trong) trước khi chụp lại.
+      await new Promise(r=> setTimeout(r, 200));
       const pdfBlob = await html2pdf().set({
         margin: 5,
         filename: `${emp.name}.pdf`,
         image: { type:'jpeg', quality:0.98 },
         html2canvas: { scale: 2, useCORS: true, backgroundColor:'#ffffff' },
         jsPDF: { unit:'mm', format:'a5', orientation:'portrait' },
-      }).from(container).outputPdf('blob');
+      }).from(doc.body).outputPdf('blob');
       const safeName = emp.name.replace(/[\\/:*?"<>|]+/g, '_');
       zip.file(`${safeName}.pdf`, pdfBlob);
       done++;
@@ -1103,7 +1101,7 @@ async function exportAllPayslipsZip(){
   }catch(err){
     toast('Lỗi khi xuất file nén: ' + err.message);
   }finally{
-    if(container && container.parentNode) document.body.removeChild(container);
+    if(frame && frame.parentNode) document.body.removeChild(frame);
     if(overlay && overlay.parentNode) document.body.removeChild(overlay);
     if(btn){ btn.disabled = false; btn.textContent = '🗜 In tất cả phiếu lương (.zip)'; }
   }
