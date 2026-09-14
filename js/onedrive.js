@@ -71,36 +71,78 @@ async function msGetSiteId(){
 }
 
 /**
- * Upload 1 file lên thư mục chỉ định trong SharePoint site dùng chung.
+ * Upload 1 file lên thư mục chỉ định trong SharePoint site dùng chung — KHÔNG giới hạn dung lượng thực tế
+ * (dùng "upload session" của Microsoft Graph cho phép tải file lớn theo từng phần — lên tới hàng chục GB).
+ * File nhỏ (<=4MB) vẫn dùng cách tải đơn giản (nhanh hơn, ít lần gọi API hơn).
  * @param {File} file
  * @param {string} folderPath vd: 'Projects/BALTICA'
+ * @param {function} onProgress tuỳ chọn — callback(percent) để hiện tiến độ khi file lớn phải tải nhiều phần
  * @returns {Promise<{webUrl:string, name:string, id:string}>}
  */
-async function msUploadFile(file, folderPath){
+async function msUploadFile(file, folderPath, onProgress){
   if(!file) return null;
-  if(file.size > 4 * 1024 * 1024){
-    throw new Error('File quá lớn (>4MB). Vui lòng nén nhỏ lại (ảnh) hoặc chia nhỏ file PDF trước khi tải lên.');
-  }
   const token = await msGetToken();
   const siteId = await msGetSiteId();
   const safeName = file.name.replace(/[#%&{}\\<>*?/$!'":@+`|=]/g, '_');
   const path = `${folderPath}/${Date.now()}_${safeName}`;
-  const url = `https://graph.microsoft.com/v1.0/sites/${siteId}/drive/root:/${path.split('/').map(encodeURIComponent).join('/')}:/content`;
-  const buf = await file.arrayBuffer();
-  const res = await fetch(url, {
-    method: 'PUT',
-    headers: {
-      Authorization: `Bearer ${token}`,
-      'Content-Type': file.type || 'application/octet-stream',
-    },
-    body: buf,
-  });
-  if(!res.ok){
-    const txt = await res.text().catch(()=> '');
-    throw new Error('Upload thất bại (mã lỗi ' + res.status + '). ' + txt.slice(0, 200));
+  const encodedPath = path.split('/').map(encodeURIComponent).join('/');
+
+  // File nhỏ (<=4MB): PUT thẳng nội dung file trong 1 lần gọi — đúng giới hạn của API "upload đơn giản".
+  if(file.size <= 4 * 1024 * 1024){
+    const url = `https://graph.microsoft.com/v1.0/sites/${siteId}/drive/root:/${encodedPath}:/content`;
+    const buf = await file.arrayBuffer();
+    const res = await fetch(url, {
+      method: 'PUT',
+      headers: { Authorization: `Bearer ${token}`, 'Content-Type': file.type || 'application/octet-stream' },
+      body: buf,
+    });
+    if(!res.ok){
+      const txt = await res.text().catch(()=> '');
+      throw new Error('Upload thất bại (mã lỗi ' + res.status + '). ' + txt.slice(0, 200));
+    }
+    const data = await res.json();
+    return { webUrl: data.webUrl, name: data.name, id: data.id };
   }
-  const data = await res.json();
-  return { webUrl: data.webUrl, name: data.name, id: data.id };
+
+  // File lớn (>4MB): dùng "upload session" — chia file thành từng phần (10MB/phần, đúng bội số 320KB
+  // theo yêu cầu của Microsoft Graph), tải lần lượt cho tới khi xong. Hỗ trợ được file rất lớn (nhiều trăm MB).
+  const sessionRes = await fetch(
+    `https://graph.microsoft.com/v1.0/sites/${siteId}/drive/root:/${encodedPath}:/createUploadSession`,
+    { method:'POST', headers:{ Authorization:`Bearer ${token}`, 'Content-Type':'application/json' },
+      body: JSON.stringify({ item: { '@microsoft.graph.conflictBehavior': 'rename', name: safeName } }) }
+  );
+  if(!sessionRes.ok){
+    const txt = await sessionRes.text().catch(()=> '');
+    throw new Error('Không tạo được phiên tải file lớn (mã lỗi ' + sessionRes.status + '). ' + txt.slice(0, 200));
+  }
+  const { uploadUrl } = await sessionRes.json();
+
+  const CHUNK_SIZE = 10 * 1024 * 1024; // 10MB mỗi phần — đúng bội số 320KB Microsoft yêu cầu
+  const total = file.size;
+  let start = 0;
+  let lastResultData = null;
+  while(start < total){
+    const end = Math.min(start + CHUNK_SIZE, total);
+    const chunk = file.slice(start, end);
+    const chunkBuf = await chunk.arrayBuffer();
+    const putRes = await fetch(uploadUrl, {
+      method: 'PUT',
+      headers: {
+        'Content-Length': String(end - start),
+        'Content-Range': `bytes ${start}-${end-1}/${total}`,
+      },
+      body: chunkBuf,
+    });
+    if(!putRes.ok && putRes.status !== 202){
+      const txt = await putRes.text().catch(()=> '');
+      throw new Error('Upload phần file thất bại (mã lỗi ' + putRes.status + '). ' + txt.slice(0, 200));
+    }
+    if(onProgress) onProgress(Math.round((end/total)*100));
+    if(putRes.status !== 202){ lastResultData = await putRes.json().catch(()=>null); } // 200/201 = đã xong hẳn
+    start = end;
+  }
+  if(!lastResultData) throw new Error('Tải file lớn không hoàn tất — thử lại.');
+  return { webUrl: lastResultData.webUrl, name: lastResultData.name, id: lastResultData.id };
 }
 
 function msIsLoggedIn(){
