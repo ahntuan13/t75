@@ -520,6 +520,12 @@ function eveningShiftMultiplier(dateStr){
   return 1.5; // Ngày thường: ca Tối = tăng ca x1.5
 }
 
+// Độ rộng CỐ ĐỊNH cho 2 cột đầu (Nhân viên + Tiền công) trong lưới Chấm công — cả 2 cột đều "dính"
+// (position:sticky) khi cuộn ngang, nên PHẢI dùng đúng 1 con số duy nhất cho cả width lẫn left-offset,
+// nếu không sẽ bị chồng chữ lên nhau (đã từng xảy ra khi 2 số này lệch nhau).
+const TS_NAME_COL_WIDTH = 130;
+const TS_TIENCONG_COL_WIDTH = 100;
+
 function renderTimesheetGrid(){
   const table = document.getElementById('ts-grid-table');
   if(!table) return;
@@ -575,18 +581,20 @@ function renderTimesheetGrid(){
     // "Tiền công" (đơn giá/ngày) — CHỈ áp dụng cho Công nhân (payType=daily); Kế toán tự nhập, lưu theo
     // từng người + từng tháng (payrollAdjustments), dùng để tính Tổng thu nhập = Tiền công x Ngày công
     // ở trang Bảng lương thay vì phải cài sẵn "Lương hiệu quả" cố định trong hồ sơ nhân viên.
+    // LƯU Ý: cột "Nhân viên" và "Tiền công" đều cố định (position:sticky) khi cuộn ngang — phải có
+    // width CỐ ĐỊNH khớp đúng với offset "left" của nhau, nếu không sẽ bị chồng chữ lên nhau.
     const adj = PAYROLL_ADJUSTMENTS.find(a=> a.employeeId===e.id && a.month===month);
     const tienCongCell = e.payType==='daily'
-      ? `<td style="position:sticky;left:150px;background:var(--card);"><input type="text" class="money-input" style="width:100px;" data-tiencong-emp="${e.id}" value="${adj && adj.tienCongNgay ? fmtNum(adj.tienCongNgay) : ''}" placeholder="0"></td>`
-      : `<td style="position:sticky;left:150px;background:var(--card);color:var(--ink-faint);">—</td>`;
-    return `<tr><td style="position:sticky;left:0;background:var(--card);white-space:nowrap;"><strong>${escapeHtml(e.name)}</strong></td>${tienCongCell}${cells}<td class="num" style="font-weight:800;">${monthTotal}h</td></tr>`;
+      ? `<td style="position:sticky;left:${TS_NAME_COL_WIDTH}px;z-index:2;width:${TS_TIENCONG_COL_WIDTH}px;min-width:${TS_TIENCONG_COL_WIDTH}px;background:var(--card);"><input type="text" class="money-input" style="width:100%;box-sizing:border-box;" data-tiencong-emp="${e.id}" value="${adj && adj.tienCongNgay ? fmtNum(adj.tienCongNgay) : ''}" placeholder="0"></td>`
+      : `<td style="position:sticky;left:${TS_NAME_COL_WIDTH}px;z-index:2;width:${TS_TIENCONG_COL_WIDTH}px;min-width:${TS_TIENCONG_COL_WIDTH}px;background:var(--card);color:var(--ink-faint);">—</td>`;
+    return `<tr><td style="position:sticky;left:0;z-index:2;width:${TS_NAME_COL_WIDTH}px;min-width:${TS_NAME_COL_WIDTH}px;max-width:${TS_NAME_COL_WIDTH}px;overflow:hidden;text-overflow:ellipsis;background:var(--card);white-space:nowrap;" title="${escapeHtml(e.name)}"><strong>${escapeHtml(e.name)}</strong></td>${tienCongCell}${cells}<td class="num" style="font-weight:800;">${monthTotal}h</td></tr>`;
   };
   const groupHeaderRow = (label)=> `<tr class="tx-subhead"><td colspan="${days.length+3}"><strong>${label}</strong></td></tr>`;
   const managers = emps.filter(e=>e.payType!=='daily').sort((a,b)=> positionRank(a.position)-positionRank(b.position) || a.name.localeCompare(b.name,'vi'));
   const workers = emps.filter(e=>e.payType==='daily').sort((a,b)=> a.name.localeCompare(b.name,'vi'));
 
   table.innerHTML = `<thead><tr>
-    <th style="position:sticky;left:0;background:var(--bg-soft);">Nhân viên</th><th style="position:sticky;left:150px;background:var(--bg-soft);">Tiền công</th>${dayHeaderCells}<th>Tổng giờ</th>
+    <th style="position:sticky;left:0;z-index:3;width:${TS_NAME_COL_WIDTH}px;min-width:${TS_NAME_COL_WIDTH}px;max-width:${TS_NAME_COL_WIDTH}px;background:var(--bg-soft);">Nhân viên</th><th style="position:sticky;left:${TS_NAME_COL_WIDTH}px;z-index:3;width:${TS_TIENCONG_COL_WIDTH}px;min-width:${TS_TIENCONG_COL_WIDTH}px;background:var(--bg-soft);">Tiền công</th>${dayHeaderCells}<th>Tổng giờ</th>
   </tr></thead><tbody>
     ${managers.length ? groupHeaderRow('🔷 QUẢN LÝ') + managers.map(empRow).join('') : ''}
     ${workers.length ? groupHeaderRow('🔶 CÔNG NHÂN') + workers.map(empRow).join('') : ''}
