@@ -120,8 +120,8 @@ function renderOrderAttachmentStatus(){
   const el = document.getElementById('order-attachment-status');
   if(!el) return;
   if(currentOrderAttachment){
-    el.innerHTML = `<button type="button" class="tag tag-blue" id="order-attachment-view" style="cursor:pointer;border:none;">📎 ${escapeHtml(currentOrderAttachmentName||'Xem file')}</button> <button type="button" class="btn btn-ghost btn-sm" id="order-attachment-remove">Xóa file</button>`;
-    document.getElementById('order-attachment-view').addEventListener('click', ()=> openAttachmentInNewTab(currentOrderAttachment));
+    const url = typeof currentOrderAttachment === 'object' ? currentOrderAttachment.url : currentOrderAttachment;
+    el.innerHTML = `<a href="${url}" target="_blank" rel="noopener" class="tag tag-blue" style="text-decoration:none;">📎 ${escapeHtml(currentOrderAttachmentName||'Xem file')}</a> <button type="button" class="btn btn-ghost btn-sm" id="order-attachment-remove">Xóa file</button>`;
     document.getElementById('order-attachment-remove').addEventListener('click', ()=>{
       currentOrderAttachment = ''; currentOrderAttachmentName = '';
       document.getElementById('order-attachment-input').value = '';
@@ -131,23 +131,25 @@ function renderOrderAttachmentStatus(){
     el.innerHTML = `<span class="helper-text">Chưa có file đính kèm.</span>`;
   }
 }
-document.getElementById('order-attachment-input')?.addEventListener('change', (e)=>{
+document.getElementById('order-attachment-input')?.addEventListener('change', async (e)=>{
   const file = e.target.files[0];
   if(!file) return;
-  if(file.size > 2*1024*1024){
-    toast('File quá lớn (>2MB), vui lòng chọn file nhỏ hơn');
-    e.target.value = '';
-    return;
-  }
   currentOrderAttachmentFile = file;
-  const reader = new FileReader();
-  reader.onload = ()=>{
-    currentOrderAttachment = reader.result;
-    currentOrderAttachmentName = file.name;
+  const el = document.getElementById('order-attachment-status');
+  if(el) el.innerHTML = `<span class="helper-text">⏳ Đang tải "${escapeHtml(file.name)}" lên OneDrive công ty...</span>`;
+  try{
+    const payee = document.getElementById('order-payee')?.value.trim() || 'KhongRoNguoiNhan';
+    const result = await msUploadFile(file, `LenhChi/${payee.replace(/[^\w\-]+/g,'_')}`, (pct)=>{
+      if(el) el.innerHTML = `<span class="helper-text">⏳ Đang tải lên OneDrive... ${pct}%</span>`;
+    });
+    currentOrderAttachment = { url: result.webUrl, name: result.name };
+    currentOrderAttachmentName = result.name;
     renderOrderAttachmentStatus();
-  };
-  reader.onerror = ()=> toast('Không đọc được file');
-  reader.readAsDataURL(file);
+    toast('Đã tải file lên OneDrive');
+  }catch(err){
+    toast(err.message || 'Không tải được file lên OneDrive, thử lại');
+    if(el) el.innerHTML = `<span class="helper-text">Chưa có file đính kèm.</span>`;
+  }
 });
 
 document.getElementById('btn-add-order')?.addEventListener('click', ()=> openOrderModal(null, 'payment'));
@@ -686,7 +688,11 @@ function handleOrderTableClick(e){
   const viewAttachmentId = e.target.closest('[data-view-order-attachment]')?.dataset.viewOrderAttachment;
   if(viewAttachmentId){
     const o = ORDERS.find(x=>x.id===viewAttachmentId);
-    if(o && o.attachment) openAttachmentInNewTab(o.attachment);
+    if(o && o.attachment){
+      if(typeof o.attachment === 'object' && o.attachment.url) window.open(o.attachment.url, '_blank', 'noopener');
+      else if(typeof o.attachment === 'string' && /^https?:\/\//.test(o.attachment)) window.open(o.attachment, '_blank', 'noopener');
+      else openAttachmentInNewTab(o.attachment); // định dạng cũ (base64) — vẫn mở được bình thường
+    }
     return;
   }
   if(repairId) repairOrderLink(repairId);
@@ -745,20 +751,24 @@ for(let i=1;i<=5;i++){
   invoiceInput?.addEventListener('change', async (e)=>{
     const file = e.target.files[0];
     if(!file) return;
-    toast('Đang xử lý file...');
+    toast(`⏳ Đang tải "${file.name}" lên OneDrive công ty...`);
     try{
-      currentExpInvoiceImages[i-1] = await readInvoiceAttachmentFile(file, 900, 0.65);
+      const result = await msUploadFile(file, `LenhTamUng/GiaiChi/HoaDon`, (pct)=> toast(`⏳ Đang tải lên... ${pct}%`));
+      currentExpInvoiceImages[i-1] = { url: result.webUrl, name: result.name };
       setExpImagePreview(i, 'invoice', currentExpInvoiceImages[i-1]);
-    }catch(err){ toast(err.message || 'Không đọc được file, thử file khác'); }
+      toast('Đã tải hóa đơn lên OneDrive');
+    }catch(err){ toast(err.message || 'Không tải được file lên OneDrive, thử lại'); }
   });
   transferInput?.addEventListener('change', async (e)=>{
     const file = e.target.files[0];
     if(!file) return;
-    toast('Đang xử lý file...');
+    toast(`⏳ Đang tải "${file.name}" lên OneDrive công ty...`);
     try{
-      currentExpTransferImages[i-1] = await readInvoiceAttachmentFile(file, 900, 0.65);
+      const result = await msUploadFile(file, `LenhTamUng/GiaiChi/ChuyenKhoan`, (pct)=> toast(`⏳ Đang tải lên... ${pct}%`));
+      currentExpTransferImages[i-1] = { url: result.webUrl, name: result.name };
       setExpImagePreview(i, 'transfer', currentExpTransferImages[i-1]);
-    }catch(err){ toast(err.message || 'Không đọc được file, thử file khác'); }
+      toast('Đã tải chứng từ CK lên OneDrive');
+    }catch(err){ toast(err.message || 'Không tải được file lên OneDrive, thử lại'); }
   });
 }
 
