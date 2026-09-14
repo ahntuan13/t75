@@ -918,23 +918,43 @@ function payslipPreparerInfo(){
 function payslipAccountantInfo(){
   return { name: 'Hoài Thương', sig: (typeof SIGNATURES!=='undefined' ? SIGNATURES.accountant.img : '') };
 }
+function detectImgFormat(dataUrl){
+  if(!dataUrl) return 'PNG';
+  if(dataUrl.startsWith('data:image/png')) return 'PNG';
+  if(dataUrl.startsWith('data:image/jpeg') || dataUrl.startsWith('data:image/jpg')) return 'JPEG';
+  if(dataUrl.startsWith('data:image/webp')) return 'WEBP';
+  return 'PNG';
+}
 
-// Trả về nội dung HTML đầy đủ (kèm <html>/<head>/<style>) cho 1 phiếu lương — dùng chung cho In (iframe)
-// và Xuất ZIP nhiều phiếu (html2pdf).
-function buildPayslipHtml(employeeId){
-  const emp = EMPLOYEES.find(x=>x.id===employeeId);
-  if(!emp) return '';
-  const month = currentPayrollMonth();
-  const r = computeEmployeeSalary(emp, month);
-  const [y,m] = month.split('-');
-  const empIndex = EMPLOYEES.findIndex(x=>x.id===employeeId) + 1;
-  const preparer = payslipPreparerInfo();
-  const accountant = payslipAccountantInfo();
-  const days = r.ngayCong;
-  const dayRate = emp.payType==='daily' ? (r.tienCongNgay > 0 ? r.tienCongNgay : emp.effectiveRate) : Math.round(r.totalIncome/30);
-
-  // Đúng 15 dòng khoản mục theo mẫu Excel gốc công ty (STT | KHOẢN MỤC | SỐ TIỀN)
-  const rows = [
+// jsPDF chỉ có sẵn font kiểu Latin cơ bản (helvetica/times/courier) — KHÔNG hiển thị được dấu tiếng Việt
+// (chữ có dấu sẽ ra ô trống/ký tự sai). Cần nạp thêm 1 font Unicode đầy đủ (Noto Sans — hỗ trợ trọn vẹn
+// tiếng Việt) rồi đăng ký vào jsPDF. Chỉ tải 1 LẦN mỗi phiên làm việc (lưu cache), và chỉ tải khi thực sự
+// bấm xuất PDF (không tải sẵn lúc mở app, tránh làm nặng app cho mọi người dùng vì đây là tính năng ít dùng).
+let VIETNAMESE_FONT_CACHE = null;
+async function ensureVietnameseFont(doc){
+  if(!VIETNAMESE_FONT_CACHE){
+    const toBase64 = (buf) => {
+      let binary = '';
+      const bytes = new Uint8Array(buf);
+      const chunk = 0x8000;
+      for(let i=0;i<bytes.length;i+=chunk){
+        binary += String.fromCharCode.apply(null, bytes.subarray(i, i+chunk));
+      }
+      return btoa(binary);
+    };
+    const [regBuf, boldBuf] = await Promise.all([
+      fetch('https://raw.githubusercontent.com/googlefonts/noto-fonts/main/hinted/ttf/NotoSans/NotoSans-Regular.ttf').then(r=>r.arrayBuffer()),
+      fetch('https://raw.githubusercontent.com/googlefonts/noto-fonts/main/hinted/ttf/NotoSans/NotoSans-Bold.ttf').then(r=>r.arrayBuffer()),
+    ]);
+    VIETNAMESE_FONT_CACHE = { regular: toBase64(regBuf), bold: toBase64(boldBuf) };
+  }
+  doc.addFileToVFS('NotoSans-Regular.ttf', VIETNAMESE_FONT_CACHE.regular);
+  doc.addFont('NotoSans-Regular.ttf', 'NotoSans', 'normal');
+  doc.addFileToVFS('NotoSans-Bold.ttf', VIETNAMESE_FONT_CACHE.bold);
+  doc.addFont('NotoSans-Bold.ttf', 'NotoSans', 'bold');
+}
+function payslipRowsFor(emp, r, days, dayRate){
+  return [
     [1, 'TỔNG CÔNG [2]=[1]/8', `${days} công`],
     [2, 'ĐƠN GIÁ', fmtVND(dayRate)],
     [3, 'THÀNH TIỀN [4]=[2]×[3]', fmtVND(r.totalIncome)],
@@ -951,6 +971,123 @@ function buildPayslipHtml(employeeId){
     [14, 'HỖ TRỢ', fmtVND(0)],
     [15, 'THỰC LĨNH', fmtVND(r.thucNhan)],
   ];
+}
+
+// ---------------- Vẽ PDF phiếu lương TRỰC TIẾP bằng jsPDF (không chụp ảnh màn hình) ----------------
+// Dùng cho XUẤT HÀNG LOẠT (.zip) — cách cũ dùng html2canvas chụp lại giao diện web hay bị vỡ layout
+// (flexbox, ảnh chưa tải kịp...) tùy máy/trình duyệt. Vẽ trực tiếp bằng lệnh của jsPDF thì luôn ra
+// đúng y hệt mọi lần, không phụ thuộc trình duyệt "chụp ảnh" có đúng hay không.
+async function buildPayslipPdfBlob(employeeId){
+  const emp = EMPLOYEES.find(x=>x.id===employeeId);
+  if(!emp) return null;
+  const month = currentPayrollMonth();
+  const r = computeEmployeeSalary(emp, month);
+  const [y,m] = month.split('-');
+  const empIndex = EMPLOYEES.findIndex(x=>x.id===employeeId) + 1;
+  const preparer = payslipPreparerInfo();
+  const accountant = payslipAccountantInfo();
+  const days = r.ngayCong;
+  const dayRate = emp.payType==='daily' ? (r.tienCongNgay > 0 ? r.tienCongNgay : emp.effectiveRate) : Math.round(r.totalIncome/30);
+  const rows = payslipRowsFor(emp, r, days, dayRate);
+
+  const { jsPDF } = window.jspdf;
+  const doc = new jsPDF({ unit:'mm', format:'a4', orientation:'portrait' });
+  await ensureVietnameseFont(doc); // BẮT BUỘC — font mặc định của jsPDF không hiển thị được dấu tiếng Việt
+  const marginX = 15, contentWidth = 210 - marginX*2;
+  let cy = 18;
+
+  const logo = typeof COMPANY_HEADER!=='undefined' ? COMPANY_HEADER.logo : '';
+  if(logo){ try{ doc.addImage(logo, detectImgFormat(logo), marginX, cy-6, 18, 18); }catch(e){} }
+  doc.setTextColor(122,31,31); doc.setFont('NotoSans','bold'); doc.setFontSize(13);
+  doc.text((typeof COMPANY_HEADER!=='undefined' ? COMPANY_HEADER.name : 'TUAN 75 INSULATION TECHNICAL SERVICES CO.,LTD'), marginX+22, cy-2);
+  doc.setTextColor(68,68,68); doc.setFont('NotoSans','normal'); doc.setFontSize(8.5);
+  doc.text((typeof COMPANY_HEADER!=='undefined' ? COMPANY_HEADER.address : ''), marginX+22, cy+3);
+  doc.text(`${(typeof COMPANY_HEADER!=='undefined' ? COMPANY_HEADER.tel : '')} — Email: ${(typeof COMPANY_HEADER!=='undefined' ? COMPANY_HEADER.email : '')}`, marginX+22, cy+7);
+  cy += 15;
+  doc.setDrawColor(122,31,31); doc.setLineWidth(0.6);
+  doc.line(marginX, cy, marginX+contentWidth, cy);
+  cy += 7;
+
+  doc.setTextColor(0,0,0); doc.setFont('NotoSans','normal'); doc.setFontSize(10);
+  doc.text(`Mã nhân viên: ${empIndex}`, marginX, cy);
+  doc.text(`Tháng ${Number(m)}/${y}`, marginX+contentWidth, cy, {align:'right'});
+  cy += 9;
+
+  doc.setFont('NotoSans','bold'); doc.setFontSize(17);
+  doc.text('PHIẾU LƯƠNG', marginX+contentWidth/2, cy, {align:'center'});
+  cy += 9;
+
+  doc.setFont('NotoSans','normal'); doc.setFontSize(11);
+  doc.text(`Họ và tên: ${emp.name}`, marginX, cy); cy += 6;
+  doc.text(`Chức vụ: ${emp.position||'—'}`, marginX, cy); cy += 7;
+
+  const colW = [14, 116, 50];
+  const rowH = 7;
+  doc.setDrawColor(153,153,153); doc.setLineWidth(0.2);
+  doc.setFillColor(255,246,204);
+  doc.rect(marginX, cy, contentWidth, rowH, 'FD');
+  doc.line(marginX+colW[0], cy, marginX+colW[0], cy+rowH);
+  doc.line(marginX+colW[0]+colW[1], cy, marginX+colW[0]+colW[1], cy+rowH);
+  doc.setFont('NotoSans','bold'); doc.setFontSize(9.5); doc.setTextColor(0,0,0);
+  doc.text('STT', marginX+colW[0]/2, cy+rowH/2+1.3, {align:'center'});
+  doc.text('Khoản mục', marginX+colW[0]+colW[1]/2, cy+rowH/2+1.3, {align:'center'});
+  doc.text('Số tiền', marginX+colW[0]+colW[1]+colW[2]/2, cy+rowH/2+1.3, {align:'center'});
+  cy += rowH;
+
+  rows.forEach(([stt,label,val], idx)=>{
+    const isTotal = idx === rows.length-1;
+    if(isTotal){ doc.setFillColor(250,250,250); doc.rect(marginX, cy, contentWidth, rowH, 'F'); }
+    doc.rect(marginX, cy, contentWidth, rowH);
+    doc.line(marginX+colW[0], cy, marginX+colW[0], cy+rowH);
+    doc.line(marginX+colW[0]+colW[1], cy, marginX+colW[0]+colW[1], cy+rowH);
+    doc.setFont('NotoSans', isTotal ? 'bold' : 'normal');
+    doc.setFontSize(isTotal ? 11 : 9);
+    doc.setTextColor(0,0,0);
+    doc.text(String(stt), marginX+colW[0]/2, cy+rowH/2+1.3, {align:'center'});
+    doc.text(String(label), marginX+colW[0]+2, cy+rowH/2+1.3);
+    doc.setTextColor(isTotal ? 10 : 0, isTotal ? 107 : 0, isTotal ? 71 : 0);
+    doc.text(String(val), marginX+colW[0]+colW[1]+colW[2]-2, cy+rowH/2+1.3, {align:'right'});
+    cy += rowH;
+  });
+  cy += 6;
+
+  if(r.adj.note){
+    doc.setFont('NotoSans','normal'); doc.setFontSize(9); doc.setTextColor(85,85,85);
+    doc.text(`Ghi chú: ${r.adj.note}`, marginX, cy);
+    cy += 8;
+  }
+
+  cy += 16;
+  const sigW = contentWidth/3;
+  const sigLabels = ['Người lập phiếu','Kế toán trưởng','Người nhận lương'];
+  const sigNames = [preparer.name, accountant.name, emp.name];
+  const sigImgs = [preparer.sig, accountant.sig, ''];
+  doc.setFont('NotoSans','bold'); doc.setFontSize(10); doc.setTextColor(0,0,0);
+  sigLabels.forEach((label,i)=> doc.text(label, marginX+sigW*i+sigW/2, cy, {align:'center'}));
+  sigImgs.forEach((sig,i)=>{
+    if(sig){ try{ doc.addImage(sig, detectImgFormat(sig), marginX+sigW*i+sigW/2-12, cy+3, 24, 16); }catch(e){} }
+  });
+  doc.setFont('NotoSans','normal'); doc.setFontSize(10);
+  sigNames.forEach((name,i)=> doc.text(name, marginX+sigW*i+sigW/2, cy+24, {align:'center'}));
+
+  return doc.output('blob');
+}
+
+// Trả về nội dung HTML đầy đủ (kèm <html>/<head>/<style>) cho 1 phiếu lương — dùng cho In từng người (iframe).
+function buildPayslipHtml(employeeId){
+  const emp = EMPLOYEES.find(x=>x.id===employeeId);
+  if(!emp) return '';
+  const month = currentPayrollMonth();
+  const r = computeEmployeeSalary(emp, month);
+  const [y,m] = month.split('-');
+  const empIndex = EMPLOYEES.findIndex(x=>x.id===employeeId) + 1;
+  const preparer = payslipPreparerInfo();
+  const accountant = payslipAccountantInfo();
+  const days = r.ngayCong;
+  const dayRate = emp.payType==='daily' ? (r.tienCongNgay > 0 ? r.tienCongNgay : emp.effectiveRate) : Math.round(r.totalIncome/30);
+
+  // Đúng 15 dòng khoản mục theo mẫu Excel gốc công ty (STT | KHOẢN MỤC | SỐ TIỀN)
+  const rows = payslipRowsFor(emp, r, days, dayRate);
 
   return `
     <html><head><title>Phiếu lương - ${escapeHtml(emp.name)}</title>
@@ -1046,52 +1183,25 @@ function printPayslip(employeeId){
 // bên trong là từng file PDF riêng cho mỗi nhân viên, y hệt nội dung phiếu lương bấm in từng người.
 async function exportAllPayslipsZip(){
   if(typeof JSZip === 'undefined'){ toast('Chưa tải được thư viện nén file (JSZip) — kiểm tra lại kết nối mạng.'); return; }
-  if(typeof html2pdf === 'undefined'){ toast('Chưa tải được thư viện xuất PDF (html2pdf) — kiểm tra lại kết nối mạng.'); return; }
+  if(typeof window.jspdf === 'undefined'){ toast('Chưa tải được thư viện xuất PDF (jsPDF) — kiểm tra lại kết nối mạng.'); return; }
   if(EMPLOYEES.length===0){ toast('Chưa có nhân viên nào để xuất phiếu lương'); return; }
 
   const month = currentPayrollMonth();
   const [y,m] = month.split('-');
   const btn = document.getElementById('btn-export-all-payslips');
   if(btn){ btn.disabled = true; btn.textContent = '⏳ Đang xuất phiếu lương...'; }
-  let overlay = null, frame = null;
 
   try{
     const zip = new JSZip();
-    // Dùng THẬT 1 iframe rồi doc.write() y hệt cách "In từng người" (printPayslip) đang chạy đúng — vì lúc đó
-    // trang phiếu lương có 1 thẻ <body> THẬT, các quy tắc CSS kiểu "body{...}" trong <style> mới áp dụng được.
-    // Cách cũ (nhét thẳng HTML vào 1 <div> thường) khiến quy tắc "body{...}" không tác dụng lên nội dung nào cả
-    // (vì <div> không phải là <body>) — đây là lý do file xuất ra bị mất hết định dạng/trông như trắng trơn.
-    overlay = document.createElement('div');
-    overlay.style.cssText = 'position:fixed;inset:0;background:#fff;z-index:99998;display:flex;align-items:center;justify-content:center;font-size:15px;color:#555;';
-    overlay.textContent = 'Đang xuất phiếu lương, vui lòng đợi...';
-    document.body.appendChild(overlay);
-
-    frame = document.createElement('iframe');
-    frame.style.cssText = 'position:fixed;top:0;left:0;width:800px;height:1130px;border:0;z-index:1;background:#fff;';
-    document.body.appendChild(frame);
-
     let done = 0;
+    // Vẽ trực tiếp bằng jsPDF (xem buildPayslipPdfBlob) — không còn chụp ảnh giao diện web nữa, nên không
+    // còn phụ thuộc trình duyệt/máy tính render đúng hay sai, luôn ra đúng y hệt bản in từng người mỗi lần.
     for(const emp of EMPLOYEES){
-      const html = buildPayslipHtml(emp.id);
-      if(!html) continue;
-      const doc = frame.contentWindow.document;
-      doc.open(); doc.write(html); doc.close();
-      // Đợi TẤT CẢ ảnh bên trong (logo công ty, chữ ký) tải/vẽ xong hẳn trước khi chụp — không đoán chừng
-      // 1 khoảng thời gian cố định nữa, vì ảnh base64 lớn có thể cần lâu hơn trên máy yếu.
-      const imgs = Array.from(doc.images || []);
-      await Promise.all(imgs.map(img => img.complete ? Promise.resolve() : new Promise(res=>{ img.onload = img.onerror = res; })));
-      await new Promise(r=> setTimeout(r, 120)); // thêm 1 nhịp nhỏ để trình duyệt vẽ lại (reflow/paint) xong hẳn
-      const pdfBlob = await html2pdf().set({
-        margin: 5,
-        filename: `${emp.name}.pdf`,
-        image: { type:'jpeg', quality:0.98 },
-        html2canvas: { scale: 2, useCORS: true, backgroundColor:'#ffffff', windowWidth: 800 },
-        jsPDF: { unit:'mm', format:'a4', orientation:'portrait' },
-      }).from(doc.body).outputPdf('blob');
+      const pdfBlob = await buildPayslipPdfBlob(emp.id);
+      if(!pdfBlob) continue;
       const safeName = emp.name.replace(/[\\/:*?"<>|]+/g, '_');
       zip.file(`${safeName}.pdf`, pdfBlob);
       done++;
-      overlay.textContent = `Đang xuất phiếu lương... (${done}/${EMPLOYEES.length})`;
       if(btn) btn.textContent = `⏳ Đang xuất... (${done}/${EMPLOYEES.length})`;
     }
 
@@ -1109,8 +1219,6 @@ async function exportAllPayslipsZip(){
   }catch(err){
     toast('Lỗi khi xuất file nén: ' + err.message);
   }finally{
-    if(frame && frame.parentNode) document.body.removeChild(frame);
-    if(overlay && overlay.parentNode) document.body.removeChild(overlay);
     if(btn){ btn.disabled = false; btn.textContent = '🗜 In tất cả phiếu lương (.zip)'; }
   }
 }
