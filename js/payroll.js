@@ -955,28 +955,29 @@ function buildPayslipHtml(employeeId){
   return `
     <html><head><title>Phiếu lương - ${escapeHtml(emp.name)}</title>
     <style>
-      @page{size:A5 portrait;margin:10mm;}
-      body{font-family:Arial,Helvetica,sans-serif;color:#111;font-size:12.5px;margin:0;}
-      .co-header{display:flex;align-items:center;gap:10px;border-bottom:2px solid #7a1f1f;padding-bottom:6px;margin-bottom:8px;}
-      .co-header img{height:38px;}
-      .co-name{color:#7a1f1f;font-weight:800;font-size:12.5px;letter-spacing:.2px;}
-      .co-info{font-size:9px;color:#444;line-height:1.4;}
-      .top{display:flex;justify-content:space-between;font-size:12px;margin-bottom:4px;}
-      h2{text-align:center;text-transform:uppercase;margin:6px 0 2px;letter-spacing:1px;font-size:17px;}
-      .sub-center{text-align:center;color:#555;margin-bottom:14px;font-size:12px;}
-      .info-row{margin-bottom:4px;font-size:13px;}
-      .info-row b{display:inline-block;min-width:95px;}
-      table{width:100%;border-collapse:collapse;margin-top:8px;}
-      th,td{border:1px solid #999;padding:5px 8px;text-align:left;font-size:12px;}
+      @page{size:A4 portrait;margin:12mm;}
+      html,body{width:186mm;margin:0 auto;}
+      body{font-family:Arial,Helvetica,sans-serif;color:#111;font-size:14px;}
+      .co-header{display:flex;align-items:center;gap:12px;border-bottom:2px solid #7a1f1f;padding-bottom:8px;margin-bottom:10px;}
+      .co-header img{height:46px;}
+      .co-name{color:#7a1f1f;font-weight:800;font-size:14.5px;letter-spacing:.2px;}
+      .co-info{font-size:10.5px;color:#444;line-height:1.5;}
+      .top{display:flex;justify-content:space-between;font-size:13px;margin-bottom:6px;}
+      h2{text-align:center;text-transform:uppercase;margin:10px 0 4px;letter-spacing:1px;font-size:20px;}
+      .sub-center{text-align:center;color:#555;margin-bottom:16px;font-size:13px;}
+      .info-row{margin-bottom:6px;font-size:14.5px;}
+      .info-row b{display:inline-block;min-width:110px;}
+      table{width:100%;border-collapse:collapse;margin-top:12px;}
+      th,td{border:1px solid #999;padding:7px 10px;text-align:left;font-size:13.5px;}
       th{background:#fff6cc;text-align:center;font-weight:700;}
-      td.stt{text-align:center;width:24px;}
+      td.stt{text-align:center;width:28px;}
       td.num{text-align:right;font-variant-numeric:tabular-nums;}
-      tr.total td{font-weight:800;background:#fafafa;font-size:13.5px;}
+      tr.total td{font-weight:800;background:#fafafa;font-size:15px;}
       tr.total td.num{color:#0a6b47;}
-      .sig{display:flex;justify-content:space-between;margin-top:26px;text-align:center;font-size:12px;}
+      .sig{display:flex;justify-content:space-between;margin-top:38px;text-align:center;font-size:13.5px;}
       .sig .col{width:31%;}
-      .sig .space{height:52px;display:flex;align-items:center;justify-content:center;}
-      .sig .space img{max-height:52px;max-width:100%;}
+      .sig .space{height:60px;display:flex;align-items:center;justify-content:center;}
+      .sig .space img{max-height:60px;max-width:100%;}
     </style></head><body>
     <div class="co-header">
       <img src="${(typeof COMPANY_HEADER!=='undefined' ? COMPANY_HEADER.logo : '')}">
@@ -1062,7 +1063,7 @@ async function exportAllPayslipsZip(){
     document.body.appendChild(overlay);
 
     frame = document.createElement('iframe');
-    frame.style.cssText = 'position:fixed;top:0;left:0;width:480px;height:680px;border:0;z-index:1;background:#fff;';
+    frame.style.cssText = 'position:fixed;top:0;left:0;width:800px;height:1130px;border:0;z-index:1;background:#fff;';
     document.body.appendChild(frame);
 
     let done = 0;
@@ -1078,7 +1079,7 @@ async function exportAllPayslipsZip(){
         filename: `${emp.name}.pdf`,
         image: { type:'jpeg', quality:0.98 },
         html2canvas: { scale: 2, useCORS: true, backgroundColor:'#ffffff' },
-        jsPDF: { unit:'mm', format:'a5', orientation:'portrait' },
+        jsPDF: { unit:'mm', format:'a4', orientation:'portrait' },
       }).from(doc.body).outputPdf('blob');
       const safeName = emp.name.replace(/[\\/:*?"<>|]+/g, '_');
       zip.file(`${safeName}.pdf`, pdfBlob);
