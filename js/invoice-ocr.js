@@ -424,6 +424,18 @@ async function handleInvoiceUpload(file){
     const total = items.reduce((s,it)=> s + (it.amountAfterTax || it.amount || 0), 0) || extracted.totalAmount || 0;
     const firstItemName = items.find(it=>it.name && it.name.trim())?.name || '';
 
+    // Tải file GỐC (không phải bản ảnh nội bộ dùng để OCR) lên OneDrive công ty — không giới hạn dung lượng,
+    // và có link thật để xem lại, thay vì nhúng thẳng base64 vào Firestore như trước (dễ vượt giới hạn 1MB/tài liệu).
+    toast('⏳ Đang tải file hóa đơn lên OneDrive công ty...');
+    let invoiceImageRef = '';
+    try{
+      const result = await msUploadFile(file, 'ThuChi/HoaDon/QuetAI');
+      invoiceImageRef = { url: result.webUrl, name: result.name };
+    }catch(uploadErr){
+      console.error('Lỗi tải hóa đơn lên OneDrive', uploadErr);
+      toast('⚠️ Đọc hóa đơn OK nhưng chưa tải được file gốc lên OneDrive — bạn có thể đính kèm lại thủ công.');
+    }
+
     const prefill = {
       type: extracted.direction,
       projectId: '',
@@ -440,7 +452,7 @@ async function handleInvoiceUpload(file){
       invoiceStatus: 'issued',
       bankAccount: extracted.bankAccount || '',
       bankName: extracted.bankName || '',
-      invoiceImage: imageDataUrl || '',
+      invoiceImage: invoiceImageRef,
       note: '', // để trống theo yêu cầu — không dán nguyên văn chữ OCR vào Ghi chú nữa
     };
     openTxModal(null, prefill);
