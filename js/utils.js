@@ -173,12 +173,26 @@ async function readInvoiceAttachmentFile(file, maxWidth=900, quality=0.65){
 
 // Hiện preview cho 1 file đính kèm chứng từ đã lưu (base64) — ảnh thì hiện thumbnail như cũ,
 // PDF thì hiện nút "Xem file PDF" (không thể hiện <img> trực tiếp được).
-function invoiceAttachmentPreviewHtml(dataUrl, opts={}){
-  if(!dataUrl) return '';
-  const isPdf = dataUrl.startsWith('data:application/pdf');
+function invoiceAttachmentPreviewHtml(fileRef, opts={}){
+  if(!fileRef) return '';
   const imgStyle = opts.imgStyle || 'max-width:150px;max-height:150px;border-radius:8px;border:1px solid var(--line);';
+
+  // File mới: đã upload lên OneDrive công ty -> chỉ có link thật (http...), không còn base64 nữa.
+  // fileRef có thể là string URL trực tiếp, hoặc {url, name}.
+  const isOneDriveRef = (typeof fileRef === 'object') || (typeof fileRef === 'string' && /^https?:\/\//.test(fileRef));
+  if(isOneDriveRef){
+    const url = typeof fileRef === 'object' ? fileRef.url : fileRef;
+    const name = (typeof fileRef === 'object' && fileRef.name) ? fileRef.name : 'Xem file (OneDrive)';
+    if(!url) return '';
+    return `<a href="${url}" target="_blank" rel="noopener" class="tag tag-blue" style="text-decoration:none;">📎 ${escapeHtml(name)}</a>`;
+  }
+
+  // File CŨ (dữ liệu đã lưu từ trước khi chuyển sang OneDrive) — vẫn là base64, giữ cách hiển thị như cũ
+  // để không mất khả năng xem lại các file đã lưu trước đây.
+  const dataUrl = fileRef;
+  const isPdf = dataUrl.startsWith('data:application/pdf');
   if(isPdf){
-    return `<button type="button" class="tag tag-blue" style="cursor:pointer;border:none;" onclick="openAttachmentInNewTab(this.dataset.url)" data-url="${escapeHtml(dataUrl)}">📄 Xem file PDF</button>`;
+    return `<button type="button" class="tag tag-blue" style="cursor:pointer;border:none;" onclick="openAttachmentInNewTab(this.dataset.url)" data-url="${escapeHtml(dataUrl)}">📄 Xem file PDF (cũ)</button>`;
   }
   return `<img src="${dataUrl}" style="${imgStyle}${opts.clickable ? 'cursor:zoom-in;' : ''}" ${opts.clickable ? `data-view-img="${escapeHtml(dataUrl)}"` : ''}>`;
 }
