@@ -154,22 +154,28 @@ document.getElementById('tx-invoice-image').addEventListener('change', async (e)
   const file = e.target.files[0];
   if(!file) return;
   currentInvoiceFileRaw = file;
-  toast('Đang xử lý file...');
+  toast(`⏳ Đang tải "${file.name}" lên OneDrive công ty...`);
   try{
-    currentInvoiceImage = await readInvoiceAttachmentFile(file, 900, 0.65);
+    const projName = document.getElementById('tx-project')?.selectedOptions?.[0]?.textContent || 'KhongDuAn';
+    const result = await msUploadFile(file, `ThuChi/HoaDon/${projName.replace(/[^\w\-]+/g,'_')}`, (pct)=> toast(`⏳ Đang tải lên... ${pct}%`));
+    currentInvoiceImage = { url: result.webUrl, name: result.name };
     setImagePreview('invoice', currentInvoiceImage);
     setInvoiceStatus('issued'); // có ảnh hóa đơn -> tự động coi là "Đã xuất hóa đơn", không cần bấm tay
-  }catch(err){ toast(err.message || 'Không đọc được file, thử file khác'); }
+    toast('Đã tải hóa đơn lên OneDrive');
+  }catch(err){ toast(err.message || 'Không tải được file lên OneDrive, thử lại'); }
 });
 document.getElementById('tx-transfer-image').addEventListener('change', async (e)=>{
   const file = e.target.files[0];
   if(!file) return;
-  toast('Đang xử lý file...');
+  toast(`⏳ Đang tải "${file.name}" lên OneDrive công ty...`);
   try{
-    currentTransferImage = await readInvoiceAttachmentFile(file, 900, 0.65);
+    const projName = document.getElementById('tx-project')?.selectedOptions?.[0]?.textContent || 'KhongDuAn';
+    const result = await msUploadFile(file, `ThuChi/ChuyenKhoan/${projName.replace(/[^\w\-]+/g,'_')}`, (pct)=> toast(`⏳ Đang tải lên... ${pct}%`));
+    currentTransferImage = { url: result.webUrl, name: result.name };
     setImagePreview('transfer', currentTransferImage);
     setTransferStatus('done'); // có ảnh chuyển khoản -> tự động coi là "Đã CK", không cần bấm tay
-  }catch(err){ toast(err.message || 'Không đọc được file, thử file khác'); }
+    toast('Đã tải chứng từ CK lên OneDrive');
+  }catch(err){ toast(err.message || 'Không tải được file lên OneDrive, thử lại'); }
 });
 
 // ---------------- Tự tính "Thành tiền sau thuế" = Thành tiền + Tiền thuế GTGT (Thu/Chi/Tạm ứng — không phải chế độ Hóa Đơn) ----------------
@@ -445,10 +451,6 @@ document.getElementById('save-tx-btn').addEventListener('click', async ()=>{
   if(!amount){ toast('Vui lòng nhập thành tiền'); return; }
   if(isInvoiceTxMode && !invoiceItemRows.some(r=> r.name.trim())){
     toast('Vui lòng nhập tên ít nhất 1 hàng hóa/dịch vụ');
-    return;
-  }
-  if((currentInvoiceImage.length + currentTransferImage.length) > 900000){
-    toast('Ảnh quá lớn, vui lòng chọn ảnh khác hoặc chụp ở độ phân giải thấp hơn');
     return;
   }
   // Đang GIẢI TRÌNH tạm ứng: bắt buộc có Mã + chứng từ hóa đơn và chuyển khoản trước khi chuyển sang Thu Chi
