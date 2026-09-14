@@ -958,39 +958,43 @@ function buildPayslipHtml(employeeId){
       @page{size:A4 portrait;margin:12mm;}
       html,body{width:186mm;margin:0 auto;}
       body{font-family:Arial,Helvetica,sans-serif;color:#111;font-size:14px;}
-      .co-header{display:flex;align-items:center;gap:12px;border-bottom:2px solid #7a1f1f;padding-bottom:8px;margin-bottom:10px;}
-      .co-header img{height:46px;}
+      .layout-table{width:100%;border-collapse:collapse;}
+      .layout-table td{border:none;padding:0;font-size:inherit;}
+      .co-header-table{border-bottom:2px solid #7a1f1f;padding-bottom:8px;margin-bottom:10px;}
+      .co-header-table img{height:46px;display:block;}
+      .co-header-table td:first-child{width:56px;vertical-align:middle;padding-right:12px;}
       .co-name{color:#7a1f1f;font-weight:800;font-size:14.5px;letter-spacing:.2px;}
       .co-info{font-size:10.5px;color:#444;line-height:1.5;}
-      .top{display:flex;justify-content:space-between;font-size:13px;margin-bottom:6px;}
+      .top-table{font-size:13px;margin-bottom:6px;}
+      .top-table td:last-child{text-align:right;}
       h2{text-align:center;text-transform:uppercase;margin:10px 0 4px;letter-spacing:1px;font-size:20px;}
       .sub-center{text-align:center;color:#555;margin-bottom:16px;font-size:13px;}
       .info-row{margin-bottom:6px;font-size:14.5px;}
       .info-row b{display:inline-block;min-width:110px;}
-      table{width:100%;border-collapse:collapse;margin-top:12px;}
-      th,td{border:1px solid #999;padding:7px 10px;text-align:left;font-size:13.5px;}
-      th{background:#fff6cc;text-align:center;font-weight:700;}
+      table.data-table{width:100%;border-collapse:collapse;margin-top:12px;}
+      table.data-table th,table.data-table td{border:1px solid #999;padding:7px 10px;text-align:left;font-size:13.5px;}
+      table.data-table th{background:#fff6cc;text-align:center;font-weight:700;}
       td.stt{text-align:center;width:28px;}
       td.num{text-align:right;font-variant-numeric:tabular-nums;}
       tr.total td{font-weight:800;background:#fafafa;font-size:15px;}
       tr.total td.num{color:#0a6b47;}
-      .sig{display:flex;justify-content:space-between;margin-top:38px;text-align:center;font-size:13.5px;}
-      .sig .col{width:31%;}
-      .sig .space{height:60px;display:flex;align-items:center;justify-content:center;}
-      .sig .space img{max-height:60px;max-width:100%;}
+      .sig-table{margin-top:38px;text-align:center;font-size:13.5px;}
+      .sig-table td{width:33.33%;vertical-align:top;}
+      .sig-space{height:60px;}
+      .sig-space img{max-height:60px;max-width:100%;}
     </style></head><body>
-    <div class="co-header">
-      <img src="${(typeof COMPANY_HEADER!=='undefined' ? COMPANY_HEADER.logo : '')}">
-      <div>
+    <table class="layout-table co-header-table"><tr>
+      <td><img src="${(typeof COMPANY_HEADER!=='undefined' ? COMPANY_HEADER.logo : '')}"></td>
+      <td>
         <div class="co-name">${(typeof COMPANY_HEADER!=='undefined' ? COMPANY_HEADER.name : 'TUAN 75 INSULATION TECHNICAL SERVICES CO.,LTD')}</div>
         <div class="co-info">${(typeof COMPANY_HEADER!=='undefined' ? COMPANY_HEADER.address+'<br>'+COMPANY_HEADER.tel+' — '+COMPANY_HEADER.email : '')}</div>
-      </div>
-    </div>
-    <div class="top"><span>Mã nhân viên: <b>${empIndex}</b></span><span>Tháng ${Number(m)}/${y}</span></div>
+      </td>
+    </tr></table>
+    <table class="layout-table top-table"><tr><td>Mã nhân viên: <b>${empIndex}</b></td><td>Tháng ${Number(m)}/${y}</td></tr></table>
     <h2>Phiếu lương</h2>
     <div class="info-row"><b>Họ và tên:</b> ${escapeHtml(emp.name)}</div>
     <div class="info-row"><b>Chức vụ:</b> ${escapeHtml(emp.position||'—')}</div>
-    <table>
+    <table class="data-table">
       <thead><tr><th>STT</th><th>Khoản mục</th><th style="width:120px;">Số tiền</th></tr></thead>
       <tbody>
         ${rows.map(([stt,label,val], idx)=> idx===rows.length-1
@@ -1000,23 +1004,23 @@ function buildPayslipHtml(employeeId){
       </tbody>
     </table>
     ${r.adj.note ? `<p style="margin-top:10px;font-size:11.5px;color:#555;"><i>Ghi chú: ${escapeHtml(r.adj.note)}</i></p>` : ''}
-    <div class="sig">
-      <div class="col">
+    <table class="layout-table sig-table"><tr>
+      <td>
         <div><strong>Người lập phiếu</strong></div>
-        <div class="space">${preparer.sig ? `<img src="${preparer.sig}">` : ''}</div>
+        <div class="sig-space">${preparer.sig ? `<img src="${preparer.sig}">` : ''}</div>
         <div>${escapeHtml(preparer.name)}</div>
-      </div>
-      <div class="col">
+      </td>
+      <td>
         <div><strong>Kế toán trưởng</strong></div>
-        <div class="space">${accountant.sig ? `<img src="${accountant.sig}">` : ''}</div>
+        <div class="sig-space">${accountant.sig ? `<img src="${accountant.sig}">` : ''}</div>
         <div>${escapeHtml(accountant.name)}</div>
-      </div>
-      <div class="col">
+      </td>
+      <td>
         <div><strong>Người nhận lương</strong></div>
-        <div class="space"></div>
+        <div class="sig-space"></div>
         <div>${escapeHtml(emp.name)}</div>
-      </div>
-    </div>
+      </td>
+    </tr></table>
     </body></html>`;
 }
 
@@ -1072,13 +1076,16 @@ async function exportAllPayslipsZip(){
       if(!html) continue;
       const doc = frame.contentWindow.document;
       doc.open(); doc.write(html); doc.close();
-      // Đợi trình duyệt render xong hẳn (kể cả ảnh chữ ký base64 bên trong) trước khi chụp lại.
-      await new Promise(r=> setTimeout(r, 200));
+      // Đợi TẤT CẢ ảnh bên trong (logo công ty, chữ ký) tải/vẽ xong hẳn trước khi chụp — không đoán chừng
+      // 1 khoảng thời gian cố định nữa, vì ảnh base64 lớn có thể cần lâu hơn trên máy yếu.
+      const imgs = Array.from(doc.images || []);
+      await Promise.all(imgs.map(img => img.complete ? Promise.resolve() : new Promise(res=>{ img.onload = img.onerror = res; })));
+      await new Promise(r=> setTimeout(r, 120)); // thêm 1 nhịp nhỏ để trình duyệt vẽ lại (reflow/paint) xong hẳn
       const pdfBlob = await html2pdf().set({
         margin: 5,
         filename: `${emp.name}.pdf`,
         image: { type:'jpeg', quality:0.98 },
-        html2canvas: { scale: 2, useCORS: true, backgroundColor:'#ffffff' },
+        html2canvas: { scale: 2, useCORS: true, backgroundColor:'#ffffff', windowWidth: 800 },
         jsPDF: { unit:'mm', format:'a4', orientation:'portrait' },
       }).from(doc.body).outputPdf('blob');
       const safeName = emp.name.replace(/[\\/:*?"<>|]+/g, '_');
