@@ -79,6 +79,24 @@ async function msGetSiteId(){
  * @param {function} onProgress tuỳ chọn — callback(percent) để hiện tiến độ khi file lớn phải tải nhiều phần
  * @returns {Promise<{webUrl:string, name:string, id:string}>}
  */
+// Tạo LINK CHIA SẺ chính thức cho file vừa tải lên — bắt buộc phải làm bước này, vì link "webUrl" mặc định
+// trả về từ API upload chỉ xem được nếu người bấm vào ĐÃ SẴN CÓ quyền truy cập trực tiếp tới file đó (thường
+// chỉ đúng người tải lên) — người khác trong công ty bấm vào dễ bị chặn/không hiện được nội dung.
+// scope:'organization' = ai trong công ty (đăng nhập đúng tài khoản Microsoft 365 công ty) cũng xem được,
+// không cần được cấp quyền riêng cho từng file.
+async function msCreateShareLink(siteId, itemId, token){
+  try{
+    const res = await fetch(`https://graph.microsoft.com/v1.0/sites/${siteId}/drive/items/${itemId}/createLink`, {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ type: 'view', scope: 'organization' }),
+    });
+    if(!res.ok) return null;
+    const data = await res.json();
+    return data.link ? data.link.webUrl : null;
+  }catch(e){ return null; }
+}
+
 async function msUploadFile(file, folderPath, onProgress){
   if(!file) return null;
   const token = await msGetToken();
@@ -101,7 +119,8 @@ async function msUploadFile(file, folderPath, onProgress){
       throw new Error('Upload thất bại (mã lỗi ' + res.status + '). ' + txt.slice(0, 200));
     }
     const data = await res.json();
-    return { webUrl: data.webUrl, name: data.name, id: data.id };
+    const shareUrl = await msCreateShareLink(siteId, data.id, token);
+    return { webUrl: shareUrl || data.webUrl, name: data.name, id: data.id };
   }
 
   // File lớn (>4MB): dùng "upload session" — chia file thành từng phần (10MB/phần, đúng bội số 320KB
@@ -142,7 +161,8 @@ async function msUploadFile(file, folderPath, onProgress){
     start = end;
   }
   if(!lastResultData) throw new Error('Tải file lớn không hoàn tất — thử lại.');
-  return { webUrl: lastResultData.webUrl, name: lastResultData.name, id: lastResultData.id };
+  const shareUrl = await msCreateShareLink(siteId, lastResultData.id, token);
+  return { webUrl: shareUrl || lastResultData.webUrl, name: lastResultData.name, id: lastResultData.id };
 }
 
 function msIsLoggedIn(){
