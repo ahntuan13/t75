@@ -147,7 +147,7 @@ document.getElementById('order-attachment-input')?.addEventListener('change', as
     renderOrderAttachmentStatus();
     toast('Đã tải file lên OneDrive');
   }catch(err){
-    toast(err.message || 'Không tải được file lên OneDrive, thử lại');
+    toast(friendlyMsError(err));
     if(el) el.innerHTML = `<span class="helper-text">Chưa có file đính kèm.</span>`;
   }
 });
@@ -838,7 +838,7 @@ document.getElementById('exp-blocks-container')?.addEventListener('change', asyn
       currentExpInvoiceImages[id] = { url: result.webUrl, name: result.name };
       setExpImagePreview(id, 'invoice', currentExpInvoiceImages[id]);
       toast('Đã tải hóa đơn lên OneDrive');
-    }catch(err){ toast(err.message || 'Không tải được file lên OneDrive, thử lại'); }
+    }catch(err){ toast(friendlyMsError(err)); }
     return;
   }
   if(transferMatch){
@@ -851,7 +851,7 @@ document.getElementById('exp-blocks-container')?.addEventListener('change', asyn
       currentExpTransferImages[id] = { url: result.webUrl, name: result.name };
       setExpImagePreview(id, 'transfer', currentExpTransferImages[id]);
       toast('Đã tải chứng từ CK lên OneDrive');
-    }catch(err){ toast(err.message || 'Không tải được file lên OneDrive, thử lại'); }
+    }catch(err){ toast(friendlyMsError(err)); }
     return;
   }
 });
