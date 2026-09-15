@@ -723,8 +723,73 @@ function handleOrderTableClick(e){
 // =============================================================
 
 // Ảnh hóa đơn/chuyển khoản đính kèm riêng cho từng khung Giải chi 1-5 (mảng 5 phần tử, rỗng nếu chưa chọn ảnh).
-let currentExpInvoiceImages = ['', '', '', '', ''];
-let currentExpTransferImages = ['', '', '', '', ''];
+// ---------------- Giải chi lệnh tạm ứng — số khung KHÔNG giới hạn (trước đây cố định đúng 5) ----------------
+let explainBlockIds = []; // danh sách id khung đang hiển thị, vd [1,2,3,4,5,6...] — có thể thêm/bớt tự do
+let nextExplainBlockId = 1; // luôn tăng dần, kể cả khi xóa bớt khung ở giữa — tránh trùng id với khung cũ
+let currentExpInvoiceImages = {}; // key = id khung, value = '' | {url,name}
+let currentExpTransferImages = {};
+
+function renderExplainBlockHtml(id){
+  const removeBtn = explainBlockIds.length > 1
+    ? `<button type="button" class="btn btn-ghost btn-sm" data-remove-exp-block="${id}" style="float:right;color:var(--red);">🗑 Xóa khung</button>`
+    : '';
+  return `
+    <div class="exp-block" data-exp-block="${id}">
+      <label class="exp-block-title">Giải chi ${id}${removeBtn}</label>
+      <div class="exp-row">
+        <div class="field grow2"><label>Dự án</label><select id="exp${id}-project"><option value="">— Không chọn (INDIRECT) —</option></select></div>
+        <div class="field"><label>Mã (code)</label>
+          <select id="exp${id}-code">
+            <option value="">-- Chọn mã --</option>
+            <option value="QL">QL - Quản lý</option>
+            <option value="VTC">VTC - Vật tư chính</option>
+            <option value="VTP">VTP - Vật tư phụ</option>
+            <option value="NC">NC - Nhân công</option>
+            <option value="TAX">TAX - Thuế</option>
+          </select>
+        </div>
+        <div class="field grow2"><label>Nội dung</label><input id="exp${id}-content" placeholder="VD: Tạm ứng chi phí công trình"></div>
+        <div class="field grow2"><label>Diễn giải</label><input id="exp${id}-desc"></div>
+      </div>
+      <div class="exp-row">
+        <div class="field"><label>ĐVT</label><input id="exp${id}-unit" placeholder="lot, tháng..."></div>
+        <div class="field grow-sm"><label>SL</label><input type="number" id="exp${id}-qty" value="1"></div>
+        <div class="field"><label>Đơn giá</label><input type="text" id="exp${id}-price" placeholder="0"></div>
+        <div class="field"><label>Thành tiền</label><input type="text" id="exp${id}-amount" placeholder="0"></div>
+      </div>
+      <div class="exp-row exp-attach-row">
+        <div class="field">
+          <label>📎 Hóa đơn (ảnh/PDF, tùy chọn)</label>
+          <input type="file" id="exp${id}-invoice-image" accept="image/*,application/pdf,.pdf">
+          <div style="margin-top:6px;" id="exp${id}-invoice-image-preview-wrap"></div>
+        </div>
+        <div class="field">
+          <label>📎 Chuyển khoản (ảnh/PDF, tùy chọn)</label>
+          <input type="file" id="exp${id}-transfer-image" accept="image/*,application/pdf,.pdf">
+          <div style="margin-top:6px;" id="exp${id}-transfer-image-preview-wrap"></div>
+        </div>
+      </div>
+    </div>`;
+}
+
+function renderAllExplainBlocks(){
+  const container = document.getElementById('exp-blocks-container');
+  if(!container) return;
+  container.innerHTML = explainBlockIds.map(renderExplainBlockHtml).join('');
+  fillExplainProjectSelects();
+  explainBlockIds.forEach(id=>{
+    setExpImagePreview(id, 'invoice', currentExpInvoiceImages[id] || '');
+    setExpImagePreview(id, 'transfer', currentExpTransferImages[id] || '');
+  });
+}
+
+document.getElementById('exp-add-block-btn')?.addEventListener('click', ()=>{
+  const id = nextExplainBlockId++;
+  explainBlockIds.push(id);
+  currentExpInvoiceImages[id] = '';
+  currentExpTransferImages[id] = '';
+  renderAllExplainBlocks();
+});
 
 function setExpImagePreview(i, kind, dataUrl){
   const wrap = document.getElementById(`exp${i}-${kind}-image-preview-wrap`);
@@ -733,61 +798,97 @@ function setExpImagePreview(i, kind, dataUrl){
     ? invoiceAttachmentPreviewHtml(dataUrl, {imgStyle:'max-width:100px;max-height:100px;border-radius:8px;border:1px solid var(--line);'}) + ` <button type="button" class="btn btn-ghost btn-sm" data-remove-exp-image="${i}:${kind}">Xóa file</button>`
     : '';
 }
-document.addEventListener('click', (e)=>{
-  const target = e.target.closest('[data-remove-exp-image]')?.dataset.removeExpImage;
-  if(!target) return;
-  const [idxStr, kind] = target.split(':');
-  const idx = Number(idxStr);
-  if(kind==='invoice') currentExpInvoiceImages[idx-1] = '';
-  else currentExpTransferImages[idx-1] = '';
-  const input = document.getElementById(`exp${idx}-${kind}-image`);
-  if(input) input.value = '';
-  setExpImagePreview(idx, kind, '');
-});
 
-for(let i=1;i<=5;i++){
-  const invoiceInput = document.getElementById(`exp${i}-invoice-image`);
-  const transferInput = document.getElementById(`exp${i}-transfer-image`);
-  invoiceInput?.addEventListener('change', async (e)=>{
+// Toàn bộ tương tác bên trong các khung Giải chi (xóa ảnh, xóa khung, chọn file, gõ số lượng/đơn giá) đều
+// dùng CHUNG 1 trình lắng nghe gắn trên khung chứa (event delegation) — nhờ vậy khung MỚI thêm vào sau này
+// tự động hoạt động luôn, không cần gắn lại sự kiện riêng cho từng khung như cách làm cũ (cố định 5 khung).
+document.getElementById('exp-blocks-container')?.addEventListener('click', (e)=>{
+  const removeImgTarget = e.target.closest('[data-remove-exp-image]')?.dataset.removeExpImage;
+  if(removeImgTarget){
+    const [idxStr, kind] = removeImgTarget.split(':');
+    const idx = Number(idxStr);
+    if(kind==='invoice') currentExpInvoiceImages[idx] = '';
+    else currentExpTransferImages[idx] = '';
+    const input = document.getElementById(`exp${idx}-${kind}-image`);
+    if(input) input.value = '';
+    setExpImagePreview(idx, kind, '');
+    return;
+  }
+  const removeBlockId = e.target.closest('[data-remove-exp-block]')?.dataset.removeExpBlock;
+  if(removeBlockId){
+    const id = Number(removeBlockId);
+    explainBlockIds = explainBlockIds.filter(x=>x!==id);
+    delete currentExpInvoiceImages[id];
+    delete currentExpTransferImages[id];
+    renderAllExplainBlocks();
+    updateExplainAmountCheck();
+    return;
+  }
+});
+document.getElementById('exp-blocks-container')?.addEventListener('change', async (e)=>{
+  const invoiceMatch = e.target.id.match(/^exp(\d+)-invoice-image$/);
+  const transferMatch = e.target.id.match(/^exp(\d+)-transfer-image$/);
+  if(invoiceMatch){
+    const id = Number(invoiceMatch[1]);
     const file = e.target.files[0];
     if(!file) return;
     toast(`⏳ Đang tải "${file.name}" lên OneDrive công ty...`);
     try{
       const result = await msUploadFile(file, `LenhTamUng/GiaiChi/HoaDon`, (pct)=> toast(`⏳ Đang tải lên... ${pct}%`));
-      currentExpInvoiceImages[i-1] = { url: result.webUrl, name: result.name };
-      setExpImagePreview(i, 'invoice', currentExpInvoiceImages[i-1]);
+      currentExpInvoiceImages[id] = { url: result.webUrl, name: result.name };
+      setExpImagePreview(id, 'invoice', currentExpInvoiceImages[id]);
       toast('Đã tải hóa đơn lên OneDrive');
     }catch(err){ toast(err.message || 'Không tải được file lên OneDrive, thử lại'); }
-  });
-  transferInput?.addEventListener('change', async (e)=>{
+    return;
+  }
+  if(transferMatch){
+    const id = Number(transferMatch[1]);
     const file = e.target.files[0];
     if(!file) return;
     toast(`⏳ Đang tải "${file.name}" lên OneDrive công ty...`);
     try{
       const result = await msUploadFile(file, `LenhTamUng/GiaiChi/ChuyenKhoan`, (pct)=> toast(`⏳ Đang tải lên... ${pct}%`));
-      currentExpTransferImages[i-1] = { url: result.webUrl, name: result.name };
-      setExpImagePreview(i, 'transfer', currentExpTransferImages[i-1]);
+      currentExpTransferImages[id] = { url: result.webUrl, name: result.name };
+      setExpImagePreview(id, 'transfer', currentExpTransferImages[id]);
       toast('Đã tải chứng từ CK lên OneDrive');
     }catch(err){ toast(err.message || 'Không tải được file lên OneDrive, thử lại'); }
-  });
-}
+    return;
+  }
+});
+// Auto-calc SL*Đơn giá -> Thành tiền cho từng khung (bất kể khung cũ hay mới thêm), và cập nhật lại tổng.
+document.getElementById('exp-blocks-container')?.addEventListener('input', (e)=>{
+  const m = e.target.id.match(/^exp(\d+)-(qty|price|amount)$/);
+  if(!m) return;
+  const id = m[1];
+  const qtyEl = document.getElementById(`exp${id}-qty`);
+  const priceEl = document.getElementById(`exp${id}-price`);
+  const amountEl = document.getElementById(`exp${id}-amount`);
+  if(m[2]==='price') formatMoneyInput(priceEl);
+  if(m[2]==='amount') formatMoneyInput(amountEl);
+  if(m[2]!=='amount'){
+    const qty = Number(qtyEl.value) || 1;
+    const price = parseMoneyInput(priceEl);
+    if(price) setMoneyInputValue(amountEl, qty*price);
+  }
+  updateExplainAmountCheck();
+});
 
 function fillExplainProjectSelects(){
-  for(let i=1;i<=5;i++){
-    const sel = document.getElementById(`exp${i}-project`);
-    if(!sel) continue;
+  explainBlockIds.forEach(id=>{
+    const sel = document.getElementById(`exp${id}-project`);
+    if(!sel) return;
     const cur = sel.value;
     sel.innerHTML = '<option value="">— Không chọn —</option>' + PROJECTS.map(p=>`<option value="${p.id}">${escapeHtml(p.name)}</option>`).join('');
     if(cur) sel.value = cur;
-  }
+  });
 }
 
 function updateExplainAmountCheck(){
   const order = ORDERS.find(x=>x.id===document.getElementById('exp-order-id').value);
   let total = 0;
-  for(let i=1;i<=5;i++){
-    total += parseMoneyInput(document.getElementById(`exp${i}-amount`));
-  }
+  explainBlockIds.forEach(id=>{
+    total += parseMoneyInput(document.getElementById(`exp${id}-amount`));
+  });
   const el = document.getElementById('exp-total-check');
   if(!el) return;
   const orderAmount = order ? Number(order.amount||0) : 0;
@@ -798,53 +899,39 @@ function updateExplainAmountCheck(){
       : ` <span style="color:var(--red)">⚠️ Vượt ${fmtVND(-diff)} so với lệnh gốc</span>`);
 }
 
-// Gắn auto-calc SL*Đơn giá -> Thành tiền cho từng khung, và cập nhật lại tổng mỗi khi gõ
-for(let i=1;i<=5;i++){
-  const qtyEl = document.getElementById(`exp${i}-qty`);
-  const priceEl = document.getElementById(`exp${i}-price`);
-  const amountEl = document.getElementById(`exp${i}-amount`);
-  if(!qtyEl || !priceEl || !amountEl) continue;
-  const recalc = ()=>{
-    const qty = Number(qtyEl.value) || 1;
-    const price = parseMoneyInput(priceEl);
-    if(price) setMoneyInputValue(amountEl, qty*price);
-    updateExplainAmountCheck();
-  };
-  qtyEl.addEventListener('input', recalc);
-  priceEl.addEventListener('input', ()=>{ formatMoneyInput(priceEl); recalc(); });
-  amountEl.addEventListener('input', ()=>{ formatMoneyInput(amountEl); updateExplainAmountCheck(); });
-}
-
 function openOrderExplainModal(orderId){
   const o = ORDERS.find(x=>x.id===orderId);
   if(!o) return;
-  fillExplainProjectSelects();
   document.getElementById('exp-order-id').value = orderId;
   document.getElementById('exp-date').value = todayISO();
   document.getElementById('exp-payee').value = o.payee || '';
   document.getElementById('exp-summary').innerHTML =
     `<strong>${escapeHtml(ORDER_TYPE_LABELS[o.orderType]||'Tạm ứng')}</strong> — ${escapeHtml(o.reason)}<br>Số tiền lệnh gốc: <strong>${fmtVND(o.amount)}</strong>`;
 
+  // Số khung mặc định = số khoản đã giải chi từ trước (nếu có), tối thiểu 5 khung như cũ để KT quen tay —
+  // KHÔNG còn giới hạn TỐI ĐA nữa, bấm "+ Thêm khung Giải chi" để thêm bao nhiêu khung tùy nhu cầu.
   const existing = Array.isArray(o.explainAllocations) ? o.explainAllocations : [];
-  for(let i=1;i<=5;i++){
-    const a = existing[i-1] || {};
-    document.getElementById(`exp${i}-project`).value = a.projectId || '';
-    document.getElementById(`exp${i}-code`).value = a.code || '';
-    document.getElementById(`exp${i}-content`).value = a.content || '';
-    document.getElementById(`exp${i}-desc`).value = a.description || '';
-    document.getElementById(`exp${i}-unit`).value = a.unit || '';
-    document.getElementById(`exp${i}-qty`).value = a.qty || 1;
-    setMoneyInputValue(document.getElementById(`exp${i}-price`), a.unitPrice);
-    setMoneyInputValue(document.getElementById(`exp${i}-amount`), a.amount);
-    currentExpInvoiceImages[i-1] = a.invoiceImage || '';
-    currentExpTransferImages[i-1] = a.transferImage || '';
-    setExpImagePreview(i, 'invoice', currentExpInvoiceImages[i-1]);
-    setExpImagePreview(i, 'transfer', currentExpTransferImages[i-1]);
-    const invoiceInput = document.getElementById(`exp${i}-invoice-image`);
-    const transferInput = document.getElementById(`exp${i}-transfer-image`);
-    if(invoiceInput) invoiceInput.value = '';
-    if(transferInput) transferInput.value = '';
-  }
+  const blockCount = Math.max(5, existing.length);
+  explainBlockIds = Array.from({length: blockCount}, (_,i)=> i+1);
+  nextExplainBlockId = blockCount + 1;
+  currentExpInvoiceImages = {}; currentExpTransferImages = {};
+  renderAllExplainBlocks();
+
+  explainBlockIds.forEach(id=>{
+    const a = existing[id-1] || {};
+    document.getElementById(`exp${id}-project`).value = a.projectId || '';
+    document.getElementById(`exp${id}-code`).value = a.code || '';
+    document.getElementById(`exp${id}-content`).value = a.content || '';
+    document.getElementById(`exp${id}-desc`).value = a.description || '';
+    document.getElementById(`exp${id}-unit`).value = a.unit || '';
+    document.getElementById(`exp${id}-qty`).value = a.qty || 1;
+    setMoneyInputValue(document.getElementById(`exp${id}-price`), a.unitPrice);
+    setMoneyInputValue(document.getElementById(`exp${id}-amount`), a.amount);
+    currentExpInvoiceImages[id] = a.invoiceImage || '';
+    currentExpTransferImages[id] = a.transferImage || '';
+    setExpImagePreview(id, 'invoice', currentExpInvoiceImages[id]);
+    setExpImagePreview(id, 'transfer', currentExpTransferImages[id]);
+  });
   document.getElementById('exp-approval-target').value = '';
   updateExplainAmountCheck();
   openModal('modal-order-explain');
@@ -857,10 +944,10 @@ document.getElementById('save-explain-btn')?.addEventListener('click', async ()=
   const date = document.getElementById('exp-date').value || todayISO();
 
   const blocks = [];
-  for(let i=1;i<=5;i++){
+  explainBlockIds.forEach(i=>{
     const projectId = document.getElementById(`exp${i}-project`).value;
     const amount = parseMoneyInput(document.getElementById(`exp${i}-amount`));
-    if(!amount) continue; // khung hoàn toàn trống (không nhập số tiền) -> bỏ qua
+    if(!amount) return; // khung hoàn toàn trống (không nhập số tiền) -> bỏ qua
     // KHÔNG chọn dự án vẫn phải tính — sẽ tự động rơi vào Chi phí gián tiếp (mã INDIRECT), y hệt Lệnh chi thường.
     const proj = projectId ? projectById(projectId) : null;
     blocks.push({
@@ -872,10 +959,10 @@ document.getElementById('save-explain-btn')?.addEventListener('click', async ()=
       qty: Number(document.getElementById(`exp${i}-qty`).value) || 1,
       unitPrice: parseMoneyInput(document.getElementById(`exp${i}-price`)),
       amount,
-      invoiceImage: currentExpInvoiceImages[i-1] || '',
-      transferImage: currentExpTransferImages[i-1] || '',
+      invoiceImage: currentExpInvoiceImages[i] || '',
+      transferImage: currentExpTransferImages[i] || '',
     });
-  }
+  });
   if(blocks.length === 0){ toast('Vui lòng điền ít nhất 1 khung Giải chi (nhập Số tiền)'); return; }
 
   const approvalTarget = document.getElementById('exp-approval-target').value;
@@ -940,8 +1027,8 @@ document.getElementById('save-explain-btn')?.addEventListener('click', async ()=
 
     toast(`✅ Đã giải trình xong — tạo ${blocks.length} khoản Chi phân bổ theo dự án`);
     logActivity('update', {projectName:'Giải chi tạm ứng', content: o.reason, amount: blocks.reduce((s,b)=>s+b.amount,0), type:'OUT'});
-    currentExpInvoiceImages = ['', '', '', '', ''];
-    currentExpTransferImages = ['', '', '', '', ''];
+    currentExpInvoiceImages = {};
+    currentExpTransferImages = {};
     closeModal('modal-order-explain');
   }catch(err){ toast('Lỗi: '+err.message); }
 });
