@@ -169,6 +169,47 @@ function msIsLoggedIn(){
   return !!msalInstance.getAllAccounts().length;
 }
 
+// Chuyển lỗi MSAL/Graph khó hiểu thành thông báo tiếng Việt dễ hành động — đặc biệt lỗi "chặn popup", vì
+// đây là lỗi HAY GẶP NHẤT: mở cửa sổ đăng nhập Microsoft ngay sau khi vừa chọn xong file (từ hộp thoại chọn
+// file của hệ điều hành) hay bị trình duyệt coi là "không phải người dùng chủ động bấm" nên tự động chặn lại.
+function friendlyMsError(err){
+  const msg = String(err && err.message || err || '');
+  if(/popup_window_error|popup.*block|failed to open/i.test(msg)){
+    return 'Trình duyệt đã CHẶN cửa sổ đăng nhập Microsoft (hay gặp khi vừa chọn xong file thì mở popup đăng nhập). '
+      + 'Cách khắc phục: bấm nút "🔗 Kết nối OneDrive" ở cuối menu bên trái để đăng nhập TRƯỚC, rồi mới đính kèm file. '
+      + 'Nếu vẫn bị chặn, vào cài đặt trình duyệt cho phép popup cho trang này.';
+  }
+  return msg || 'Lỗi không xác định khi kết nối OneDrive';
+}
+
+function renderOnedriveConnectStatus(){
+  const icon = document.getElementById('onedrive-connect-icon');
+  const label = document.getElementById('onedrive-connect-label');
+  if(!icon || !label) return;
+  if(msIsLoggedIn()){
+    icon.textContent = '✅'; label.textContent = 'Đã kết nối OneDrive';
+  } else {
+    icon.textContent = '🔗'; label.textContent = 'Kết nối OneDrive';
+  }
+}
+document.getElementById('onedrive-connect-btn')?.addEventListener('click', async ()=>{
+  const btn = document.getElementById('onedrive-connect-btn');
+  if(msIsLoggedIn()){ toast('✅ Đã kết nối OneDrive công ty rồi — sẵn sàng đính kèm file.'); return; }
+  btn.disabled = true;
+  try{
+    await msLogin(); // gọi TRỰC TIẾP ngay khi bấm nút này — không qua bước chọn file nào trước đó, nên
+                      // trình duyệt luôn coi đây là thao tác người dùng chủ động, không bao giờ bị chặn popup.
+    toast('✅ Đăng nhập OneDrive công ty thành công — giờ đính kèm file sẽ không cần đăng nhập lại nữa.');
+    renderOnedriveConnectStatus();
+  }catch(err){
+    toast(friendlyMsError(err));
+  }finally{
+    btn.disabled = false;
+  }
+});
+if(document.readyState !== 'loading') renderOnedriveConnectStatus();
+else document.addEventListener('DOMContentLoaded', renderOnedriveConnectStatus);
+
 async function msSignOut(){
   await msEnsureInit();
   const account = msGetAccount();
