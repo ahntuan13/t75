@@ -156,7 +156,7 @@ for(let i=1;i<=5;i++){
       };
       renderContractInfoStatus(i);
       toast('Đã thêm file cho HĐ ' + i);
-    }catch(err){ toast('Lỗi tải lên OneDrive: ' + err.message); }
+    }catch(err){ toast(friendlyMsError(err)); }
   });
 }
 
@@ -194,7 +194,7 @@ document.getElementById('project-file-input')?.addEventListener('change', async 
     currentContractFiles.push({ url: result.webUrl, name: result.name, uploadedAt: new Date().toISOString() });
     toast('Đã thêm file đính kèm — bấm vào tên file để xem lại');
   }catch(err){
-    toast('Lỗi tải lên OneDrive: ' + err.message);
+    toast(friendlyMsError(err));
   }
   renderContractFileStatus();
 });
@@ -233,7 +233,7 @@ document.getElementById('project-payment-file-input')?.addEventListener('change'
     currentPaymentDossierFiles.push({ url: result.webUrl, name: result.name, uploadedAt: new Date().toISOString() });
     toast('Đã thêm hồ sơ thanh toán — bấm vào tên file để xem lại');
   }catch(err){
-    toast('Lỗi tải lên OneDrive: ' + err.message);
+    toast(friendlyMsError(err));
   }
   renderPaymentDossierStatus();
 });
