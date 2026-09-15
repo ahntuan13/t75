@@ -162,7 +162,7 @@ document.getElementById('tx-invoice-image').addEventListener('change', async (e)
     setImagePreview('invoice', currentInvoiceImage);
     setInvoiceStatus('issued'); // có ảnh hóa đơn -> tự động coi là "Đã xuất hóa đơn", không cần bấm tay
     toast('Đã tải hóa đơn lên OneDrive');
-  }catch(err){ toast(err.message || 'Không tải được file lên OneDrive, thử lại'); }
+  }catch(err){ toast(friendlyMsError(err)); }
 });
 document.getElementById('tx-transfer-image').addEventListener('change', async (e)=>{
   const file = e.target.files[0];
@@ -175,7 +175,7 @@ document.getElementById('tx-transfer-image').addEventListener('change', async (e
     setImagePreview('transfer', currentTransferImage);
     setTransferStatus('done'); // có ảnh chuyển khoản -> tự động coi là "Đã CK", không cần bấm tay
     toast('Đã tải chứng từ CK lên OneDrive');
-  }catch(err){ toast(err.message || 'Không tải được file lên OneDrive, thử lại'); }
+  }catch(err){ toast(friendlyMsError(err)); }
 });
 
 // ---------------- Tự tính "Thành tiền sau thuế" = Thành tiền + Tiền thuế GTGT (Thu/Chi/Tạm ứng — không phải chế độ Hóa Đơn) ----------------
