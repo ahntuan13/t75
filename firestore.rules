@@ -140,7 +140,8 @@ service cloud.firestore {
       allow update: if isAdmin() || (isNotSubAdmin() && isOrderApprovalSubmit()) || isOrderApprovalDecision()
         || (isNotSubAdmin() && changedKeys().hasOnly(['explanation','explainAllocations','explainedAt','explainedBy','explainStatus','attachment','attachmentName']))
         || (isNotSubAdmin() && (!('approvalStatus' in resource.data) || resource.data.approvalStatus == 'none' || resource.data.approvalStatus == '')
-          && changedKeys().hasOnly(['date','projectId','projectName','code','orderType','payer','payee','payeeBank','payeeTaxCode','reason','amount','requester','note','explanation','attachment','attachmentName']));
+          && changedKeys().hasOnly(['date','projectId','projectName','code','orderType','payer','payee','payeeBank','payeeTaxCode','reason','amount','requester','note','explanation','attachment','attachmentName',
+            'approvalStatus','approverRole','approverEmail','approvalSubmittedAt','approvedBy','approvedAt']));
       // Kế toán (User)/Admin được quyền xóa Lệnh chi/Lệnh tạm ứng — Sub-admin (GĐ) thì KHÔNG.
       allow delete: if isSignedIn() && isNotSubAdmin();
     }
