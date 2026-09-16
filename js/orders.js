@@ -93,6 +93,20 @@ function openOrderModal(id, context, presetType){
   document.getElementById('order-approval-select-wrap').style.display = alreadyDecided ? 'none' : '';
   document.getElementById('order-approval-helper').style.display = alreadyDecided ? 'none' : '';
   renderOrderApprovalCurrentStatus(o);
+
+  // Lệnh ĐÃ gửi duyệt / ĐÃ có kết quả (pending/approved/rejected): Kế toán CHỈ được sửa Giải trình + File
+  // đính kèm — khóa (disabled, xám đi) các trường còn lại để KHÔNG tưởng nhầm là sửa được, vì sửa xong lưu
+  // cũng sẽ không được ghi lại (Firestore Rules chặn, xem save-order-btn). Admin thì không bị khóa gì cả.
+  const hasApprovalHistory = id && o.approvalStatus && o.approvalStatus !== 'none';
+  const lockCoreFields = !!(hasApprovalHistory && !isAdmin());
+  const CORE_FIELD_IDS = ['order-date','order-project','order-code','order-type','order-payer','order-payee','order-payee-bank','order-payee-tax','order-reason','order-amount','order-requester','order-note'];
+  CORE_FIELD_IDS.forEach(fid=>{
+    const el = document.getElementById(fid);
+    if(el) el.disabled = lockCoreFields;
+  });
+  const lockNotice = document.getElementById('order-lock-notice');
+  if(lockNotice) lockNotice.style.display = lockCoreFields ? '' : 'none';
+
   fillOrderPayeeDatalist();
   applyAdvanceSalaryDefaults(!id); // chỉ tự gợi ý khi TẠO MỚI, không ghi đè khi đang sửa
   openModal('modal-order');
@@ -195,44 +209,67 @@ document.getElementById('save-order-btn').addEventListener('click', async ()=>{
 
   const projectId = document.getElementById('order-project').value;
   const proj = projectId ? projectById(projectId) : null;
-  const data = {
-    date, projectId: projectId || null, projectName: proj ? proj.name : '',
-    code: document.getElementById('order-code').value,
-    orderType: document.getElementById('order-type').value,
-    payer: document.getElementById('order-payer').value.trim(),
-    payee, reason, amount,
-    payeeBank: document.getElementById('order-payee-bank').value.trim(),
-    payeeTaxCode: document.getElementById('order-payee-tax').value.trim(),
-    requester: document.getElementById('order-requester').value.trim(),
-    explanation: document.getElementById('order-explanation').value.trim(),
-    attachment: currentOrderAttachment,
-    attachmentName: currentOrderAttachmentName,
-    note: document.getElementById('order-note').value.trim(),
-  };
 
-  const approvalTarget = document.getElementById('order-approval-target').value; // '' hoặc 'GD'
-  if(approvalTarget){
-    const approverEmail = APPROVERS.gdEmail || '';
-    if(!approverEmail){
-      toast('Chưa cài đặt email Giám đốc — vào mục Người dùng để nhập trước.');
-      return;
-    }
-    data.approvalStatus = 'pending';
-    data.approverRole = approvalTarget;
-    data.approverEmail = approverEmail;
-    data.approvalSubmittedAt = firebase.firestore.FieldValue.serverTimestamp();
-    data.approvedBy = '';
-    data.approvedAt = '';
-  } else if(id){
-    // Đang sửa 1 lệnh ĐÃ gửi duyệt trước đó nhưng còn "Đang chờ" (chưa ai quyết định) mà giờ chọn lại về
-    // "Chưa gửi duyệt" -> coi như KT thu hồi yêu cầu duyệt, xóa hẳn trạng thái pending cũ (không để sót lại
-    // ngầm khiến GĐ/PGĐ vẫn thấy thông báo dù KT tưởng đã hủy gửi). Lệnh ĐÃ có kết quả duyệt (approved/rejected)
-    // thì KHÔNG tự động xóa qua đường này, tránh vô tình xoá mất quyết định đã có.
-    const existing = ORDERS.find(o=>o.id===id);
-    if(existing && existing.approvalStatus === 'pending'){
-      data.approvalStatus = firebase.firestore.FieldValue.delete();
-      data.approverRole = firebase.firestore.FieldValue.delete();
-      data.approverEmail = firebase.firestore.FieldValue.delete();
+  // Lệnh ĐÃ gửi duyệt / ĐÃ có kết quả duyệt (pending/approved/rejected) thì Kế toán CHỈ được phép sửa
+  // phần Giải trình + File đính kèm — không được đổi nội dung/số tiền/người nhận... (đúng theo Firestore
+  // Rules). Nếu vẫn gửi kèm TOÀN BỘ các trường như bình thường (dù giá trị không đổi) sẽ bị chặn hẳn với
+  // lỗi "Missing or insufficient permissions" — nên ở đúng trường hợp này, CHỈ gửi đúng các trường được
+  // phép, không gửi thừa trường nào khác.
+  const existingOrder = id ? ORDERS.find(o=>o.id===id) : null;
+  const hasApprovalHistory = existingOrder && existingOrder.approvalStatus && existingOrder.approvalStatus !== 'none';
+  const isRestrictedEdit = !!(id && !isAdmin() && hasApprovalHistory);
+
+  let data;
+  if(isRestrictedEdit){
+    data = {
+      explanation: document.getElementById('order-explanation').value.trim(),
+      attachment: currentOrderAttachment,
+      attachmentName: currentOrderAttachmentName,
+    };
+  } else {
+    data = {
+      date, projectId: projectId || null, projectName: proj ? proj.name : '',
+      code: document.getElementById('order-code').value,
+      orderType: document.getElementById('order-type').value,
+      payer: document.getElementById('order-payer').value.trim(),
+      payee, reason, amount,
+      payeeBank: document.getElementById('order-payee-bank').value.trim(),
+      payeeTaxCode: document.getElementById('order-payee-tax').value.trim(),
+      requester: document.getElementById('order-requester').value.trim(),
+      explanation: document.getElementById('order-explanation').value.trim(),
+      attachment: currentOrderAttachment,
+      attachmentName: currentOrderAttachmentName,
+      note: document.getElementById('order-note').value.trim(),
+    };
+  }
+
+  // Việc gửi duyệt/thu hồi gửi duyệt KHÔNG áp dụng khi đang ở "isRestrictedEdit" (lệnh đã có kết quả duyệt
+  // rồi — không cần và không được phép đụng vào các trường duyệt nữa qua đường sửa lệnh thông thường này).
+  if(!isRestrictedEdit){
+    const approvalTarget = document.getElementById('order-approval-target').value; // '' hoặc 'GD'
+    if(approvalTarget){
+      const approverEmail = APPROVERS.gdEmail || '';
+      if(!approverEmail){
+        toast('Chưa cài đặt email Giám đốc — vào mục Người dùng để nhập trước.');
+        return;
+      }
+      data.approvalStatus = 'pending';
+      data.approverRole = approvalTarget;
+      data.approverEmail = approverEmail;
+      data.approvalSubmittedAt = firebase.firestore.FieldValue.serverTimestamp();
+      data.approvedBy = '';
+      data.approvedAt = '';
+    } else if(id){
+      // Đang sửa 1 lệnh ĐÃ gửi duyệt trước đó nhưng còn "Đang chờ" (chưa ai quyết định) mà giờ chọn lại về
+      // "Chưa gửi duyệt" -> coi như KT thu hồi yêu cầu duyệt, xóa hẳn trạng thái pending cũ (không để sót lại
+      // ngầm khiến GĐ/PGĐ vẫn thấy thông báo dù KT tưởng đã hủy gửi). Lệnh ĐÃ có kết quả duyệt (approved/rejected)
+      // thì KHÔNG tự động xóa qua đường này, tránh vô tình xoá mất quyết định đã có.
+      const existing = ORDERS.find(o=>o.id===id);
+      if(existing && existing.approvalStatus === 'pending'){
+        data.approvalStatus = firebase.firestore.FieldValue.delete();
+        data.approverRole = firebase.firestore.FieldValue.delete();
+        data.approverEmail = firebase.firestore.FieldValue.delete();
+      }
     }
   }
 
