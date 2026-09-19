@@ -145,7 +145,7 @@ for(let i=1;i<=5;i++){
     try{
       const projName = document.getElementById('project-name').value.trim() || 'KhongTenDuAn';
       const folder = 'Projects/' + projName.replace(/[^\w\-]+/g, '_') + '/HD' + i;
-      const result = await msUploadFile(file, folder);
+      const result = await msUploadFile(file, folder, (pct)=> toast(`⏳ Đang tải "${file.name}"... ${pct}%`));
       currentContractInfo[i-1] = {
         name: document.getElementById(`proj-hd${i}-name`).value.trim(),
         value: parseMoneyInput(document.getElementById(`proj-hd${i}-value`)),
@@ -190,7 +190,7 @@ document.getElementById('project-file-input')?.addEventListener('change', async 
   try{
     const projName = document.getElementById('project-name').value.trim() || 'KhongTenDuAn';
     const folder = 'Projects/' + projName.replace(/[^\w\-]+/g, '_');
-    const result = await msUploadFile(file, folder);
+    const result = await msUploadFile(file, folder, (pct)=> toast(`⏳ Đang tải "${file.name}"... ${pct}%`));
     currentContractFiles.push({ url: result.webUrl, name: result.name, uploadedAt: new Date().toISOString() });
     toast('Đã thêm file đính kèm — bấm vào tên file để xem lại');
   }catch(err){
@@ -229,7 +229,7 @@ document.getElementById('project-payment-file-input')?.addEventListener('change'
   try{
     const projName = document.getElementById('project-name').value.trim() || 'KhongTenDuAn';
     const folder = 'Projects/' + projName.replace(/[^\w\-]+/g, '_') + '/HoSoThanhToan';
-    const result = await msUploadFile(file, folder);
+    const result = await msUploadFile(file, folder, (pct)=> toast(`⏳ Đang tải "${file.name}"... ${pct}%`));
     currentPaymentDossierFiles.push({ url: result.webUrl, name: result.name, uploadedAt: new Date().toISOString() });
     toast('Đã thêm hồ sơ thanh toán — bấm vào tên file để xem lại');
   }catch(err){
