@@ -161,6 +161,35 @@ function listenAppUsers(){
   }, (err)=> console.error('users listen error', err));
 }
 
+// Tóm tắt quyền hạn CHI TIẾT theo từng vai trò — gộp lại từ toàn bộ các lần thống nhất quyền hạn qua quá
+// trình làm 2 dự án Budget T75 và T75-2. Cập nhật đúng danh sách này mỗi khi có thay đổi quyền hạn.
+const ROLE_PERMISSIONS_DETAIL = {
+  admin: `
+    <ul class="perm-list">
+      <li><b>Toàn quyền</b> mọi nơi trong app — tạo/sửa/xóa không giới hạn</li>
+      <li>Duyệt/Từ chối Lệnh chi/thu/tạm ứng (nếu email nằm trong danh sách người duyệt)</li>
+      <li>Xem Báo cáo (Dòng tiền theo kỳ, Lãi lỗ) và Lịch sử chỉnh sửa</li>
+      <li>Quản lý Người dùng & phân quyền, cài đặt hệ thống</li>
+    </ul>`,
+  user: `
+    <ul class="perm-list">
+      <li><b>Dự án:</b> xem + sửa thông tin đã có — không tạo mới, không xóa</li>
+      <li><b>Thu chi dự án / Chi phí gián tiếp:</b> chỉ xem — không tạo/sửa/xóa/đổi trạng thái (khoản Chi phải đi qua Lệnh chi)</li>
+      <li><b>Hóa đơn / Chuyển khoản:</b> xem + sửa, đính kèm file (không giới hạn dung lượng) — không xóa. Upload ảnh tự cập nhật trạng thái Đã xuất/Đã CK</li>
+      <li><b>Lệnh chi / Lệnh thu / Lệnh tạm ứng:</b> tạo/sửa/xóa/gửi duyệt — không tự duyệt được. Lệnh đã duyệt chỉ còn sửa được Giải trình + File đính kèm</li>
+      <li><b>Giải chi (Lệnh tạm ứng):</b> làm không giới hạn số khung phân bổ</li>
+      <li><b>Bảng lương / Chấm công:</b> toàn quyền (thêm/sửa/xóa nhân viên, chấm công, điều chỉnh lương)</li>
+      <li><b>Không xem được:</b> Báo cáo (Dòng tiền theo kỳ, Lãi lỗ), Người dùng & phân quyền, Lịch sử chỉnh sửa</li>
+    </ul>`,
+  subadmin: `
+    <ul class="perm-list">
+      <li><b>Chỉ xem</b> — không tạo/sửa/xóa được bất kỳ gì trong toàn bộ app</li>
+      <li><b>Duyệt/Từ chối</b> Lệnh chi, Lệnh thu, Lệnh tạm ứng đang chờ (nếu email nằm trong danh sách người duyệt)</li>
+      <li>Xem được Báo cáo (Dòng tiền theo kỳ, Lãi lỗ) — quyền riêng, Kế toán không có</li>
+      <li><b>Không xem được:</b> Người dùng & phân quyền, Lịch sử chỉnh sửa</li>
+    </ul>`,
+};
+
 function renderUsersTable(){
   const table = document.getElementById('users-table');
   if(!table) return;
@@ -168,11 +197,13 @@ function renderUsersTable(){
     table.innerHTML = `<tr><td><div class="empty-state"><div class="big">🔐</div>Chưa có ai trong danh sách phân quyền.</div></td></tr>`;
     return;
   }
-  table.innerHTML = `<thead><tr><th>Email</th><th>Tên hiển thị</th><th>Vai trò</th><th>UID</th><th></th></tr></thead><tbody>
+  const roleLabel = (r)=> r==='admin' ? '<span class="tag tag-gold">Quản trị viên</span>' : r==='subadmin' ? '<span class="tag tag-blue">Sub-admin (GĐ/PGĐ)</span>' : '<span class="tag tag-gray">Thành viên (Kế toán)</span>';
+  table.innerHTML = `<thead><tr><th>Email</th><th>Tên hiển thị</th><th>Vai trò</th><th style="min-width:340px;">Quyền hạn</th><th>UID</th><th></th></tr></thead><tbody>
     ${APP_USERS.map(u=>`<tr>
       <td><strong>${escapeHtml(u.email)}</strong></td>
       <td>${escapeHtml(u.name||'—')}</td>
-      <td>${u.role==='admin' ? '<span class="tag tag-gold">Quản trị viên</span>' : '<span class="tag tag-gray">Thành viên</span>'}</td>
+      <td>${roleLabel(u.role)}</td>
+      <td style="font-size:12.5px;line-height:1.5;">${ROLE_PERMISSIONS_DETAIL[u.role] || ROLE_PERMISSIONS_DETAIL.user}</td>
       <td class="mono" style="font-size:11px;color:var(--ink-faint);">${escapeHtml(u.id)}</td>
       <td><div class="row-actions">
         <button class="icon-btn" data-edit-user="${u.id}" title="Sửa quyền">✎</button>
