@@ -109,11 +109,16 @@ async function msUploadFile(file, folderPath, onProgress){
   if(file.size <= 4 * 1024 * 1024){
     const url = `https://graph.microsoft.com/v1.0/sites/${siteId}/drive/root:/${encodedPath}:/content`;
     const buf = await file.arrayBuffer();
-    const res = await fetch(url, {
-      method: 'PUT',
-      headers: { Authorization: `Bearer ${token}`, 'Content-Type': file.type || 'application/octet-stream' },
-      body: buf,
-    });
+    let res;
+    try{
+      res = await fetch(url, {
+        method: 'PUT',
+        headers: { Authorization: `Bearer ${token}`, 'Content-Type': file.type || 'application/octet-stream' },
+        body: buf,
+      });
+    }catch(netErr){
+      throw new Error('Không kết nối được tới OneDrive — kiểm tra lại mạng rồi thử lại. (' + netErr.message + ')');
+    }
     if(!res.ok){
       const txt = await res.text().catch(()=> '');
       throw new Error('Upload thất bại (mã lỗi ' + res.status + '). ' + txt.slice(0, 200));
@@ -125,11 +130,16 @@ async function msUploadFile(file, folderPath, onProgress){
 
   // File lớn (>4MB): dùng "upload session" — chia file thành từng phần (10MB/phần, đúng bội số 320KB
   // theo yêu cầu của Microsoft Graph), tải lần lượt cho tới khi xong. Hỗ trợ được file rất lớn (nhiều trăm MB).
-  const sessionRes = await fetch(
-    `https://graph.microsoft.com/v1.0/sites/${siteId}/drive/root:/${encodedPath}:/createUploadSession`,
-    { method:'POST', headers:{ Authorization:`Bearer ${token}`, 'Content-Type':'application/json' },
-      body: JSON.stringify({ item: { '@microsoft.graph.conflictBehavior': 'rename', name: safeName } }) }
-  );
+  let sessionRes;
+  try{
+    sessionRes = await fetch(
+      `https://graph.microsoft.com/v1.0/sites/${siteId}/drive/root:/${encodedPath}:/createUploadSession`,
+      { method:'POST', headers:{ Authorization:`Bearer ${token}`, 'Content-Type':'application/json' },
+        body: JSON.stringify({ item: { '@microsoft.graph.conflictBehavior': 'rename', name: safeName } }) }
+    );
+  }catch(netErr){
+    throw new Error('Không kết nối được tới OneDrive để bắt đầu tải file lớn — kiểm tra lại mạng, hoặc thử lại sau. (' + netErr.message + ')');
+  }
   if(!sessionRes.ok){
     const txt = await sessionRes.text().catch(()=> '');
     throw new Error('Không tạo được phiên tải file lớn (mã lỗi ' + sessionRes.status + '). ' + txt.slice(0, 200));
@@ -144,14 +154,22 @@ async function msUploadFile(file, folderPath, onProgress){
     const end = Math.min(start + CHUNK_SIZE, total);
     const chunk = file.slice(start, end);
     const chunkBuf = await chunk.arrayBuffer();
-    const putRes = await fetch(uploadUrl, {
-      method: 'PUT',
-      headers: {
-        'Content-Length': String(end - start),
-        'Content-Range': `bytes ${start}-${end-1}/${total}`,
-      },
-      body: chunkBuf,
-    });
+    let putRes;
+    try{
+      putRes = await fetch(uploadUrl, {
+        method: 'PUT',
+        headers: {
+          'Content-Length': String(end - start),
+          'Content-Range': `bytes ${start}-${end-1}/${total}`,
+        },
+        body: chunkBuf,
+      });
+    }catch(netErr){
+      // fetch() ném lỗi kiểu này (không phải mã lỗi HTTP) thường là do MẠNG bị ngắt giữa chừng hoặc bị
+      // chặn CORS — khác hẳn lỗi "sai quyền/sai định dạng" (những lỗi đó Graph vẫn trả về HTTP status bình
+      // thường). Báo rõ để không nhầm là lỗi quyền truy cập.
+      throw new Error(`Mất kết nối khi đang tải file (đã tải ${Math.round((start/total)*100)}%) — kiểm tra lại mạng rồi thử tải lại từ đầu. (${netErr.message})`);
+    }
     if(!putRes.ok && putRes.status !== 202){
       const txt = await putRes.text().catch(()=> '');
       throw new Error('Upload phần file thất bại (mã lỗi ' + putRes.status + '). ' + txt.slice(0, 200));
@@ -185,11 +203,36 @@ function friendlyMsError(err){
 function renderOnedriveConnectStatus(){
   const icon = document.getElementById('onedrive-connect-icon');
   const label = document.getElementById('onedrive-connect-label');
-  if(!icon || !label) return;
-  if(msIsLoggedIn()){
-    icon.textContent = '✅'; label.textContent = 'Đã kết nối OneDrive';
-  } else {
-    icon.textContent = '🔗'; label.textContent = 'Kết nối OneDrive';
+  const banner = document.getElementById('onedrive-connect-banner');
+  const connected = msIsLoggedIn();
+  if(icon && label){
+    if(connected){ icon.textContent = '✅'; label.textContent = 'Đã kết nối OneDrive'; }
+    else { icon.textContent = '🔗'; label.textContent = 'Kết nối OneDrive'; }
+  }
+  // Banner nhắc kết nối OneDrive — chỉ hiện khi CHƯA kết nối VÀ người dùng chưa tự đóng nó trong phiên này
+  // (đóng rồi thì không hiện lại nữa cho tới khi tải lại trang, tránh làm phiền liên tục).
+  if(banner){
+    if(connected || sessionStorage.getItem('onedriveBannerDismissed')==='1'){
+      banner.style.display = 'none';
+      banner.innerHTML = '';
+    } else {
+      banner.className = 'approval-banner';
+      banner.style.display = 'flex';
+      banner.style.alignItems = 'center';
+      banner.style.justifyContent = 'space-between';
+      banner.style.gap = '12px';
+      banner.innerHTML = `
+        <div>🔗 Bạn <strong>chưa kết nối OneDrive công ty</strong> — cần kết nối trước để đính kèm file (hóa đơn, chuyển khoản, hợp đồng...) không bị lỗi giữa chừng.</div>
+        <div style="display:flex;gap:8px;flex:none;">
+          <button class="btn btn-primary btn-sm" id="onedrive-banner-connect-btn">Kết nối ngay</button>
+          <button class="btn btn-ghost btn-sm" id="onedrive-banner-dismiss-btn">Để sau</button>
+        </div>`;
+      document.getElementById('onedrive-banner-connect-btn')?.addEventListener('click', ()=> document.getElementById('onedrive-connect-btn')?.click());
+      document.getElementById('onedrive-banner-dismiss-btn')?.addEventListener('click', ()=>{
+        sessionStorage.setItem('onedriveBannerDismissed', '1');
+        banner.style.display = 'none';
+      });
+    }
   }
 }
 document.getElementById('onedrive-connect-btn')?.addEventListener('click', async ()=>{
