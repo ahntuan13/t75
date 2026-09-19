@@ -37,11 +37,34 @@ function msGetAccount(){
   return accounts.length ? accounts[0] : null;
 }
 
+// Khóa dùng chung cho MỌI lượt tương tác Microsoft (mở popup đăng nhập) — MSAL không cho phép 2 lượt tương
+// tác chạy cùng lúc (sẽ báo lỗi "interaction_in_progress"). Nếu code này lỡ gọi msLogin()/acquireTokenPopup()
+// ở 2 chỗ gần như cùng lúc (VD: bấm nút "Kết nối OneDrive" đúng lúc 1 file khác đang tự động xin token), lượt
+// gọi sau sẽ CHỜ ĐÚNG lượt đang chạy thay vì bắn thêm 1 popup mới.
+let msInteractionPromise = null;
+function msRunInteractive(fn){
+  if(msInteractionPromise) return msInteractionPromise;
+  msInteractionPromise = Promise.resolve().then(fn).finally(()=>{ msInteractionPromise = null; });
+  return msInteractionPromise;
+}
+
+// Tự phục hồi khi bị "kẹt" trạng thái tương tác: nếu người dùng ĐÓNG cửa sổ đăng nhập Microsoft giữa chừng
+// (không đăng nhập xong) thay vì để nó tự đóng, MSAL đôi khi không kịp dọn cờ "đang tương tác" đã lưu trong
+// sessionStorage — khiến MỌI lần thử sau đó đều báo lỗi "interaction_in_progress" dù thực ra không có gì
+// đang chạy cả. Xóa đúng cờ đó để lần thử tiếp theo hoạt động lại bình thường, không cần tải lại trang.
+function msClearStuckInteraction(){
+  try{
+    Object.keys(sessionStorage).filter(k=> /interaction\.status/i.test(k)).forEach(k=> sessionStorage.removeItem(k));
+  }catch(e){ /* bỏ qua nếu trình duyệt chặn truy cập sessionStorage */ }
+}
+
 async function msLogin(){
   await msEnsureInit();
-  const result = await msalInstance.loginPopup({ scopes: MS_SCOPES });
-  msalInstance.setActiveAccount(result.account);
-  return result.account;
+  return msRunInteractive(async ()=>{
+    const result = await msalInstance.loginPopup({ scopes: MS_SCOPES });
+    msalInstance.setActiveAccount(result.account);
+    return result.account;
+  });
 }
 
 async function msGetToken(){
@@ -54,7 +77,7 @@ async function msGetToken(){
     const res = await msalInstance.acquireTokenSilent({ scopes: MS_SCOPES, account });
     return res.accessToken;
   }catch(err){
-    const res = await msalInstance.acquireTokenPopup({ scopes: MS_SCOPES, account });
+    const res = await msRunInteractive(()=> msalInstance.acquireTokenPopup({ scopes: MS_SCOPES, account }));
     return res.accessToken;
   }
 }
@@ -102,7 +125,8 @@ async function msUploadFile(file, folderPath, onProgress){
   const token = await msGetToken();
   const siteId = await msGetSiteId();
   const safeName = file.name.replace(/[#%&{}\\<>*?/$!'":@+`|=]/g, '_');
-  const path = `${folderPath}/${Date.now()}_${safeName}`;
+  const timestampedName = `${Date.now()}_${safeName}`;
+  const path = `${folderPath}/${timestampedName}`;
   const encodedPath = path.split('/').map(encodeURIComponent).join('/');
 
   // File nhỏ (<=4MB): PUT thẳng nội dung file trong 1 lần gọi — đúng giới hạn của API "upload đơn giản".
@@ -135,7 +159,7 @@ async function msUploadFile(file, folderPath, onProgress){
     sessionRes = await fetch(
       `https://graph.microsoft.com/v1.0/sites/${siteId}/drive/root:/${encodedPath}:/createUploadSession`,
       { method:'POST', headers:{ Authorization:`Bearer ${token}`, 'Content-Type':'application/json' },
-        body: JSON.stringify({ item: { '@microsoft.graph.conflictBehavior': 'rename', name: safeName } }) }
+        body: JSON.stringify({ item: { '@microsoft.graph.conflictBehavior': 'rename', name: timestampedName } }) }
     );
   }catch(netErr){
     throw new Error('Không kết nối được tới OneDrive để bắt đầu tải file lớn — kiểm tra lại mạng, hoặc thử lại sau. (' + netErr.message + ')');
@@ -192,6 +216,13 @@ function msIsLoggedIn(){
 // file của hệ điều hành) hay bị trình duyệt coi là "không phải người dùng chủ động bấm" nên tự động chặn lại.
 function friendlyMsError(err){
   const msg = String(err && err.message || err || '');
+  if(/interaction_in_progress/i.test(msg)){
+    // Tự dọn cờ bị kẹt ngay khi phát hiện lỗi này — thường do lần trước đóng cửa sổ đăng nhập giữa chừng.
+    // Sau khi dọn xong, hầu hết trường hợp bấm thử lại ngay sẽ chạy bình thường, không cần tải lại trang.
+    msClearStuckInteraction();
+    return 'Đang có 1 cửa sổ đăng nhập Microsoft khác chưa hoàn tất (có thể do lần trước bạn đóng cửa sổ đó giữa chừng). '
+      + 'Đã tự dọn lại — vui lòng bấm thử lại ngay. Nếu vẫn báo lỗi này, tải lại trang (F5) rồi thử lại.';
+  }
   if(/popup_window_error|popup.*block|failed to open/i.test(msg)){
     return 'Trình duyệt đã CHẶN cửa sổ đăng nhập Microsoft (hay gặp khi vừa chọn xong file thì mở popup đăng nhập). '
       + 'Cách khắc phục: bấm nút "🔗 Kết nối OneDrive" ở cuối menu bên trái để đăng nhập TRƯỚC, rồi mới đính kèm file. '
