@@ -123,6 +123,7 @@
     <div class="main">
       <button id="menu-toggle">☰</button>
       <div id="approval-banner" style="display:none;"></div>
+      <div id="onedrive-connect-banner" style="display:none;"></div>
 
       <!-- DASHBOARD -->
       <div class="view active" id="view-dashboard">
@@ -504,6 +505,44 @@
           <button class="btn btn-primary btn-sm" id="save-ocr-settings-btn">Lưu cài đặt OCR</button>
         </div>
         <div class="card"><div class="table-wrap"><table class="data" id="users-table"></table></div></div>
+
+        <div class="card">
+          <div class="card-head"><h3>🗺️ Sơ đồ quy trình Lệnh chi / Lệnh thu / Lệnh tạm ứng</h3></div>
+          <p class="helper-text" style="margin-bottom:16px;">Đây là luồng xử lý chính của app — mọi khoản Thu/Chi có kiểm soát đều đi qua đúng các bước này.</p>
+          <div class="flow-map">
+            <div class="flow-step">
+              <div class="flow-box"><b>1. Kế toán tạo lệnh</b><span>Lệnh chi / Lệnh thu / Lệnh tạm ứng</span></div>
+            </div>
+            <div class="flow-arrow">↓</div>
+            <div class="flow-step">
+              <div class="flow-box"><b>2. Chọn "Gửi duyệt"</b><span>Hoặc để nháp — GĐ/PGĐ chỉ thấy khi đã gửi</span></div>
+            </div>
+            <div class="flow-arrow">↓</div>
+            <div class="flow-step">
+              <div class="flow-box flow-box-amber"><b>3. GĐ/PGĐ xem xét</b><span>Chỉ đúng email trong danh sách người duyệt mới thấy nút</span></div>
+            </div>
+            <div class="flow-branch">
+              <div class="flow-branch-line">
+                <div class="flow-branch-item">
+                  <div class="flow-arrow">↓ Từ chối</div>
+                  <div class="flow-box flow-box-gray"><b>Dừng lại</b><span>Không ghi vào Thu Chi</span></div>
+                </div>
+                <div class="flow-branch-item">
+                  <div class="flow-arrow">↓ Duyệt</div>
+                  <div class="flow-box flow-box-teal"><b>4. Tự động tạo Thu Chi</b><span>Trạng thái "Đã duyệt" gán sẵn — không duyệt lại lần 2</span></div>
+                </div>
+              </div>
+            </div>
+            <div class="flow-arrow">↓</div>
+            <div class="flow-step">
+              <div class="flow-box"><b>5. Riêng Lệnh tạm ứng — Giải chi</b><span>Kế toán phân bổ số tiền vào đúng (các) dự án cụ thể</span></div>
+            </div>
+            <div class="flow-arrow">↓</div>
+            <div class="flow-step">
+              <div class="flow-box flow-box-teal"><b>6. Bổ sung chứng từ bất kỳ lúc nào</b><span>Đính kèm ảnh Hóa đơn/CK sau đó — tự cập nhật trạng thái, KHÔNG kích hoạt duyệt lại</span></div>
+            </div>
+          </div>
+        </div>
       </div>
 
       <!-- ACTIVITY LOG + BACKUP (admin only) -->
@@ -590,7 +629,7 @@
         </div>
         <div class="field full">
           <label>📎 Đính kèm hồ sơ dự án (1 dự án có thể có nhiều HĐ khác nhau — mỗi HĐ 1 file riêng)</label>
-          <div class="helper-text" style="margin-bottom:4px;">File tối đa 4MB/file. Lần đầu upload sẽ hiện popup đăng nhập Microsoft 365 công ty. Upload xong bấm thẳng vào tên file để xem lại.</div>
+          <div class="helper-text" style="margin-bottom:4px;">Không giới hạn dung lượng file (file lớn sẽ tự động tải theo từng phần, hiện % tiến độ). Lần đầu upload cần bấm "🔗 Kết nối OneDrive" ở cuối menu bên trái trước. Upload xong bấm thẳng vào tên file để xem lại.</div>
         </div>
         <div class="exp-block">
           <label class="exp-block-title">Thông tin HĐ 1</label>
@@ -921,7 +960,7 @@
         </div>
         <div class="field full" id="order-attachment-field">
           <label>📎 Đính kèm hóa đơn/báo giá (ảnh hoặc PDF)</label>
-          <div class="helper-text" style="margin-bottom:6px;">Chọn tối đa 1 file (ảnh, PDF, Word, Excel...), tối đa ~2MB.</div>
+          <div class="helper-text" style="margin-bottom:6px;">Chọn tối đa 1 file (ảnh, PDF, Word, Excel...) — không giới hạn dung lượng.</div>
           <input type="file" id="order-attachment-input" accept="image/*,application/pdf,.pdf,.doc,.docx,.xls,.xlsx">
           <div id="order-attachment-status" style="margin-top:8px;"></div>
         </div>
