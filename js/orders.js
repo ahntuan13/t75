@@ -135,7 +135,7 @@ function renderOrderAttachmentStatus(){
   if(!el) return;
   if(currentOrderAttachment){
     const url = typeof currentOrderAttachment === 'object' ? currentOrderAttachment.url : currentOrderAttachment;
-    el.innerHTML = `<a href="${url}" target="_blank" rel="noopener" class="tag tag-blue" style="text-decoration:none;">📎 ${escapeHtml(currentOrderAttachmentName||'Xem file')}</a> <button type="button" class="btn btn-ghost btn-sm" id="order-attachment-remove">Xóa file</button>`;
+    el.innerHTML = `<a href="${url}" target="_blank" rel="noopener" class="tag tag-blue" style="text-decoration:none;" title="${escapeHtml(currentOrderAttachmentName||'')}">📎 File đính kèm</a> <button type="button" class="btn btn-ghost btn-sm" id="order-attachment-remove">Xóa file</button>`;
     document.getElementById('order-attachment-remove').addEventListener('click', ()=>{
       currentOrderAttachment = ''; currentOrderAttachmentName = '';
       document.getElementById('order-attachment-input').value = '';
