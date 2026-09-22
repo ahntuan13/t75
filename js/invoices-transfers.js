@@ -36,7 +36,7 @@ function renderInvoices(){
   }
   rows = rows.slice().sort((a,b)=> (b.invoiceDate||b.date||'').localeCompare(a.invoiceDate||a.date||''));
   table.innerHTML = `<thead><tr>
-    <th>Trạng thái</th><th>Số hóa đơn</th><th>Ngày HĐ</th><th>Dự án</th><th>Loại</th><th>Nội dung</th><th>Giá trị</th><th>Ảnh</th><th></th>
+    <th>Trạng thái</th><th>Số hóa đơn</th><th>Ngày HĐ</th><th>Dự án</th><th>Loại</th><th>Nội dung</th><th>Giá trị</th><th>File đính kèm</th><th></th>
   </tr></thead><tbody>${rows.map(t=>{
     // Quá hạn (>7 ngày kể từ ngày tạo) MÀ CHƯA có ảnh hóa đơn đính kèm -> tô đỏ để dễ nhận biết cần xử lý gấp.
     // Nếu đã đánh dấu "Đã xuất" rồi thì KHÔNG tô đỏ nữa, dù chưa kịp đính kèm ảnh.
@@ -102,7 +102,7 @@ function renderTransfers(){
   }
   rows = rows.slice().sort((a,b)=> (b.transferDate||b.date||'').localeCompare(a.transferDate||a.date||''));
   table.innerHTML = `<thead><tr>
-    <th>Trạng thái</th><th>Ngày CK</th><th>Ngân hàng</th><th>Số TK</th><th>Chủ TK</th><th>Dự án</th><th>Loại</th><th>Số tiền</th><th>Ảnh</th><th></th>
+    <th>Trạng thái</th><th>Ngày CK</th><th>Ngân hàng</th><th>Số TK</th><th>Chủ TK</th><th>Dự án</th><th>Loại</th><th>Số tiền</th><th>File đính kèm</th><th></th>
   </tr></thead><tbody>${rows.map(t=>{
     const done = (t.transferStatus||'pending')==='done';
     const doneLabel = t.type==='IN' ? '✅ Đã nhận' : '✅ Đã CK';
