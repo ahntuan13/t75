@@ -624,16 +624,9 @@ function getFilteredOrders(){
 
 function orderRowHtml(o){
   const myEmail = (auth.currentUser && auth.currentUser.email || '').toLowerCase();
-  // Gạch xóa dòng CHỈ khi đã thực sự XONG (không còn cần làm gì thêm):
-  // - Lệnh chi thường: gạch ngay khi đã ghi vào Thu Chi (có transactionId) — không có bước "chờ" nào thêm.
-  // - Lệnh TẠM ỨNG: sau khi duyệt vẫn còn "Chờ giải chi" (advanceExplainStatus='pending') — CHƯA xong,
-  //   không gạch vội. Chỉ gạch khi Kế toán đã bấm Giải chi xong (advanceExplainStatus='explained').
-  let isExplainedOrDone = !!o.transactionId;
-  if(o.transactionId && isAdvanceOrder(o)){
-    const linkedTx = (o.transactionCollection === 'fixedCosts' ? (typeof FIXEDCOSTS!=='undefined'?FIXEDCOSTS:[]) : TRANSACTIONS)
-      .find(t=> t.id === o.transactionId);
-    isExplainedOrDone = !!linkedTx && linkedTx.advanceExplainStatus === 'explained';
-  }
+  // Gạch xóa dòng khi đã ghi vào Thu Chi (có transactionId) — Lệnh tạm ứng không còn render qua hàm này
+  // nữa (xem advanceRowHtml trong renderAdvanceTable, có logic gạch riêng dựa trên số tiền còn lại).
+  const isExplainedOrDone = !!o.transactionId;
   // Cột "Duyệt" riêng, tách khỏi cột Trạng thái và khỏi nhóm icon Sửa/Xem/Xóa —
   // GĐ/PGĐ (bất kỳ ai trong danh sách approverEmails) bấm thẳng từ bảng, không cần mở Sửa lệnh.
   let approveCell = '';
@@ -696,6 +689,17 @@ function getFilteredAdvances(){
   return sortOrdersByStatusThenDate(rows);
 }
 
+// Tổng số tiền đã giải chi (phân bổ vào các khoản Chi cụ thể) của 1 lệnh tạm ứng — dựa trên chính
+// explainAllocations lưu trên lệnh, không phụ thuộc vào cờ boolean advanceExplainStatus của giao dịch gốc
+// (cờ đó chỉ nói "đã giải chi lần nào chưa", không nói rõ đã giải chi ĐỦ hết số tiền hay còn thiếu).
+function advanceExplainedAmount(o){
+  const allocations = Array.isArray(o.explainAllocations) ? o.explainAllocations : [];
+  return allocations.reduce((s,a)=> s + Number(a.amount||0), 0);
+}
+function advanceRemainingAmount(o){
+  return Math.max(0, Number(o.amount||0) - advanceExplainedAmount(o));
+}
+
 function renderAdvanceTable(){
   const table = document.getElementById('advance-table');
   if(!table) return;
@@ -704,7 +708,47 @@ function renderAdvanceTable(){
     table.innerHTML = `<tr><td><div class="empty-state"><div class="big">💳</div>Chưa có lệnh tạm ứng nào.</div></td></tr>`;
     return;
   }
-  table.innerHTML = ORDER_THEAD + `<tbody>${rows.map(orderRowHtml).join('')}</tbody>`;
+  const thead = `<thead><tr>
+    <th></th><th>Ngày</th><th>Loại</th><th>Người nhận</th><th>Lý do</th><th>Dự án</th><th>Số tiền</th><th>Còn lại chưa giải chi</th><th>Trạng thái</th><th>Duyệt</th><th>Đính kèm</th><th></th>
+  </tr></thead>`;
+  const advanceRowHtml = (o)=>{
+    const myEmail = (auth.currentUser && auth.currentUser.email || '').toLowerCase();
+    // Chỉ gạch ngang khi giải chi ĐỦ hết số tiền tạm ứng (không còn "Còn lại") — không dựa vào cờ boolean
+    // advanceExplainStatus nữa, vì cờ đó chỉ báo "đã bấm Giải chi ít nhất 1 lần", có thể vẫn còn thiếu tiền.
+    const remaining = advanceRemainingAmount(o);
+    const hasAllocations = Array.isArray(o.explainAllocations) && o.explainAllocations.length > 0;
+    const isExplainedOrDone = hasAllocations && remaining <= 0;
+    let approveCell = '';
+    if((o.approvalStatus||'none')==='pending' && myEmail && isAuthorizedApprover(myEmail)){
+      approveCell = `<button class="icon-btn" data-approve-order="${o.id}" title="Duyệt">✅</button><button class="icon-btn" data-reject-order="${o.id}" title="Từ chối">❌</button>`;
+    }
+    return `<tr${isExplainedOrDone ? ' class="tx-row-explained"' : ''}>
+      <td><input type="checkbox" class="order-select-cb" data-order-id="${o.id}"></td>
+      <td>${fmtDate(o.date)}</td>
+      <td>${isIncomeOrder(o) ? '<span class="tag tag-in">Thu</span>' : '<span class="tag tag-out">Chi</span>'} ${escapeHtml(ORDER_TYPE_LABELS[o.orderType] || 'Thanh toán chi phí')}</td>
+      <td><strong>${escapeHtml(o.payee)}</strong></td>
+      <td>${escapeHtml(o.reason)}</td>
+      <td>${escapeHtml(o.projectName||'—')}</td>
+      <td class="num"><strong>${fmtVND(o.amount)}</strong></td>
+      <td class="num">${hasAllocations
+          ? (remaining > 0 ? `<strong style="color:var(--gold);">${fmtVND(remaining)}</strong>` : `<span style="color:var(--teal);">Đã giải chi đủ</span>`)
+          : `<span class="helper-text">Chưa giải chi</span>`}</td>
+      <td>${statusTag(o)}</td>
+      <td class="order-approve-cell">${approveCell}</td>
+      <td>${o.attachment ? `<button class="icon-btn" data-view-order-attachment="${o.id}" title="Xem file đính kèm: ${escapeHtml(o.attachmentName||'')}">📎</button>` : '—'}</td>
+      <td>
+        <div class="row-actions">
+          <button class="icon-btn" data-view-order="${o.id}" title="Xem chi tiết">👁</button>
+          <button class="icon-btn" data-print-order="${o.id}" title="In">🖨</button>
+          <button class="icon-btn" data-edit-order="${o.id}" title="Sửa">✎</button>
+          ${!isSubAdmin() ? `<button class="icon-btn" data-explain-order="${o.id}" title="Giải chi (chỉ Kế toán)">🧾</button>` : ''}
+          ${(o.transactionId && !o.projectId && isAdmin()) ? `<button class="icon-btn" data-repair-order="${o.id}" title="Kiểm tra/Sửa liên kết Chi phí gián tiếp">🔧</button>` : ''}
+          <button class="icon-btn" data-del-order="${o.id}" title="Xóa">🗑</button>
+        </div>
+      </td>
+    </tr>`;
+  };
+  table.innerHTML = thead + `<tbody>${rows.map(advanceRowHtml).join('')}</tbody>`;
 }
 
 document.getElementById('advance-table')?.addEventListener('click', handleOrderTableClick);
@@ -979,6 +1023,9 @@ document.getElementById('save-explain-btn')?.addEventListener('click', async ()=
   const o = ORDERS.find(x=>x.id===orderId);
   if(!o) return;
   const date = document.getElementById('exp-date').value || todayISO();
+  // Danh sách khoản đã giải chi TỪ LẦN TRƯỚC (nếu có) — dùng để biết khung nào đã có giao dịch tạo sẵn rồi,
+  // để CẬP NHẬT LẠI đúng giao dịch đó thay vì tạo thêm giao dịch mới mỗi lần bấm Lưu giải trình.
+  const existingAllocations = Array.isArray(o.explainAllocations) ? o.explainAllocations : [];
 
   const blocks = [];
   explainBlockIds.forEach(i=>{
@@ -987,6 +1034,9 @@ document.getElementById('save-explain-btn')?.addEventListener('click', async ()=
     if(!amount) return; // khung hoàn toàn trống (không nhập số tiền) -> bỏ qua
     // KHÔNG chọn dự án vẫn phải tính — sẽ tự động rơi vào Chi phí gián tiếp (mã INDIRECT), y hệt Lệnh chi thường.
     const proj = projectId ? projectById(projectId) : null;
+    // Khung ở đúng VỊ TRÍ này (thứ tự i, khớp cách openOrderExplainModal nạp dữ liệu existing[id-1]) đã có
+    // giao dịch tạo từ trước hay chưa — có thì lấy lại đúng id giao dịch đó để cập nhật, không tạo mới.
+    const prev = existingAllocations[i-1] || null;
     blocks.push({
       projectId: projectId || '', projectName: proj ? proj.name : '',
       code: document.getElementById(`exp${i}-code`).value || (projectId ? '' : 'INDIRECT'),
@@ -998,6 +1048,8 @@ document.getElementById('save-explain-btn')?.addEventListener('click', async ()=
       amount,
       invoiceImage: currentExpInvoiceImages[i] || '',
       transferImage: currentExpTransferImages[i] || '',
+      prevTransactionId: prev ? (prev.transactionId || null) : null,
+      prevTransactionCollection: prev ? (prev.transactionCollection || null) : null,
     });
   });
   if(blocks.length === 0){ toast('Vui lòng điền ít nhất 1 khung Giải chi (nhập Số tiền)'); return; }
@@ -1010,12 +1062,11 @@ document.getElementById('save-explain-btn')?.addEventListener('click', async ()=
   }
 
   try{
-    const CHUNK = 400;
     const batch = db.batch();
+    const keptTransactionIds = new Set(); // để biết giao dịch cũ nào KHÔNG còn khung tương ứng nữa -> cần xóa
     blocks.forEach(b=>{
       const hasProject = !!b.projectId;
       const targetCollection = hasProject ? 'transactions' : 'fixedCosts';
-      const ref = db.collection(targetCollection).doc();
       const txData = {
         type:'OUT', projectId: b.projectId, projectName: b.projectName,
         date, code: b.code, content: b.content, description: b.description,
@@ -1025,8 +1076,6 @@ document.getElementById('save-explain-btn')?.addEventListener('click', async ()=
         invoiceImage: b.invoiceImage || '', transferImage: b.transferImage || '',
         invoiceStatus: b.invoiceImage ? 'issued' : 'pending',
         transferStatus: b.transferImage ? 'done' : 'pending',
-        createdAt: firebase.firestore.FieldValue.serverTimestamp(),
-        createdBy: auth.currentUser.email,
       };
       if(approvalTarget){
         txData.approvalStatus = 'pending';
@@ -1036,8 +1085,44 @@ document.getElementById('save-explain-btn')?.addEventListener('click', async ()=
         txData.approvedBy = '';
         txData.approvedAt = '';
       }
-      batch.set(ref, txData);
+
+      let ref;
+      if(b.prevTransactionId && b.prevTransactionCollection === targetCollection){
+        // Khung này ĐÃ có giao dịch tạo từ lần giải chi trước, và vẫn cùng loại (có dự án hay không) như cũ
+        // -> CẬP NHẬT LẠI đúng giao dịch đó, không tạo thêm bản ghi mới.
+        ref = db.collection(targetCollection).doc(b.prevTransactionId);
+        batch.update(ref, txData);
+      } else {
+        // Khung mới thêm, HOẶC đổi dự án khiến giao dịch phải chuyển collection (Thu Chi <-> Chi phí gián tiếp,
+        // Firestore không "move" được giữa 2 collection bằng update) -> tạo giao dịch mới. Giao dịch CŨ (nếu
+        // có, do đổi loại) đưa về 0đ thay vì xóa hẳn — Kế toán không có quyền xóa giao dịch (chỉ Admin).
+        if(b.prevTransactionId && b.prevTransactionCollection){
+          batch.update(db.collection(b.prevTransactionCollection).doc(b.prevTransactionId), {
+            amount: 0, note: `[Đã chuyển sang khoản khác khi sửa Giải chi ngày ${todayISO()}]`,
+          });
+        }
+        ref = db.collection(targetCollection).doc();
+        txData.createdAt = firebase.firestore.FieldValue.serverTimestamp();
+        txData.createdBy = auth.currentUser.email;
+        batch.set(ref, txData);
+      }
+      b.transactionId = ref.id;
+      b.transactionCollection = targetCollection;
+      keptTransactionIds.add(ref.id);
+      delete b.prevTransactionId; delete b.prevTransactionCollection; // chỉ dùng tạm để xử lý, không lưu lại
     });
+
+    // Khung nào đã bị XÓA khỏi form (bấm "🗑 Xóa khung" hoặc xóa hết Số tiền) mà trước đó đã có giao dịch
+    // riêng -> đưa giao dịch đó về 0đ kèm ghi chú rõ ràng (KHÔNG xóa hẳn — Kế toán không có quyền xóa giao
+    // dịch, chỉ Admin mới xóa được), tránh để sót lại 1 khoản Chi có số tiền mà không ai còn theo dõi trên form.
+    existingAllocations.forEach(prev=>{
+      if(prev.transactionId && !keptTransactionIds.has(prev.transactionId)){
+        batch.update(db.collection(prev.transactionCollection || 'transactions').doc(prev.transactionId), {
+          amount: 0, note: `[Đã xóa khỏi Giải chi ngày ${todayISO()}]`,
+        });
+      }
+    });
+
     await batch.commit();
 
     const orderUpdate = {
