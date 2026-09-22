@@ -182,9 +182,12 @@ function invoiceAttachmentPreviewHtml(fileRef, opts={}){
   const isOneDriveRef = (typeof fileRef === 'object') || (typeof fileRef === 'string' && /^https?:\/\//.test(fileRef));
   if(isOneDriveRef){
     const url = typeof fileRef === 'object' ? fileRef.url : fileRef;
-    const name = (typeof fileRef === 'object' && fileRef.name) ? fileRef.name : 'Xem file (OneDrive)';
+    const realName = (typeof fileRef === 'object' && fileRef.name) ? fileRef.name : '';
     if(!url) return '';
-    return `<a href="${url}" target="_blank" rel="noopener" class="tag tag-blue" style="text-decoration:none;">📎 ${escapeHtml(name)}</a>`;
+    // Hiện nhãn NGẮN, CỐ ĐỊNH (kiểu hyperlink trong Office) thay vì tên file gốc — tên gốc có kèm mã thời
+    // gian chống trùng nên rất dài, hay bị vỡ giao diện ở bảng/cột hẹp. Tên thật vẫn xem được khi rê chuột vào.
+    const label = opts.label || '📎 File đính kèm';
+    return `<a href="${url}" target="_blank" rel="noopener" class="tag tag-blue" style="text-decoration:none;" title="${escapeHtml(realName)}">${label}</a>`;
   }
 
   // File CŨ (dữ liệu đã lưu từ trước khi chuyển sang OneDrive) — vẫn là base64, giữ cách hiển thị như cũ
