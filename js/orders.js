@@ -864,12 +864,36 @@ function renderAllExplainBlocks(){
   });
 }
 
+// Chèn THÊM đúng 1 khung mới vào cuối danh sách — KHÔNG vẽ lại các khung đã có, để không làm mất dữ liệu
+// người dùng đã gõ vào những khung đó (lỗi trước đây: bấm "+ Thêm khung" từng vẽ lại TOÀN BỘ container,
+// vô tình xóa sạch mọi thứ đã nhập ở khung 1-5 dù chỉ định thêm khung 6).
+function appendExplainBlockDom(id){
+  const container = document.getElementById('exp-blocks-container');
+  if(!container) return;
+  container.insertAdjacentHTML('beforeend', renderExplainBlockHtml(id));
+  const sel = document.getElementById(`exp${id}-project`);
+  if(sel) sel.innerHTML = '<option value="">— Không chọn —</option>' + PROJECTS.map(p=>`<option value="${p.id}">${escapeHtml(p.name)}</option>`).join('');
+  setExpImagePreview(id, 'invoice', '');
+  setExpImagePreview(id, 'transfer', '');
+}
+
+// Xóa ĐÚNG 1 khung khỏi giao diện — không đụng tới các khung còn lại.
+function removeExplainBlockDom(id){
+  document.querySelector(`[data-exp-block="${id}"]`)?.remove();
+  // Nếu chỉ còn lại ĐÚNG 1 khung, ẩn nốt nút "🗑 Xóa khung" của khung đó (khớp quy tắc gốc: còn 1 khung thì
+  // không cho xóa nữa) — không cần vẽ lại cả khung, chỉ cần bỏ đúng cái nút đó đi.
+  if(explainBlockIds.length === 1){
+    const lastBlock = document.querySelector(`[data-exp-block="${explainBlockIds[0]}"]`);
+    lastBlock?.querySelector('[data-remove-exp-block]')?.remove();
+  }
+}
+
 document.getElementById('exp-add-block-btn')?.addEventListener('click', ()=>{
   const id = nextExplainBlockId++;
   explainBlockIds.push(id);
   currentExpInvoiceImages[id] = '';
   currentExpTransferImages[id] = '';
-  renderAllExplainBlocks();
+  appendExplainBlockDom(id);
 });
 
 function setExpImagePreview(i, kind, dataUrl){
@@ -901,7 +925,7 @@ document.getElementById('exp-blocks-container')?.addEventListener('click', (e)=>
     explainBlockIds = explainBlockIds.filter(x=>x!==id);
     delete currentExpInvoiceImages[id];
     delete currentExpTransferImages[id];
-    renderAllExplainBlocks();
+    removeExplainBlockDom(id);
     updateExplainAmountCheck();
     return;
   }
