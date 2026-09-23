@@ -72,21 +72,25 @@ function renderFixedCostsTable(){
   wrap.innerHTML = html;
 }
 
-// Giải trình: chuyển 1 khoản tạm ứng "Chờ giải trình" sang Thu Chi — mở lại đúng form Nhập giao dịch,
-// điền sẵn thông tin cũ, bắt buộc chọn Dự án/Mã và đính kèm chứng từ hóa đơn + chuyển khoản trước khi lưu.
+// Giải trình 1 khoản tạm ứng "Chờ giải trình" — dùng CHUNG cho Chi phí gián tiếp và Thu chi dự án.
+// Luôn mở thẳng form "Giải chi" nhiều khung của ĐÚNG lệnh tạm ứng gốc (bên trang Lệnh tạm ứng), để chỉ còn
+// 1 đường giải chi duy nhất: số liệu "Còn lại chưa giải chi" luôn khớp, không bị ghi chi 2 lần.
 function openExplainModal(id){
-  const t = FIXEDCOSTS.find(x=>x.id===id);
-  if(!t) return;
-  const prefill = {
-    type: 'OUT',
-    date: t.date,
-    content: t.content,
-    description: t.description,
-    amount: t.amount,
-    note: t.note,
-  };
-  openTxModal(null, prefill, 'transactions', id);
-  toast('Chọn Dự án, Mã và đính kèm hóa đơn + chuyển khoản để hoàn tất giải trình');
+  if(typeof isSubAdmin==='function' && isSubAdmin()){ toast('Giám đốc/PGĐ chỉ xem, không giải chi.'); return; }
+  const order = (typeof ORDERS!=='undefined' ? ORDERS : []).find(o=> o.transactionId === id);
+  if(order && typeof openOrderExplainModal === 'function'){
+    openOrderExplainModal(order.id);
+    return;
+  }
+  // Khoản tạm ứng KHÔNG có lệnh gốc (VD nhập từ Excel, hoặc dữ liệu rất cũ trước khi có Lệnh tạm ứng) —
+  // không có lệnh nào để giải chi nhiều khung, nên giữ cách cũ: chuyển cả khoản sang Thu Chi qua form Nhập giao dịch.
+  const fc = (typeof FIXEDCOSTS!=='undefined' ? FIXEDCOSTS : []).find(x=>x.id===id);
+  const tx = TRANSACTIONS.find(x=>x.id===id);
+  const t = fc || tx;
+  if(!t){ toast('Không tìm thấy khoản tạm ứng này.'); return; }
+  const prefill = { type:'OUT', date:t.date, content:t.content, description:t.description, amount:t.amount, note:t.note };
+  openTxModal(null, prefill, 'transactions', id, fc ? 'fixedCosts' : 'transactions');
+  toast('Khoản này không có Lệnh tạm ứng gốc — chọn Dự án, Mã và đính kèm chứng từ để hoàn tất giải trình');
 }
 
 document.getElementById('fc-table')?.addEventListener('click', (e)=>{

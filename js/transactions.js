@@ -355,9 +355,11 @@ document.getElementById('seg-advance')?.addEventListener('click', ()=>{
 
 let currentTxTarget = 'transactions'; // 'transactions' | 'fixedCosts'
 let currentTxExplainSourceId = null; // nếu có: đang "giải trình" 1 khoản tạm ứng từ Chi phí gián tiếp -> chuyển sang Thu Chi
+let currentTxExplainSourceCol = 'fixedCosts'; // collection chứa khoản tạm ứng gốc (fixedCosts hoặc transactions)
 
-function openTxModal(id, prefill, target, explainSourceId){
+function openTxModal(id, prefill, target, explainSourceId, explainSourceCol){
   currentTxExplainSourceId = explainSourceId || null;
+  currentTxExplainSourceCol = explainSourceCol || 'fixedCosts';
   currentTxTarget = target || 'transactions';
   const isFc = currentTxTarget === 'fixedCosts';
   const sourceArr = isFc ? (typeof FIXEDCOSTS!=='undefined'?FIXEDCOSTS:[]) : TRANSACTIONS;
@@ -548,7 +550,7 @@ document.getElementById('save-tx-btn').addEventListener('click', async ()=>{
       // Nếu đây là bước GIẢI TRÌNH: đánh dấu bản ghi gốc bên Chi phí gián tiếp là "đã giải trình"
       // (không xóa — giữ lại để đối chiếu, chỉ gạch ngang/tô xám và loại khỏi tổng Chi phí gián tiếp).
       if(currentTxExplainSourceId){
-        await db.collection('fixedCosts').doc(currentTxExplainSourceId).update({
+        await db.collection(currentTxExplainSourceCol).doc(currentTxExplainSourceId).update({
           advanceExplainStatus: 'explained',
           movedToTransactionId: newRef.id,
           explainedAt: firebase.firestore.FieldValue.serverTimestamp(),
@@ -610,8 +612,8 @@ function txRowHtml(t){
     : isExplained
       ? ' <span class="tag tag-gray" title="Đã giải trình, xem bản chính thức trong Thu Chi">✅ Đã giải trình → Thu Chi</span>'
       : '';
-  const explainBtn = isPendingExplain
-    ? `<button class="icon-btn" data-explain-tx="${t.id}" title="Giải trình: gán dự án + chứng từ, chuyển sang Thu Chi">🧾</button>`
+  const explainBtn = (isPendingExplain && !isSubAdmin())
+    ? `<button class="icon-btn" data-explain-tx="${t.id}" title="Giải chi khoản tạm ứng này (mở form Giải chi của Lệnh tạm ứng gốc)">🧾</button>`
     : '';
 
   return `<tr${isExplained ? ' class="tx-row-explained"' : ''}>
@@ -894,6 +896,8 @@ document.getElementById('tx-table').addEventListener('click', (e)=>{
   const delId = e.target.closest('[data-del-tx]')?.dataset.delTx;
   const approveId = e.target.closest('[data-approve-tx]')?.dataset.approveTx;
   const rejectId = e.target.closest('[data-reject-tx]')?.dataset.rejectTx;
+  const explainId = e.target.closest('[data-explain-tx]')?.dataset.explainTx;
+  if(explainId){ openExplainModal(explainId); return; } // trước đây nút 🧾 ở Thu chi dự án bấm không có tác dụng
   if(viewId) openTxViewModal(viewId, 'tx');
   if(editId) openTxModal(editId, null, 'transactions');
   if(delId){
