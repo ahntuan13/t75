@@ -420,8 +420,10 @@ async function handleInvoiceUpload(file){
 
     const items = extracted.items || [];
     const pretax = items.reduce((s,it)=> s + (it.amount||0), 0);
-    const vat = items.reduce((s,it)=> s + (it.vatAmount||0), 0);
+    const vatSum = items.reduce((s,it)=> s + (it.vatAmount||0), 0);
     const total = items.reduce((s,it)=> s + (it.amountAfterTax || it.amount || 0), 0) || extracted.totalAmount || 0;
+    // Ô "VAT" ở khối Thông tin hóa đơn là % THUẾ SUẤT, không phải số tiền thuế — quy đổi trước khi điền vào.
+    const vatRate = pretax > 0 ? Math.round((vatSum/pretax)*100) : 0;
     const firstItemName = items.find(it=>it.name && it.name.trim())?.name || '';
 
     // Tải file GỐC (không phải bản ảnh nội bộ dùng để OCR) lên OneDrive công ty — không giới hạn dung lượng,
@@ -448,7 +450,7 @@ async function handleInvoiceUpload(file){
       invoiceNumber: extracted.invoiceNumber || '',
       invoiceDate: extracted.invoiceDate || '',
       invoiceTaxCode: extracted.sellerTaxCode || '',
-      pretaxAmount: pretax, vatAmount: vat, totalAmount: total,
+      pretaxAmount: pretax, vatAmount: vatRate, totalAmount: total,
       invoiceStatus: 'issued',
       bankAccount: extracted.bankAccount || '',
       bankName: extracted.bankName || '',

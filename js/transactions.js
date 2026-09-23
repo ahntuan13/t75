@@ -178,12 +178,14 @@ document.getElementById('tx-transfer-image').addEventListener('change', async (e
   }catch(err){ toast(friendlyMsError(err)); }
 });
 
-// ---------------- Tự tính "Thành tiền sau thuế" = Thành tiền + Tiền thuế GTGT (Thu/Chi/Tạm ứng — không phải chế độ Hóa Đơn) ----------------
+// ---------------- Tự tính "Thành tiền sau thuế" = Thành tiền trước VAT x (1 + VAT%) ----------------
+// (Thu/Chi/Tạm ứng — không phải chế độ Hóa Đơn nhiều dòng). Ô "VAT" là % THUẾ SUẤT (VD nhập 8 nghĩa là 8%),
+// không phải số tiền thuế — trước đây bị tính nhầm thành CỘNG THẲNG số đã nhập vào (coi 8 là 8 đồng).
 function recalcTxInvoiceTotal(){
   const pretax = parseMoneyInput(document.getElementById('tx-pretax-amount'));
-  const vat = parseMoneyInput(document.getElementById('tx-vat-amount'));
-  if(pretax || vat){
-    setMoneyInputValue(document.getElementById('tx-total-amount'), pretax + vat);
+  const vatRate = parseMoneyInput(document.getElementById('tx-vat-amount')); // % thuế suất, không phải tiền
+  if(pretax){
+    setMoneyInputValue(document.getElementById('tx-total-amount'), Math.round(pretax * (1 + vatRate/100)));
   }
 }
 ['tx-pretax-amount','tx-vat-amount'].forEach(id=>{
@@ -236,10 +238,14 @@ document.getElementById('tx-scan-invoice-btn')?.addEventListener('click', async 
     if(extracted.sellerTaxCode) document.getElementById('tx-invoice-tax-code').value = extracted.sellerTaxCode;
     const items = extracted.items || [];
     const pretax = items.reduce((s,it)=> s + (it.amount||0), 0);
-    const vat = items.reduce((s,it)=> s + (it.vatAmount||0), 0);
+    const vatSum = items.reduce((s,it)=> s + (it.vatAmount||0), 0);
     const total = items.reduce((s,it)=> s + (it.amountAfterTax || it.amount || 0), 0) || extracted.totalAmount || 0;
+    // Ô "VAT" ở khối Thông tin hóa đơn là % THUẾ SUẤT, không phải số tiền thuế — quy đổi tổng tiền thuế đọc
+    // được từ hóa đơn (vatSum) ra đúng % tương ứng trước khi điền vào, để công thức nhân (Thành tiền trước
+    // VAT x (1+VAT%)) ra đúng số tiền sau VAT thật.
+    const vatRate = pretax > 0 ? Math.round((vatSum/pretax)*100) : 0;
     if(pretax) setMoneyInputValue(document.getElementById('tx-pretax-amount'), pretax);
-    if(vat) setMoneyInputValue(document.getElementById('tx-vat-amount'), vat);
+    if(vatRate) setMoneyInputValue(document.getElementById('tx-vat-amount'), vatRate);
     if(total) setMoneyInputValue(document.getElementById('tx-total-amount'), total);
     if(total && !isInvoiceTxMode) setMoneyInputValue(document.getElementById('tx-amount'), total);
     toast('✅ Đã đọc xong — kiểm tra KỸ lại thông tin (MST, số tiền, số hóa đơn) trước khi lưu.');
