@@ -26,6 +26,11 @@ service cloud.firestore {
     function isSystemGeneratedFromApproval() {
       return request.resource.data.note is string && request.resource.data.note.matches('^Tự động tạo từ.*');
     }
+    // Giao dịch do chính luồng "Giải chi Lệnh tạm ứng" tự sinh ra — Kế toán được xóa các dòng này (khi bỏ
+    // bớt khung giải chi / dọn bản trùng). Các giao dịch khác vẫn chỉ Admin được xóa.
+    function isExplainGeneratedDoc() {
+      return resource.data.note is string && resource.data.note.matches('^Tự động tạo từ Giải chi.*');
+    }
     function changedKeys() {
       return request.resource.data.diff(resource.data).affectedKeys();
     }
@@ -105,7 +110,7 @@ service cloud.firestore {
       // đổi trạng thái ở đúng 2 trang đó (xem js/transactions.js) — Firestore Rules không phân biệt được
       // request đến từ trang nào, chỉ phân biệt được ai và sửa field gì.
       allow update: if isNotSubAdmin() || isApprovalDecision();
-      allow delete: if isAdmin();
+      allow delete: if isAdmin() || (isNotSubAdmin() && isExplainGeneratedDoc());
     }
 
     // Chi phí gián tiếp (không gắn dự án cụ thể) — quyền y hệt transactions, thêm luồng "giải trình"
@@ -113,7 +118,7 @@ service cloud.firestore {
       allow read: if isSignedIn();
       allow create: if isSignedIn() && (isAdmin() || isSystemGeneratedFromApproval());
       allow update: if isNotSubAdmin() || isApprovalDecision();
-      allow delete: if isAdmin();
+      allow delete: if isAdmin() || (isNotSubAdmin() && isExplainGeneratedDoc());
     }
 
     // Cài đặt chung (VD: email GĐ duyệt chi) — ai cũng đọc được, chỉ Admin sửa
