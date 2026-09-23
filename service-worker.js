@@ -4,7 +4,7 @@
 //
 // LƯU Ý QUAN TRỌNG: mỗi khi sửa code (css/js/html), nên đổi CACHE_VERSION bên dưới lên 1 số mới —
 // nếu không, người dùng đã cài app có thể vẫn thấy bản cũ do trình duyệt dùng lại cache.
-const CACHE_VERSION = 'v1';
+const CACHE_VERSION = 'v2026-09-23-1';
 const CACHE_NAME = `t75-app-shell-${CACHE_VERSION}`;
 
 const APP_SHELL_FILES = [
