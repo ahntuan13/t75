@@ -742,6 +742,7 @@ function renderAdvanceTable(){
           <button class="icon-btn" data-print-order="${o.id}" title="In">🖨</button>
           <button class="icon-btn" data-edit-order="${o.id}" title="Sửa">✎</button>
           ${!isSubAdmin() ? `<button class="icon-btn" data-explain-order="${o.id}" title="Giải chi (chỉ Kế toán)">🧾</button>` : ''}
+          ${isAdmin() ? `<button class="icon-btn" data-cleanup-order="${o.id}" title="Dọn giao dịch Giải chi bị trùng (Admin)">🧹</button>` : ''}
           ${(o.transactionId && !o.projectId && isAdmin()) ? `<button class="icon-btn" data-repair-order="${o.id}" title="Kiểm tra/Sửa liên kết Chi phí gián tiếp">🔧</button>` : ''}
           <button class="icon-btn" data-del-order="${o.id}" title="Xóa">🗑</button>
         </div>
@@ -776,6 +777,8 @@ function handleOrderTableClick(e){
     }
     return;
   }
+  const cleanupId = e.target.closest('[data-cleanup-order]')?.dataset.cleanupOrder;
+  if(cleanupId){ openExplainCleanupModal(cleanupId); return; }
   if(repairId) repairOrderLink(repairId);
   if(viewId) openOrderModal(viewId);
   if(editId) openOrderModal(editId);
@@ -809,6 +812,13 @@ let explainBlockIds = []; // danh sách id khung đang hiển thị, vd [1,2,3,4
 let nextExplainBlockId = 1; // luôn tăng dần, kể cả khi xóa bớt khung ở giữa — tránh trùng id với khung cũ
 let currentExpInvoiceImages = {}; // key = id khung, value = '' | {url,name}
 let currentExpTransferImages = {};
+// Khoản giải chi ĐÃ LƯU từ trước ứng với từng khung (key = id khung, value = object allocation cũ hoặc null
+// nếu là khung mới). Dùng để biết khung nào đã có giao dịch rồi -> CẬP NHẬT đúng giao dịch đó thay vì tạo
+// thêm bản trùng. Ghép theo đúng khung (không ghép theo vị trí thứ tự như trước — thêm/xóa khung ở giữa
+// từng làm lệch thứ tự và sinh giao dịch trùng).
+let explainBlockPrev = {};
+let explainSaving = false; // chống bấm "Lưu giải trình" 2 lần liên tiếp (cũng từng gây tạo trùng giao dịch)
+function genAllocKey(){ return 'a' + Date.now().toString(36) + Math.random().toString(36).slice(2,8); }
 
 function renderExplainBlockHtml(id){
   const removeBtn = explainBlockIds.length > 1
@@ -893,6 +903,7 @@ document.getElementById('exp-add-block-btn')?.addEventListener('click', ()=>{
   explainBlockIds.push(id);
   currentExpInvoiceImages[id] = '';
   currentExpTransferImages[id] = '';
+  explainBlockPrev[id] = null; // khung mới hoàn toàn, chưa có giao dịch nào
   appendExplainBlockDom(id);
 });
 
@@ -925,6 +936,7 @@ document.getElementById('exp-blocks-container')?.addEventListener('click', (e)=>
     explainBlockIds = explainBlockIds.filter(x=>x!==id);
     delete currentExpInvoiceImages[id];
     delete currentExpTransferImages[id];
+    delete explainBlockPrev[id]; // giao dịch cũ của khung này (nếu có) sẽ được xóa khi bấm Lưu giải trình
     removeExplainBlockDom(id);
     updateExplainAmountCheck();
     return;
@@ -1020,9 +1032,11 @@ function openOrderExplainModal(orderId){
   explainBlockIds = Array.from({length: blockCount}, (_,i)=> i+1);
   nextExplainBlockId = blockCount + 1;
   currentExpInvoiceImages = {}; currentExpTransferImages = {};
+  explainBlockPrev = {};
   renderAllExplainBlocks();
 
   explainBlockIds.forEach(id=>{
+    explainBlockPrev[id] = existing[id-1] || null;
     const a = existing[id-1] || {};
     document.getElementById(`exp${id}-project`).value = a.projectId || '';
     document.getElementById(`exp${id}-code`).value = a.code || '';
@@ -1042,25 +1056,32 @@ function openOrderExplainModal(orderId){
   openModal('modal-order-explain');
 }
 
+// Toàn bộ giao dịch Thu Chi + Chi phí gián tiếp đang có trong bộ nhớ, kèm tên collection chứa nó.
+function allTxWithCollection(){
+  const fc = (typeof FIXEDCOSTS!=='undefined') ? FIXEDCOSTS : [];
+  return TRANSACTIONS.map(t=>({...t, _col:'transactions'})).concat(fc.map(t=>({...t, _col:'fixedCosts'})));
+}
+// Dòng ghi chú mà các bản CŨ dùng khi tạo giao dịch Giải chi (trước khi có liên kết sourceOrderId) — dùng
+// để nhận diện lại các giao dịch cũ của đúng lệnh này.
+function legacyExplainNote(o){ return `Tự động tạo từ Giải chi Lệnh tạm ứng (${o.payee}) — ${o.reason}`; }
+function isExplainGeneratedNote(note){ return typeof note === 'string' && note.startsWith('Tự động tạo từ Giải chi'); }
+
 document.getElementById('save-explain-btn')?.addEventListener('click', async ()=>{
+  if(explainSaving) return; // đang lưu dở -> bỏ qua cú bấm thứ 2, tránh tạo trùng
   const orderId = document.getElementById('exp-order-id').value;
   const o = ORDERS.find(x=>x.id===orderId);
   if(!o) return;
   const date = document.getElementById('exp-date').value || todayISO();
-  // Danh sách khoản đã giải chi TỪ LẦN TRƯỚC (nếu có) — dùng để biết khung nào đã có giao dịch tạo sẵn rồi,
-  // để CẬP NHẬT LẠI đúng giao dịch đó thay vì tạo thêm giao dịch mới mỗi lần bấm Lưu giải trình.
-  const existingAllocations = Array.isArray(o.explainAllocations) ? o.explainAllocations : [];
+  const prevAllocations = Array.isArray(o.explainAllocations) ? o.explainAllocations : [];
 
+  // ---- 1. Đọc dữ liệu từ các khung trên form ----
   const blocks = [];
   explainBlockIds.forEach(i=>{
     const projectId = document.getElementById(`exp${i}-project`).value;
     const amount = parseMoneyInput(document.getElementById(`exp${i}-amount`));
-    if(!amount) return; // khung hoàn toàn trống (không nhập số tiền) -> bỏ qua
-    // KHÔNG chọn dự án vẫn phải tính — sẽ tự động rơi vào Chi phí gián tiếp (mã INDIRECT), y hệt Lệnh chi thường.
+    if(!amount) return; // khung không có Số tiền -> bỏ qua
     const proj = projectId ? projectById(projectId) : null;
-    // Khung ở đúng VỊ TRÍ này (thứ tự i, khớp cách openOrderExplainModal nạp dữ liệu existing[id-1]) đã có
-    // giao dịch tạo từ trước hay chưa — có thì lấy lại đúng id giao dịch đó để cập nhật, không tạo mới.
-    const prev = existingAllocations[i-1] || null;
+    const prev = explainBlockPrev[i] || null;
     blocks.push({
       projectId: projectId || '', projectName: proj ? proj.name : '',
       code: document.getElementById(`exp${i}-code`).value || (projectId ? '' : 'INDIRECT'),
@@ -1072,11 +1093,17 @@ document.getElementById('save-explain-btn')?.addEventListener('click', async ()=
       amount,
       invoiceImage: currentExpInvoiceImages[i] || '',
       transferImage: currentExpTransferImages[i] || '',
-      prevTransactionId: prev ? (prev.transactionId || null) : null,
-      prevTransactionCollection: prev ? (prev.transactionCollection || null) : null,
+      _prev: prev,
     });
   });
   if(blocks.length === 0){ toast('Vui lòng điền ít nhất 1 khung Giải chi (nhập Số tiền)'); return; }
+
+  // ---- 2. Chốt chặn an toàn trước khi lưu ----
+  const keptPrevCount = blocks.filter(b=> b._prev).length;
+  const droppedCount = prevAllocations.length - keptPrevCount;
+  if(droppedCount > 0 && !confirm(`Bạn đang BỎ ${droppedCount} khoản đã giải chi trước đó (khung bị xóa hoặc để trống Số tiền).\n\nCác khoản này sẽ bị xóa khỏi Thu Chi / Chi phí gián tiếp / Hóa đơn. Tiếp tục lưu?`)) return;
+  const totalAlloc = blocks.reduce((s,b)=> s + b.amount, 0);
+  if(totalAlloc > Number(o.amount||0) && !confirm(`Tổng giải chi (${fmtVND(totalAlloc)}) đang VƯỢT số tiền tạm ứng (${fmtVND(o.amount)}).\n\nVẫn lưu?`)) return;
 
   const approvalTarget = document.getElementById('exp-approval-target').value;
   let approverEmail = '';
@@ -1085,96 +1112,195 @@ document.getElementById('save-explain-btn')?.addEventListener('click', async ()=
     if(!approverEmail){ toast('Chưa cài đặt email Giám đốc — vào mục Người dùng để nhập trước.'); return; }
   }
 
+  const saveBtn = document.getElementById('save-explain-btn');
+  explainSaving = true;
+  if(saveBtn){ saveBtn.disabled = true; saveBtn.textContent = '⏳ Đang lưu...'; }
   try{
+    // ---- 3. Tìm giao dịch đã có của lệnh này để CẬP NHẬT, không tạo trùng ----
+    const allTx = allTxWithCollection();
+    const txById = (id)=> allTx.find(t=> t.id===id) || null;
+    const linkedTx = allTx.filter(t=> t.sourceOrderId === orderId);        // giao dịch đã gắn liên kết (bản mới)
+    const legacyNote = legacyExplainNote(o);
+    const legacyTx = allTx.filter(t=> !t.sourceOrderId && t.note === legacyNote && Number(t.amount) > 0 && t.id !== o.transactionId); // giao dịch bản cũ, chưa gắn liên kết
+    const usedIds = new Set();
+
     const batch = db.batch();
-    const keptTransactionIds = new Set(); // để biết giao dịch cũ nào KHÔNG còn khung tương ứng nữa -> cần xóa
+    const savedAllocations = [];
     blocks.forEach(b=>{
-      const hasProject = !!b.projectId;
-      const targetCollection = hasProject ? 'transactions' : 'fixedCosts';
+      const prev = b._prev;
+      let existing = null;
+      if(prev && prev.transactionId) existing = txById(prev.transactionId);
+      if(!existing && prev && prev.allocKey) existing = linkedTx.find(t=> t.sourceAllocKey === prev.allocKey) || null;
+      if(!existing && prev){
+        // Dữ liệu CŨ không lưu ID giao dịch: nhận diện lại theo ghi chú + số tiền (+ nội dung nếu trùng khớp)
+        existing = legacyTx.find(t=> !usedIds.has(t.id) && Number(t.amount)===Number(prev.amount) && (t.content||'')===(prev.content||''))
+                || legacyTx.find(t=> !usedIds.has(t.id) && Number(t.amount)===Number(prev.amount)) || null;
+      }
+      if(existing && usedIds.has(existing.id)) existing = null;
+
+      const allocKey = (prev && prev.allocKey) || genAllocKey();
+      const targetCollection = b.projectId ? 'transactions' : 'fixedCosts';
       const txData = {
         type:'OUT', projectId: b.projectId, projectName: b.projectName,
         date, code: b.code, content: b.content, description: b.description,
         unit: b.unit, qty: b.qty, unitPrice: b.unitPrice, amount: b.amount,
         invoiceNumber:'', invoiceDate:'', bankName:'', bankAccount:'', bankHolder:'', transferDate:'',
-        note: `Tự động tạo từ Giải chi Lệnh tạm ứng (${o.payee}) — ${o.reason}`,
+        note: legacyNote,
         invoiceImage: b.invoiceImage || '', transferImage: b.transferImage || '',
         invoiceStatus: b.invoiceImage ? 'issued' : 'pending',
         transferStatus: b.transferImage ? 'done' : 'pending',
+        sourceOrderId: orderId,      // liên kết ngược về lệnh tạm ứng gốc
+        sourceAllocKey: allocKey,    // mã cố định của khung giải chi này
       };
       if(approvalTarget){
-        txData.approvalStatus = 'pending';
-        txData.approverRole = approvalTarget;
-        txData.approverEmail = approverEmail;
-        txData.approvalSubmittedAt = firebase.firestore.FieldValue.serverTimestamp();
-        txData.approvedBy = '';
-        txData.approvedAt = '';
+        Object.assign(txData, { approvalStatus:'pending', approverRole: approvalTarget, approverEmail,
+          approvalSubmittedAt: firebase.firestore.FieldValue.serverTimestamp(), approvedBy:'', approvedAt:'' });
       }
 
       let ref;
-      if(b.prevTransactionId && b.prevTransactionCollection === targetCollection){
-        // Khung này ĐÃ có giao dịch tạo từ lần giải chi trước, và vẫn cùng loại (có dự án hay không) như cũ
-        // -> CẬP NHẬT LẠI đúng giao dịch đó, không tạo thêm bản ghi mới.
-        ref = db.collection(targetCollection).doc(b.prevTransactionId);
+      if(existing && existing._col === targetCollection){
+        ref = db.collection(targetCollection).doc(existing.id);
         batch.update(ref, txData);
       } else {
-        // Khung mới thêm, HOẶC đổi dự án khiến giao dịch phải chuyển collection (Thu Chi <-> Chi phí gián tiếp,
-        // Firestore không "move" được giữa 2 collection bằng update) -> tạo giao dịch mới. Giao dịch CŨ (nếu
-        // có, do đổi loại) đưa về 0đ thay vì xóa hẳn — Kế toán không có quyền xóa giao dịch (chỉ Admin).
-        if(b.prevTransactionId && b.prevTransactionCollection){
-          batch.update(db.collection(b.prevTransactionCollection).doc(b.prevTransactionId), {
-            amount: 0, note: `[Đã chuyển sang khoản khác khi sửa Giải chi ngày ${todayISO()}]`,
-          });
+        if(existing){
+          // Đổi dự án khiến khoản phải chuyển giữa Thu Chi <-> Chi phí gián tiếp -> xóa bản cũ, tạo bản mới
+          batch.delete(db.collection(existing._col).doc(existing.id));
         }
         ref = db.collection(targetCollection).doc();
         txData.createdAt = firebase.firestore.FieldValue.serverTimestamp();
         txData.createdBy = auth.currentUser.email;
         batch.set(ref, txData);
       }
-      b.transactionId = ref.id;
-      b.transactionCollection = targetCollection;
-      keptTransactionIds.add(ref.id);
-      delete b.prevTransactionId; delete b.prevTransactionCollection; // chỉ dùng tạm để xử lý, không lưu lại
+      if(existing) usedIds.add(existing.id);
+      usedIds.add(ref.id);
+
+      const { _prev, ...clean } = b;
+      savedAllocations.push({ ...clean, allocKey, transactionId: ref.id, transactionCollection: targetCollection });
     });
 
-    // Khung nào đã bị XÓA khỏi form (bấm "🗑 Xóa khung" hoặc xóa hết Số tiền) mà trước đó đã có giao dịch
-    // riêng -> đưa giao dịch đó về 0đ kèm ghi chú rõ ràng (KHÔNG xóa hẳn — Kế toán không có quyền xóa giao
-    // dịch, chỉ Admin mới xóa được), tránh để sót lại 1 khoản Chi có số tiền mà không ai còn theo dõi trên form.
-    existingAllocations.forEach(prev=>{
-      if(prev.transactionId && !keptTransactionIds.has(prev.transactionId)){
-        batch.update(db.collection(prev.transactionCollection || 'transactions').doc(prev.transactionId), {
-          amount: 0, note: `[Đã xóa khỏi Giải chi ngày ${todayISO()}]`,
-        });
+    // ---- 4. Xóa các giao dịch cũ của lệnh này không còn khung nào tương ứng ----
+    const staleIds = new Set();
+    linkedTx.forEach(t=>{ if(!usedIds.has(t.id)) staleIds.add(t.id); });
+    prevAllocations.forEach(a=>{ if(a.transactionId && !usedIds.has(a.transactionId) && txById(a.transactionId)) staleIds.add(a.transactionId); });
+    staleIds.forEach(id=>{
+      const t = txById(id);
+      if(!t) return;
+      if(isAdmin() || isExplainGeneratedNote(t.note)){
+        batch.delete(db.collection(t._col).doc(id));
+      } else {
+        batch.update(db.collection(t._col).doc(id), { amount: 0, note: `[Đã xóa khỏi Giải chi ngày ${todayISO()}] ${t.note||''}` });
       }
     });
 
-    await batch.commit();
-
-    const orderUpdate = {
-      explainAllocations: blocks,
+    // ---- 5. Ghi danh sách giải chi vào lệnh + đánh dấu khoản tạm ứng gốc — CÙNG 1 lần lưu (nguyên khối) ----
+    // Trước đây ghi giao dịch trước rồi mới ghi vào lệnh ở 1 bước riêng: nếu bước sau lỗi, giao dịch vẫn nằm đó
+    // mà lệnh không biết -> lần sau lại tạo thêm. Giờ gộp chung: hoặc lưu hết, hoặc không lưu gì.
+    batch.update(db.collection('paymentOrders').doc(orderId), {
+      explainAllocations: savedAllocations,
       explainedAt: firebase.firestore.FieldValue.serverTimestamp(),
       explainedBy: auth.currentUser.email,
-    };
-    await db.collection('paymentOrders').doc(orderId).update(orderUpdate);
-
-    // Đánh dấu bản ghi TẠM (dự kiến) ban đầu là "đã giải chi" — bất kể nó đang nằm ở Thu Chi hay Chi phí
-    // gián tiếp — để loại khỏi mọi tổng tính toán (số liệu chính thức giờ nằm ở các khoản Giải chi vừa tạo,
-    // tránh tính trùng tiền 2 lần).
-    if(o.transactionId){
-      const originalCollection = o.transactionCollection || 'transactions';
-      try{
-        await db.collection(originalCollection).doc(o.transactionId).update({
-          advanceExplainStatus: 'explained',
-          movedToTransactionId: orderId,
-          explainedAt: firebase.firestore.FieldValue.serverTimestamp(),
-          explainedBy: auth.currentUser.email,
-        });
-      }catch(err){ console.error('mark explained error', err); }
+    });
+    const originalTx = o.transactionId ? txById(o.transactionId) : null;
+    if(originalTx){
+      batch.update(db.collection(originalTx._col).doc(originalTx.id), {
+        advanceExplainStatus: 'explained',
+        movedToTransactionId: orderId,
+        explainedAt: firebase.firestore.FieldValue.serverTimestamp(),
+        explainedBy: auth.currentUser.email,
+      });
     }
 
-    toast(`✅ Đã giải trình xong — tạo ${blocks.length} khoản Chi phân bổ theo dự án`);
-    logActivity('update', {projectName:'Giải chi tạm ứng', content: o.reason, amount: blocks.reduce((s,b)=>s+b.amount,0), type:'OUT'});
+    await batch.commit();
+
+    toast(`✅ Đã lưu giải chi — ${savedAllocations.length} khoản phân bổ${staleIds.size ? `, đã dọn ${staleIds.size} khoản cũ không còn dùng` : ''}`);
+    logActivity('update', {projectName:'Giải chi tạm ứng', content: o.reason, amount: totalAlloc, type:'OUT'});
     currentExpInvoiceImages = {};
     currentExpTransferImages = {};
+    explainBlockPrev = {};
     closeModal('modal-order-explain');
-  }catch(err){ toast('Lỗi: '+err.message); }
+  }catch(err){
+    toast('Lỗi khi lưu giải chi (chưa có gì bị thay đổi): ' + err.message);
+  }finally{
+    explainSaving = false;
+    if(saveBtn){ saveBtn.disabled = false; saveBtn.textContent = 'Lưu giải trình'; }
+  }
 });
+
+// =============================================================
+// 🧹 DỌN GIAO DỊCH GIẢI CHI BỊ TRÙNG (Admin) — xử lý dữ liệu đã lỡ phát sinh từ các bản cũ.
+// Liệt kê MỌI giao dịch sinh ra từ Giải chi của 1 lệnh tạm ứng: dòng nào đang được lệnh sử dụng
+// (có trong danh sách giải chi hiện tại) thì giữ; các dòng còn lại (bản trùng / mồ côi) được tick sẵn để xóa.
+// =============================================================
+function ensureExplainCleanupModal(){
+  if(document.getElementById('modal-explain-cleanup')) return;
+  document.body.insertAdjacentHTML('beforeend', `
+    <div class="modal-backdrop" id="modal-explain-cleanup">
+      <div class="modal" style="max-width:980px;width:100%;">
+        <div class="modal-head"><h3>🧹 Dọn giao dịch Giải chi bị trùng</h3><button class="modal-close" data-close>✕</button></div>
+        <div class="modal-body">
+          <div id="cleanup-summary" class="tx-view-note" style="margin-bottom:12px;"></div>
+          <div class="table-wrap"><table class="data" id="cleanup-table"></table></div>
+        </div>
+        <div class="modal-foot">
+          <button class="btn btn-ghost" data-close>Đóng</button>
+          <button class="btn btn-danger" id="cleanup-delete-btn">🗑 Xóa các dòng đã chọn</button>
+        </div>
+      </div>
+    </div>`);
+  document.getElementById('cleanup-delete-btn').addEventListener('click', runExplainCleanup);
+}
+
+let cleanupCandidates = [];
+function openExplainCleanupModal(orderId){
+  if(!isAdmin()){ toast('Chỉ Admin được dùng công cụ này.'); return; }
+  const o = ORDERS.find(x=>x.id===orderId);
+  if(!o) return;
+  ensureExplainCleanupModal();
+  const allTx = allTxWithCollection();
+  const legacyNote = legacyExplainNote(o);
+  const activeIds = new Set((o.explainAllocations||[]).map(a=> a.transactionId).filter(Boolean));
+  cleanupCandidates = allTx
+    .filter(t=> t.id !== o.transactionId && (t.sourceOrderId === orderId || t.note === legacyNote || t.note === `Giải chi từ Lệnh tạm ứng (${o.payee}) — ${o.reason}`))
+    .map(t=> ({ ...t, _active: activeIds.has(t.id) }));
+  // Các dòng 0đ đã bị "vô hiệu" bởi bản cũ (mất liên kết lệnh) — hiện thêm để Admin dọn luôn nếu muốn.
+  const zeroed = allTx.filter(t=> Number(t.amount)===0 && typeof t.note==='string' && /^\[Đã (xóa khỏi Giải chi|chuyển sang khoản khác)/.test(t.note))
+    .map(t=> ({ ...t, _active:false, _zeroed:true }));
+  zeroed.forEach(z=>{ if(!cleanupCandidates.some(c=>c.id===z.id)) cleanupCandidates.push(z); });
+
+  const dupCount = cleanupCandidates.filter(c=> !c._active).length;
+  document.getElementById('cleanup-summary').innerHTML =
+    `<strong>${escapeHtml(o.reason)}</strong> — ${escapeHtml(o.payee)} · Tạm ứng ${fmtVND(o.amount)}<br>` +
+    `Tìm thấy <strong>${cleanupCandidates.length}</strong> giao dịch liên quan: <span style="color:var(--teal)">${cleanupCandidates.length-dupCount} đang dùng</span>, ` +
+    `<span style="color:var(--red)">${dupCount} trùng / mồ côi</span> (đã tick sẵn để xóa). Kiểm tra lại trước khi bấm xóa.`;
+  const table = document.getElementById('cleanup-table');
+  table.innerHTML = cleanupCandidates.length ? `<thead><tr><th></th><th>Tình trạng</th><th>Ngày</th><th>Nơi lưu</th><th>Dự án</th><th>Nội dung</th><th>Số tiền</th></tr></thead><tbody>` +
+    cleanupCandidates.map(c=> `<tr>
+      <td><input type="checkbox" class="cleanup-cb" data-id="${c.id}" ${c._active ? '' : 'checked'}></td>
+      <td>${c._active ? '<span class="tag tag-in">Đang dùng</span>' : c._zeroed ? '<span class="tag tag-gray">Dòng 0đ đã vô hiệu</span>' : '<span class="tag tag-out">Trùng / mồ côi</span>'}</td>
+      <td>${fmtDate(c.date)}</td>
+      <td>${c._col==='fixedCosts' ? 'Chi phí gián tiếp' : 'Thu chi dự án'}</td>
+      <td>${escapeHtml(c.projectName||'—')}</td>
+      <td>${escapeHtml(c.content||'')}</td>
+      <td class="num">${fmtVND(c.amount||0)}</td>
+    </tr>`).join('') + `</tbody>`
+    : `<tr><td><div class="empty-state">Không tìm thấy giao dịch Giải chi nào của lệnh này.</div></td></tr>`;
+  openModal('modal-explain-cleanup');
+}
+
+async function runExplainCleanup(){
+  const ids = Array.from(document.querySelectorAll('.cleanup-cb:checked')).map(cb=> cb.dataset.id);
+  if(!ids.length){ toast('Chưa chọn dòng nào để xóa.'); return; }
+  const activePicked = cleanupCandidates.filter(c=> ids.includes(c.id) && c._active).length;
+  if(!confirm(`Xóa vĩnh viễn ${ids.length} giao dịch?` + (activePicked ? `\n\n⚠️ Trong đó có ${activePicked} dòng ĐANG DÙNG — xóa sẽ làm lệch số liệu Giải chi của lệnh.` : ''))) return;
+  try{
+    const batch = db.batch();
+    ids.forEach(id=>{
+      const c = cleanupCandidates.find(x=>x.id===id);
+      if(c) batch.delete(db.collection(c._col).doc(id));
+    });
+    await batch.commit();
+    toast(`✅ Đã xóa ${ids.length} giao dịch trùng`);
+    logActivity('delete', {projectName:'Dọn Giải chi trùng', content:`Xóa ${ids.length} giao dịch`, type:'OUT'});
+    closeModal('modal-explain-cleanup');
+  }catch(err){ toast('Lỗi khi xóa: ' + err.message); }
+}
