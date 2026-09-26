@@ -275,6 +275,7 @@ document.getElementById('onedrive-connect-btn')?.addEventListener('click', async
                       // trình duyệt luôn coi đây là thao tác người dùng chủ động, không bao giờ bị chặn popup.
     toast('✅ Đăng nhập OneDrive công ty thành công — giờ đính kèm file sẽ không cần đăng nhập lại nữa.');
     renderOnedriveConnectStatus();
+    if(typeof checkAutoBackup === 'function') checkAutoBackup(); // vừa kết nối xong -> kiểm tra sao lưu tự động luôn
   }catch(err){
     toast(friendlyMsError(err));
   }finally{

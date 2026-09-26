@@ -124,6 +124,7 @@
       <button id="menu-toggle">☰</button>
       <div id="approval-banner" style="display:none;"></div>
       <div id="onedrive-connect-banner" style="display:none;"></div>
+      <div id="backup-warning-banner" style="display:none;"></div>
 
       <!-- DASHBOARD -->
       <div class="view active" id="view-dashboard">
@@ -551,26 +552,27 @@
           <div><h2>Lịch sử chỉnh sửa & Sao lưu</h2><div class="sub">Chỉ Admin thấy được trang này</div></div>
         </div>
         <div class="card">
-          <div class="card-head"><h3>💾 Sao lưu dữ liệu Thu Chi lên OneDrive</h3></div>
+          <div class="card-head"><h3>💾 Sao lưu toàn bộ dữ liệu lên OneDrive công ty</h3></div>
           <p class="helper-text" style="margin-bottom:14px;">
-            Xuất toàn bộ <strong>4 nhóm dữ liệu chính</strong> (Thu Chi + Chi phí gián tiếp, Dự án, Lệnh chi/Tạm ứng + Nhân viên + Chấm công) thành 1 file Excel nhiều sheet, lưu vào thư mục <code>Backups/</code> trên OneDrive công ty.<br><br>
-            <strong>Về việc tự động 20h hằng ngày:</strong> app tĩnh (GitHub Pages) không có server chạy nền nên không thể tự sao lưu đúng giờ dù không ai mở app
-            (muốn làm được thật sự cần nâng cấp Firebase Cloud Functions — gói trả phí Blaze, báo mình nếu bạn muốn triển khai thêm phần đó).
-            Giải pháp hiện tại: <strong>mỗi khi Admin mở app sau 20h mà hôm đó CHƯA sao lưu lần nào, hệ thống sẽ tự động sao lưu ngay lúc đó</strong> (không cần bấm nút) —
-            miễn có Admin mở app ít nhất 1 lần mỗi ngày sau 20h là dữ liệu vẫn được sao lưu đều đặn. Bạn vẫn có thể bấm nút dưới để sao lưu thủ công bất cứ lúc nào.
+            Mỗi lần sao lưu tạo 2 file trong thư mục <code>Backups/</code> trên OneDrive công ty:
+            <strong>.json</strong> — bản <strong>đầy đủ 100%</strong> (Thu chi, Chi phí gián tiếp, Dự án, Lệnh thu/chi/tạm ứng kèm Giải chi, Nhân viên, Chấm công, Điều chỉnh lương, Cài đặt, Người dùng, Lịch sử) dùng để khôi phục;
+            <strong>.xlsx</strong> — bản để xem/đối chiếu bằng Excel.<br><br>
+            <strong>Tự động:</strong> khi Admin mở app (đã kết nối OneDrive) mà hôm nay chưa có bản sao lưu — hệ thống tự sao lưu nếu đã sau 20h, hoặc sao lưu bù ngay nếu đã bỏ lỡ từ hôm trước.
+            Quá 2 ngày chưa có bản nào, trang chủ sẽ hiện cảnh báo nhắc Admin.
           </p>
           <button class="btn btn-primary btn-sm" id="btn-backup-onedrive">💾 Sao lưu ngay lên OneDrive</button>
           <div class="helper-text" id="backup-status" style="margin-top:10px;"></div>
         </div>
         <div class="card">
-          <div class="card-head"><h3>📥 Khôi phục dữ liệu Thu Chi từ file sao lưu</h3></div>
+          <div class="card-head"><h3>📥 Khôi phục dữ liệu từ bản sao lưu</h3></div>
           <p class="helper-text" style="margin-bottom:14px;">
-            Dùng khi lỡ mất/hỏng dữ liệu. Tải file sao lưu (.xlsx) đúng định dạng từ thư mục <code>Backups/</code> trên OneDrive về máy, rồi chọn lại ở đây — hệ thống sẽ tự nhận diện và khôi phục đúng từng nhóm dữ liệu có trong file (Thu Chi, Chi phí gián tiếp, Dự án, Lệnh chi/Tạm ứng, Nhân viên, Chấm công).
-            <br><em>Lưu ý: bản sao lưu Excel chỉ lưu các trường thông tin cốt lõi (đủ để khôi phục đúng số liệu tài chính) — một số trường phụ như file đính kèm hợp đồng, ghi chú riêng của Lệnh chi... sẽ KHÔNG được khôi phục lại do không nằm trong file Excel. Báo mình nếu cần backup đầy đủ 100% mọi trường dữ liệu.</em>
-            <strong style="color:var(--red);">⚠️ Khôi phục sẽ XÓA TOÀN BỘ dữ liệu Thu Chi hiện tại và thay bằng đúng nội dung trong file sao lưu — không hoàn tác được.</strong>
+            Tải file <strong>.json</strong> cần khôi phục từ thư mục <code>Backups/</code> trên OneDrive về máy, rồi chọn ở đây. Bạn chọn được từng nhóm dữ liệu muốn khôi phục;
+            nhóm được chọn quay về <strong>đúng trạng thái lúc sao lưu</strong>, giữ nguyên mọi liên kết (Lệnh chi ↔ Thu chi, Giải chi, file đính kèm...).
+            Trước khi khôi phục, hệ thống tự tải về máy 1 bản sao lưu của dữ liệu hiện tại để quay lại được nếu chọn nhầm.
+            <br><em>File .xlsx kiểu cũ vẫn chọn được nhưng khôi phục không đầy đủ — chỉ dùng khi không có file .json.</em>
           </p>
           <button class="btn btn-danger btn-sm" id="btn-restore-backup">📥 Chọn file sao lưu để khôi phục</button>
-          <input type="file" id="restore-backup-input" accept=".xlsx,.xls" style="display:none">
+          <input type="file" id="restore-backup-input" accept=".json,.xlsx,.xls" style="display:none">
         </div>
         <div class="card">
           <div class="card-head"><h3>🕘 Lịch sử chỉnh sửa Thu Chi</h3></div>

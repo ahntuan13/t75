@@ -71,119 +71,286 @@ function renderActivityLogTable(){
 
 document.getElementById('log-filter-days')?.addEventListener('change', renderActivityLogTable);
 
-// ---------------- Sao lưu Thu Chi lên OneDrive ----------------
-// LƯU Ý QUAN TRỌNG VỀ GIỚI HẠN KỸ THUẬT: App này là web tĩnh (GitHub Pages), KHÔNG có server chạy nền,
-// nên KHÔNG THỂ tự sao lưu đúng "8h tối" dù không ai mở app (cần Firebase Cloud Functions + gói trả phí
-// Blaze để làm được việc đó thật sự). Giải pháp khả thi nhất trong điều kiện hiện tại: mỗi khi có AI (Admin)
-// MỞ APP sau 20:00 mà HÔM NAY CHƯA sao lưu lần nào, hệ thống sẽ tự động sao lưu ngay lúc đó (không cần bấm nút).
-// Nếu không ai mở app sau 20h hôm đó, ngày đó sẽ không có bản sao lưu — đây là giới hạn thực tế cần lưu ý.
-async function runBackupToOneDrive(silent){
-  const el = document.getElementById('backup-status');
-  if(typeof XLSX === 'undefined') return false;
-  const hasAnyData = TRANSACTIONS.length || (typeof FIXEDCOSTS!=='undefined' && FIXEDCOSTS.length) ||
-    (typeof PROJECTS!=='undefined' && PROJECTS.length) || (typeof ORDERS!=='undefined' && ORDERS.length) ||
-    (typeof EMPLOYEES!=='undefined' && EMPLOYEES.length);
-  if(!hasAnyData) return false;
-  if(el) el.innerHTML = '⏳ Đang tạo file sao lưu...';
-  try{
-    const wb = XLSX.utils.book_new();
+// =============================================================
+// SAO LƯU ĐẦY ĐỦ LÊN ONEDRIVE CÔNG TY
+// Mỗi lần sao lưu tạo 2 file trong thư mục Backups/ trên OneDrive:
+//  - .json  : bản ĐẦY ĐỦ 100% (mọi nhóm, mọi trường, giữ nguyên ID) — dùng để KHÔI PHỤC chính xác.
+//  - .xlsx  : bản để NGƯỜI đọc/đối chiếu bằng Excel (không dùng để khôi phục đầy đủ được).
+// App là web tĩnh, không có server chạy nền: sao lưu tự động chạy khi Admin mở app (xem checkAutoBackup).
+// =============================================================
 
-    // 1) DÒNG TIỀN: Thu Chi (theo dự án)
-    const txData = TRANSACTIONS.slice()
-      .sort((a,b)=> (a.projectName||'').localeCompare(b.projectName||'','vi') || (a.date||'').localeCompare(b.date||''))
-      .map(t=> ({
-        'Dự án': t.projectName||'', 'Loại': t.type==='IN'?'Thu':'Chi', 'Ngày': t.date||'', 'Mã': t.code||'',
-        'Nội dung': t.content||'', 'Diễn giải': t.description||'', 'Thành tiền': t.amount||0,
-        'Trạng thái hóa đơn': (t.invoiceStatus||'pending')==='issued'?'Đã xuất':'Chưa xuất',
-        'Số hóa đơn': t.invoiceNumber||'', 'Trạng thái CK/Nhận': (t.transferStatus||'pending')==='done' ? (t.type==='IN'?'Đã nhận':'Đã CK') : (t.type==='IN'?'Chưa nhận':'Chưa CK'),
-        'Ngân hàng': t.bankName||'', 'Số TK': t.bankAccount||'', 'Trạng thái duyệt': t.approvalStatus||'', 'Ghi chú': t.note||'',
-      }));
-    XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(txData.length?txData:[{}]), 'ThuChi');
+// Các nhóm dữ liệu được sao lưu. restore:false = chỉ lưu để tra cứu, không khôi phục ngược (VD Lịch sử
+// chỉnh sửa: quy tắc bảo mật không cho sửa/xóa, đúng tinh thần "nhật ký không được can thiệp").
+const BACKUP_COLLECTIONS = [
+  { name:'transactions',      label:'Thu chi dự án',             restore:true,  defaultOn:true },
+  { name:'fixedCosts',        label:'Chi phí gián tiếp',          restore:true,  defaultOn:true },
+  { name:'projects',          label:'Dự án',                      restore:true,  defaultOn:true },
+  { name:'paymentOrders',     label:'Lệnh thu/chi/tạm ứng',       restore:true,  defaultOn:true },
+  { name:'employees',         label:'Nhân viên',                  restore:true,  defaultOn:true },
+  { name:'timesheets',        label:'Chấm công',                  restore:true,  defaultOn:true },
+  { name:'payrollAdjustments',label:'Điều chỉnh lương / Tiền công',restore:true,  defaultOn:true },
+  { name:'settings',          label:'Cài đặt hệ thống',           restore:true,  defaultOn:false },
+  { name:'users',             label:'Người dùng & phân quyền',     restore:true,  defaultOn:false },
+  { name:'activityLog',       label:'Lịch sử chỉnh sửa',          restore:false, defaultOn:false },
+];
+const BACKUP_FORMAT_VERSION = 1;
 
-    // 2) DÒNG TIỀN: Chi phí gián tiếp
-    const fcData = (typeof FIXEDCOSTS!=='undefined'?FIXEDCOSTS:[]).slice()
-      .sort((a,b)=> (a.date||'').localeCompare(b.date||''))
-      .map(t=> ({
-        'Loại': t.type==='IN'?'Thu':'Chi', 'Ngày': t.date||'', 'Mã': t.code||'', 'Nội dung': t.content||'',
-        'Diễn giải': t.description||'', 'Thành tiền': t.amount||0, 'Trạng thái giải chi': t.advanceExplainStatus||'',
-        'Ghi chú': t.note||'',
-      }));
-    XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(fcData.length?fcData:[{}]), 'ChiPhiGianTiep');
-
-    // 3) DỰ ÁN
-    const projData = (typeof PROJECTS!=='undefined'?PROJECTS:[]).map(p=> ({
-      'Tên dự án': p.name||'', 'Mã': p.code||'', 'Khách hàng': p.customer||'', 'MST': p.taxCode||'',
-      'Giá trị HĐ': p.contractValue||0, 'Chi phí dự toán': p.costBudget||0, 'Doanh thu dự toán': p.revenueBudget||0,
-      'Trạng thái': p.status||'', 'Ngày ký HĐ': p.signDate||'', 'Ngày hoàn thành': p.completionDate||'', 'Ghi chú': p.note||'',
-    }));
-    XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(projData.length?projData:[{}]), 'DuAn');
-
-    // 4) CHI & LƯƠNG: Lệnh chi/Tạm ứng
-    const ordData = (typeof ORDERS!=='undefined'?ORDERS:[]).map(o=> ({
-      'Loại': o.orderType||'', 'Ngày': o.date||'', 'Người nhận': o.payee||'', 'Lý do': o.reason||'',
-      'Dự án': o.projectName||'', 'Số tiền': o.amount||0, 'Trạng thái duyệt': o.approvalStatus||'',
-      'Đã duyệt bởi': o.approvedBy||'', 'Giải chi': o.explanation||'',
-    }));
-    XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(ordData.length?ordData:[{}]), 'LenhChiTamUng');
-
-    // 5) CHI & LƯƠNG: Nhân viên
-    const empData = (typeof EMPLOYEES!=='undefined'?EMPLOYEES:[]).map(e=> ({
-      'Họ tên': e.name||'', 'Chức vụ': e.position||'', 'Nhóm lương': e.payType==='daily'?'Công nhân':'Quản lý',
-      'Lương HĐLĐ/BHXH': e.contractSalary||0, 'Lương hiệu quả': e.effectiveRate||0, 'Ghi chú': e.note||'',
-    }));
-    XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(empData.length?empData:[{}]), 'NhanVien');
-
-    // 6) CHI & LƯƠNG: Chấm công
-    const tsData = (typeof TIMESHEETS!=='undefined'?TIMESHEETS:[]).map(t=>{
-      const s = t.shifts||{};
-      return {
-        'Nhân viên': t.employeeName||'', 'Ngày': t.date||'',
-        'Sáng - Dự án': s.sang?.projectName||'', 'Sáng - Giờ': s.sang?.hours||0,
-        'Chiều - Dự án': s.chieu?.projectName||'', 'Chiều - Giờ': s.chieu?.hours||0,
-        'Tối - Dự án': s.toi?.projectName||'', 'Tối - Giờ (TC)': s.toi?.hours||0,
-      };
-    });
-    XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(tsData.length?tsData:[{}]), 'ChamCong');
-
-    const wbBuf = XLSX.write(wb, {type:'array', bookType:'xlsx'});
-    const blob = new Blob([wbBuf], {type:'application/octet-stream'});
-
-    const now = new Date();
-    const dateStr = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}-${String(now.getDate()).padStart(2,'0')}`;
-    const fileName = `Backup_TUAN75_${dateStr}${silent ? '_auto' : ''}.xlsx`;
-    const file = new File([blob], fileName, {type:'application/octet-stream'});
-
-    if(el) el.innerHTML = '⏳ Đang tải lên OneDrive... (có thể hiện popup đăng nhập Microsoft 365 lần đầu)';
-    const result = await msUploadFile(file, 'Backups');
-    const totalCount = txData.length + fcData.length + projData.length + ordData.length + empData.length + tsData.length;
-    if(el) el.innerHTML = `✅ Đã sao lưu xong lúc ${now.toLocaleString('vi-VN')} (${totalCount} bản ghi, 6 nhóm dữ liệu) — <a href="${result.webUrl}" target="_blank">Xem file trên OneDrive</a>`;
-    toast(silent ? '💾 Đã tự động sao lưu toàn bộ dữ liệu (sau 20h hôm nay)' : 'Đã sao lưu toàn bộ dữ liệu lên OneDrive');
-    logActivity('backup', {note: `Sao lưu đầy đủ: ${txData.length} Thu Chi, ${fcData.length} Chi phí gián tiếp, ${projData.length} Dự án, ${ordData.length} Lệnh chi, ${empData.length} NV, ${tsData.length} Chấm công — ${fileName}${silent?' (tự động)':''}`});
-    await db.collection('settings').doc('backupMeta').set({ lastBackupDate: dateStr, lastBackupAt: firebase.firestore.FieldValue.serverTimestamp() }, {merge:true});
-    return true;
-  }catch(err){
-    if(el) el.innerHTML = `<span style="color:var(--red)">Lỗi sao lưu: ${escapeHtml(err.message)}</span>`;
-    if(!silent) toast('Lỗi sao lưu: ' + err.message);
-    console.error('backup error', err);
-    return false;
+// Firestore Timestamp không chuyển thẳng sang JSON được — mã hóa thành {__t:'ts', s, n} và giải mã lại khi khôi phục.
+function encodeFsValue(v){
+  if(v === null || v === undefined) return v;
+  if(v instanceof firebase.firestore.Timestamp) return { __t:'ts', s:v.seconds, n:v.nanoseconds };
+  if(Array.isArray(v)) return v.map(encodeFsValue);
+  if(typeof v === 'object'){ const o={}; Object.keys(v).forEach(k=> o[k]=encodeFsValue(v[k])); return o; }
+  return v;
+}
+function decodeFsValue(v){
+  if(v === null || v === undefined) return v;
+  if(Array.isArray(v)) return v.map(decodeFsValue);
+  if(typeof v === 'object'){
+    if(v.__t === 'ts' && typeof v.s === 'number') return new firebase.firestore.Timestamp(v.s, v.n||0);
+    const o={}; Object.keys(v).forEach(k=> o[k]=decodeFsValue(v[k])); return o;
   }
+  return v;
 }
 
+// Đọc TRỰC TIẾP từ Firestore (không dùng dữ liệu đang nạp trên màn hình — có nhóm chỉ nạp 1 phần, VD Lịch sử 500 dòng).
+async function buildFullBackupJson(onStep){
+  const out = { app:'T75', formatVersion: BACKUP_FORMAT_VERSION, createdAt: new Date().toISOString(),
+    createdBy: auth.currentUser ? auth.currentUser.email : '', counts:{}, collections:{} };
+  for(const c of BACKUP_COLLECTIONS){
+    if(onStep) onStep(c.label);
+    const snap = await db.collection(c.name).get();
+    out.collections[c.name] = snap.docs.map(d=> ({ id: d.id, data: encodeFsValue(d.data()) }));
+    out.counts[c.name] = snap.size;
+  }
+  return out;
+}
+
+function backupStamp(){
+  const now = new Date();
+  const p = (n)=> String(n).padStart(2,'0');
+  return { date:`${now.getFullYear()}-${p(now.getMonth()+1)}-${p(now.getDate())}`, time:`${p(now.getHours())}${p(now.getMinutes())}`, now };
+}
+
+// File Excel để người xem đọc (giữ như trước — không dùng để khôi phục đầy đủ).
+function buildReadableExcelBlob(){
+  if(typeof XLSX === 'undefined') return null;
+  const wb = XLSX.utils.book_new();
+  const add = (rows, name)=> XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(rows.length?rows:[{}]), name);
+  add(TRANSACTIONS.map(t=>({'Dự án':t.projectName||'','Loại':t.type==='IN'?'Thu':'Chi','Ngày':t.date||'','Mã':t.code||'','Nội dung':t.content||'','Diễn giải':t.description||'','Thành tiền':t.amount||0,'Hóa đơn':(t.invoiceStatus||'pending')==='issued'?'Đã xuất':'Chưa xuất','CK/Nhận':(t.transferStatus||'pending')==='done'?'Đã':'Chưa','Duyệt':t.approvalStatus||'','Ghi chú':t.note||''})), 'ThuChi');
+  add((typeof FIXEDCOSTS!=='undefined'?FIXEDCOSTS:[]).map(t=>({'Loại':t.type==='IN'?'Thu':'Chi','Ngày':t.date||'','Mã':t.code||'','Nội dung':t.content||'','Diễn giải':t.description||'','Thành tiền':t.amount||0,'Giải chi':t.advanceExplainStatus||'','Ghi chú':t.note||''})), 'ChiPhiGianTiep');
+  add((typeof PROJECTS!=='undefined'?PROJECTS:[]).map(p=>({'Tên dự án':p.name||'','Mã':p.code||'','Khách hàng':p.customer||'','Giá trị HĐ':p.contractValue||0,'Chi phí dự toán':p.costBudget||0,'Doanh thu dự toán':p.revenueBudget||0,'Trạng thái':p.status||''})), 'DuAn');
+  add((typeof ORDERS!=='undefined'?ORDERS:[]).map(o=>({'Loại':o.orderType||'','Ngày':o.date||'','Người nhận':o.payee||'','Lý do':o.reason||'','Dự án':o.projectName||'','Số tiền':o.amount||0,'Duyệt':o.approvalStatus||''})), 'LenhThuChi');
+  add((typeof EMPLOYEES!=='undefined'?EMPLOYEES:[]).map(e=>({'Họ tên':e.name||'','Chức vụ':e.position||'','Nhóm lương':e.payType==='daily'?'Công nhân':'Quản lý','Lương HĐLĐ':e.contractSalary||0,'Lương hiệu quả':e.effectiveRate||0})), 'NhanVien');
+  const buf = XLSX.write(wb, {type:'array', bookType:'xlsx'});
+  return new Blob([buf], {type:'application/octet-stream'});
+}
+
+let backupRunning = false;
+async function runBackupToOneDrive(silent){
+  if(backupRunning) return false;
+  const el = document.getElementById('backup-status');
+  if(!isAdmin()){ if(!silent) toast('Chỉ Admin được sao lưu toàn bộ dữ liệu.'); return false; }
+  backupRunning = true;
+  const btn = document.getElementById('btn-backup-onedrive');
+  if(btn) btn.disabled = true;
+  try{
+    const { date, time, now } = backupStamp();
+    const suffix = silent ? '_auto' : '';
+    if(el) el.innerHTML = '⏳ Đang đọc toàn bộ dữ liệu...';
+    const backup = await buildFullBackupJson((label)=>{ if(el) el.innerHTML = `⏳ Đang đọc: ${escapeHtml(label)}...`; });
+    const total = Object.values(backup.counts).reduce((s,n)=>s+n,0);
+
+    // 1) File JSON đầy đủ — quan trọng nhất, phải thành công thì mới tính là đã sao lưu.
+    const jsonName = `Backup_TUAN75_${date}_${time}${suffix}.json`;
+    const jsonFile = new File([JSON.stringify(backup)], jsonName, {type:'application/json'});
+    if(el) el.innerHTML = '⏳ Đang tải bản sao lưu đầy đủ lên OneDrive...';
+    const jsonResult = await msUploadFile(jsonFile, 'Backups', (pct)=>{ if(el) el.innerHTML = `⏳ Đang tải lên OneDrive... ${pct}%`; });
+
+    // 2) File Excel để đọc — lỗi thì bỏ qua, không làm hỏng bản sao lưu chính.
+    let xlsxResult = null;
+    try{
+      const xblob = buildReadableExcelBlob();
+      if(xblob) xlsxResult = await msUploadFile(new File([xblob], `Backup_TUAN75_${date}_${time}${suffix}.xlsx`, {type:'application/octet-stream'}), 'Backups');
+    }catch(xerr){ console.warn('Excel backup skipped', xerr); }
+
+    await db.collection('settings').doc('backupMeta').set({
+      lastBackupDate: date, lastBackupAt: firebase.firestore.FieldValue.serverTimestamp(),
+      lastBackupFile: jsonName, lastBackupUrl: jsonResult.webUrl, lastBackupTotal: total,
+    }, {merge:true});
+
+    if(el) el.innerHTML = `✅ Đã sao lưu lúc ${now.toLocaleString('vi-VN')} — ${total} bản ghi, ${BACKUP_COLLECTIONS.length} nhóm dữ liệu. `
+      + `<a href="${jsonResult.webUrl}" target="_blank" rel="noopener">📎 Bản đầy đủ (.json)</a>`
+      + (xlsxResult ? ` · <a href="${xlsxResult.webUrl}" target="_blank" rel="noopener">📎 Bản Excel</a>` : '');
+    toast(silent ? '💾 Đã tự động sao lưu toàn bộ dữ liệu lên OneDrive' : '✅ Đã sao lưu toàn bộ dữ liệu lên OneDrive');
+    logActivity('backup', {note: `Sao lưu đầy đủ ${total} bản ghi — ${jsonName}${silent?' (tự động)':''}`});
+    renderBackupWarning(new Date());
+    return true;
+  }catch(err){
+    const msg = (typeof friendlyMsError==='function') ? friendlyMsError(err) : err.message;
+    if(el) el.innerHTML = `<span style="color:var(--red)">Lỗi sao lưu: ${escapeHtml(msg)}</span>`;
+    if(!silent) toast('Lỗi sao lưu: ' + msg);
+    console.error('backup error', err);
+    return false;
+  }finally{
+    backupRunning = false;
+    if(btn) btn.disabled = false;
+  }
+}
 document.getElementById('btn-backup-onedrive')?.addEventListener('click', ()=> runBackupToOneDrive(false));
 
-// Kiểm tra khi mở app: nếu đang là Admin, sau 20h, và HÔM NAY CHƯA sao lưu -> tự động sao lưu ngay (im lặng,
-// không hiện hộp thoại xác nhận, chỉ có 1 toast nhỏ báo đã xong).
+// Banner nhắc Admin khi đã quá 2 ngày chưa có bản sao lưu nào (hoặc chưa sao lưu lần nào).
+function renderBackupWarning(lastAt){
+  const box = document.getElementById('backup-warning-banner');
+  if(!box) return;
+  const STALE_MS = 2*24*60*60*1000;
+  if(!isAdmin() || (lastAt && (Date.now() - lastAt.getTime()) < STALE_MS)){ box.style.display='none'; box.innerHTML=''; return; }
+  const label = lastAt ? `Lần sao lưu gần nhất: <strong>${lastAt.toLocaleString('vi-VN')}</strong> (đã quá 2 ngày).` : 'Hệ thống <strong>chưa có bản sao lưu nào</strong>.';
+  box.className = 'approval-banner';
+  box.style.display = 'flex'; box.style.alignItems = 'center'; box.style.justifyContent = 'space-between'; box.style.gap = '12px';
+  box.innerHTML = `<div>💾 ${label} Nên sao lưu ngay để có thể khôi phục khi app gặp sự cố.</div>
+    <div style="flex:none;"><button class="btn btn-primary btn-sm" id="backup-warning-run">Sao lưu ngay</button></div>`;
+  document.getElementById('backup-warning-run')?.addEventListener('click', async ()=>{
+    if(typeof msIsLoggedIn==='function' && !msIsLoggedIn()){ toast('Bấm "🔗 Kết nối OneDrive" ở cuối menu bên trái trước, rồi bấm Sao lưu lại.'); return; }
+    await runBackupToOneDrive(false);
+  });
+}
+
+// Chạy 1 lần khi mở app (Admin): tự sao lưu nếu hôm nay chưa có bản nào VÀ (đã sau 20h, HOẶC đã bỏ lỡ từ hôm
+// qua trở về trước — bù ngay khi mở app, không chờ tới 20h). Chỉ chạy khi ĐÃ kết nối OneDrive: không tự mở
+// popup đăng nhập ngầm (trình duyệt sẽ chặn và có thể làm kẹt đăng nhập Microsoft).
 async function checkAutoBackup(){
   try{
     if(!isAdmin()) return;
-    const now = new Date();
-    if(now.getHours() < 20) return; // chưa tới 20h thì thôi, chờ lần mở app sau
-    const dateStr = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}-${String(now.getDate()).padStart(2,'0')}`;
     const snap = await db.collection('settings').doc('backupMeta').get();
-    const lastDate = snap.exists ? snap.data().lastBackupDate : null;
-    if(lastDate === dateStr) return; // hôm nay đã sao lưu rồi
-    await runBackupToOneDrive(true);
+    const meta = snap.exists ? snap.data() : {};
+    const lastAt = meta.lastBackupAt && meta.lastBackupAt.toDate ? meta.lastBackupAt.toDate() : null;
+    renderBackupWarning(lastAt);
+    if(typeof msIsLoggedIn === 'function' && !msIsLoggedIn()) return;
+    const { date, now } = backupStamp();
+    if(meta.lastBackupDate === date) return; // hôm nay đã có bản sao lưu
+    const missedDays = !lastAt || (now - lastAt) > 24*60*60*1000;
+    if(now.getHours() >= 20 || missedDays) await runBackupToOneDrive(true);
   }catch(err){ console.error('checkAutoBackup error', err); }
+}
+
+// =============================================================
+// KHÔI PHỤC TỪ BẢN SAO LƯU ĐẦY ĐỦ (.json)
+// Ghi lại đúng từng bản ghi với ĐÚNG ID cũ (giữ nguyên liên kết Lệnh chi ↔ Thu chi, Giải chi ↔ lệnh gốc...),
+// và xóa các bản ghi phát sinh sau thời điểm sao lưu — đưa nhóm dữ liệu được chọn về đúng trạng thái lúc đó.
+// =============================================================
+let pendingRestoreBackup = null;
+function ensureRestoreModal(){
+  if(document.getElementById('modal-restore-json')) return;
+  document.body.insertAdjacentHTML('beforeend', `
+    <div class="modal-backdrop" id="modal-restore-json">
+      <div class="modal" style="max-width:720px;width:100%;">
+        <div class="modal-head"><h3>📥 Khôi phục từ bản sao lưu</h3><button class="modal-close" data-close>✕</button></div>
+        <div class="modal-body">
+          <div id="restore-json-summary" class="tx-view-note" style="margin-bottom:12px;"></div>
+          <div class="table-wrap"><table class="data" id="restore-json-table"></table></div>
+          <p class="helper-text" style="margin-top:12px;">Trước khi khôi phục, hệ thống <strong>tự tải về máy 1 bản sao lưu của dữ liệu hiện tại</strong> (và tải lên OneDrive nếu đã kết nối) — lỡ chọn nhầm vẫn quay lại được.</p>
+          <div class="field" style="margin-top:10px;"><label>Gõ <strong>KHOI PHUC</strong> để xác nhận</label><input id="restore-json-confirm" placeholder="KHOI PHUC" autocomplete="off"></div>
+        </div>
+        <div class="modal-foot"><button class="btn btn-ghost" data-close>Hủy</button><button class="btn btn-danger" id="restore-json-run">Khôi phục các nhóm đã chọn</button></div>
+      </div>
+    </div>`);
+  document.getElementById('restore-json-run').addEventListener('click', runJsonRestore);
+}
+
+async function openJsonRestore(file){
+  if(!isAdmin()){ toast('Chỉ Admin được khôi phục dữ liệu.'); return; }
+  let backup;
+  try{ backup = JSON.parse(await file.text()); }catch(e){ alert('File không đọc được — không phải file sao lưu .json hợp lệ.'); return; }
+  if(!backup || backup.app !== 'T75' || !backup.collections){ alert('File này không phải bản sao lưu của app T75.'); return; }
+  pendingRestoreBackup = backup;
+  ensureRestoreModal();
+  const created = backup.createdAt ? new Date(backup.createdAt).toLocaleString('vi-VN') : '—';
+  document.getElementById('restore-json-summary').innerHTML =
+    `<strong>${escapeHtml(file.name)}</strong><br>Tạo lúc: <strong>${created}</strong> · bởi ${escapeHtml(backup.createdBy||'—')}<br>`
+    + `<span style="color:var(--red);">Nhóm được chọn sẽ quay về ĐÚNG trạng thái lúc sao lưu — mọi thay đổi sau thời điểm đó của nhóm đó sẽ mất.</span>`;
+  const table = document.getElementById('restore-json-table');
+  table.innerHTML = '<tr><td class="helper-text">⏳ Đang đếm dữ liệu hiện tại...</td></tr>';
+  document.getElementById('restore-json-confirm').value = '';
+  openModal('modal-restore-json');
+  const rows = [];
+  for(const c of BACKUP_COLLECTIONS){
+    if(!c.restore || !Array.isArray(backup.collections[c.name])) continue;
+    let current = '—';
+    try{ current = (await db.collection(c.name).get()).size; }catch(e){}
+    rows.push(`<tr>
+      <td><input type="checkbox" class="restore-json-cb" data-col="${c.name}" ${c.defaultOn ? 'checked' : ''}></td>
+      <td>${escapeHtml(c.label)}${c.defaultOn ? '' : ' <span class="helper-text">(chỉ chọn khi thật cần)</span>'}</td>
+      <td class="num">${backup.collections[c.name].length}</td>
+      <td class="num">${current}</td>
+    </tr>`);
+  }
+  table.innerHTML = `<thead><tr><th></th><th>Nhóm dữ liệu</th><th>Trong bản sao lưu</th><th>Hiện tại</th></tr></thead><tbody>${rows.join('')}</tbody>`;
+}
+
+function downloadJsonLocally(obj, name){
+  const url = URL.createObjectURL(new Blob([JSON.stringify(obj)], {type:'application/json'}));
+  const a = document.createElement('a'); a.href = url; a.download = name;
+  document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(()=> URL.revokeObjectURL(url), 5000);
+}
+
+async function runJsonRestore(){
+  const backup = pendingRestoreBackup;
+  if(!backup) return;
+  if(document.getElementById('restore-json-confirm').value.trim().toUpperCase() !== 'KHOI PHUC'){ toast('Gõ đúng "KHOI PHUC" để xác nhận.'); return; }
+  const cols = Array.from(document.querySelectorAll('.restore-json-cb:checked')).map(cb=> cb.dataset.col);
+  if(!cols.length){ toast('Chưa chọn nhóm dữ liệu nào.'); return; }
+  const btn = document.getElementById('restore-json-run');
+  const el = document.getElementById('backup-status');
+  btn.disabled = true;
+  try{
+    // 1) Bản sao lưu an toàn của dữ liệu HIỆN TẠI — luôn tải về máy; tải thêm lên OneDrive nếu đã kết nối.
+    btn.textContent = '⏳ Đang sao lưu dữ liệu hiện tại...';
+    const safety = await buildFullBackupJson();
+    const { date, time } = backupStamp();
+    const safetyName = `Backup_TUAN75_${date}_${time}_TRUOC-KHOI-PHUC.json`;
+    downloadJsonLocally(safety, safetyName);
+    if(typeof msIsLoggedIn==='function' && msIsLoggedIn()){
+      try{ await msUploadFile(new File([JSON.stringify(safety)], safetyName, {type:'application/json'}), 'Backups'); }catch(e){ console.warn('safety upload failed', e); }
+    }
+
+    // 2) Khôi phục từng nhóm: ghi đè đúng ID cũ, xóa bản ghi không có trong bản sao lưu.
+    const myUid = auth.currentUser ? auth.currentUser.uid : '';
+    let written = 0, removed = 0;
+    for(const col of cols){
+      const label = (BACKUP_COLLECTIONS.find(c=>c.name===col)||{}).label || col;
+      btn.textContent = `⏳ Đang khôi phục: ${label}...`;
+      const items = backup.collections[col] || [];
+      const keepIds = new Set(items.map(it=> it.id));
+      const currentSnap = await db.collection(col).get();
+      const ops = [];
+      currentSnap.docs.forEach(d=>{
+        if(keepIds.has(d.id)) return;
+        if(col === 'users' && d.id === myUid) return; // không bao giờ tự xóa quyền của chính người đang khôi phục
+        ops.push({ type:'delete', ref: db.collection(col).doc(d.id) });
+      });
+      items.forEach(it=> ops.push({ type:'set', ref: db.collection(col).doc(it.id), data: decodeFsValue(it.data) }));
+      for(let i=0;i<ops.length;i+=400){
+        const batch = db.batch();
+        ops.slice(i,i+400).forEach(op=>{
+          if(op.type==='delete'){ batch.delete(op.ref); removed++; }
+          else { batch.set(op.ref, op.data); written++; }
+        });
+        await batch.commit();
+      }
+    }
+    closeModal('modal-restore-json');
+    const msg = `✅ Đã khôi phục ${cols.length} nhóm dữ liệu (${written} bản ghi, dọn ${removed} bản ghi phát sinh sau thời điểm sao lưu).`;
+    if(el) el.innerHTML = msg;
+    toast(msg);
+    logActivity('backup', {note: `Khôi phục từ bản sao lưu ${backup.createdAt||''}: ${cols.join(', ')} — ${written} bản ghi. Bản an toàn: ${safetyName}`});
+  }catch(err){
+    alert('Lỗi khi khôi phục: ' + err.message + '\n\nBản sao lưu dữ liệu trước khi khôi phục đã được tải về máy — dùng file đó để khôi phục lại nếu cần.');
+  }finally{
+    btn.disabled = false; btn.textContent = 'Khôi phục các nhóm đã chọn';
+    pendingRestoreBackup = null;
+  }
 }
 
 // ---------------- Khôi phục Thu Chi từ file sao lưu (dùng khi lỡ mất dữ liệu) ----------------
@@ -192,6 +359,9 @@ document.getElementById('restore-backup-input')?.addEventListener('change', asyn
   const file = e.target.files[0];
   e.target.value = '';
   if(!file) return;
+  if(/\.json$/i.test(file.name)){ openJsonRestore(file); return; } // bản sao lưu ĐẦY ĐỦ (khuyên dùng)
+  // Bên dưới: khôi phục từ file Excel kiểu CŨ (không đầy đủ, tạo ID mới — chỉ dùng khi không có file .json).
+  if(!confirm('Đây là file Excel kiểu CŨ: khôi phục sẽ KHÔNG đầy đủ (mất Giải chi, file đính kèm, liên kết giữa Lệnh chi và Thu chi...).\n\nNên dùng file .json cùng ngày trong thư mục Backups/. Vẫn tiếp tục với file Excel?')) return;
   if(typeof XLSX === 'undefined'){ toast('Chưa tải được thư viện Excel'); return; }
   const el = document.getElementById('backup-status');
   try{
