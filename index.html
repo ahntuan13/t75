@@ -437,7 +437,7 @@
         <div class="topbar">
           <div><h2>Chấm công</h2><div class="sub">3 ca Sáng / Chiều / Tối mỗi ngày — ca Tối (từ 17:01) tự tính là giờ tăng ca</div></div>
           <div class="topbar-actions">
-            <button class="btn btn-primary" id="btn-add-timesheet">+ Chấm công</button>
+            <button class="btn btn-primary" id="btn-add-timesheet">+ Chấm công nhanh</button>
             <button class="btn btn-ghost" id="btn-upload-timesheet">⬆ Upload bảng chấm công (Excel)</button>
           </div>
           <input type="file" id="upload-timesheet-input" accept=".xlsx,.xls" style="display:none">
@@ -448,7 +448,7 @@
         </div>
         <div class="card">
           <div class="card-head"><h3>🗓 Bảng chấm công (dạng lưới, giống Excel)</h3></div>
-          <p class="helper-text" style="margin:-6px 0 10px;">Bấm vào ô ngày của từng nhân viên để nhập giờ + chọn dự án cho đúng ca. Cột "Tổng giờ" tự cộng dồn cả tháng.</p>
+          <p class="helper-text" style="margin:-6px 0 10px;">Mỗi ngày chia 3 ca Sáng / Chiều / Tối. Mỗi ô: dòng trên là <strong>Dự án</strong> (gõ/dán tên hoặc bấm ▾ để chọn), dòng dưới là <strong>Số giờ</strong> — gõ xong bấm Enter/Tab là tự lưu. Có thể copy vùng ô từ Excel rồi dán thẳng vào (dán vào ô Dự án: xen kẽ dòng Dự án / dòng Số giờ như file Excel gốc; dán vào ô Số giờ: chỉ số giờ).</p>
           <div class="table-wrap" style="max-height:600px;overflow:auto;"><table class="data" id="ts-grid-table"></table></div>
         </div>
         <div class="card">
@@ -1023,37 +1023,44 @@
 </div>
 
 <div class="modal-backdrop" id="modal-timesheet">
-  <div class="modal">
-    <div class="modal-head"><h3>Chấm công</h3><button class="modal-close" data-close>✕</button></div>
+  <div class="modal" style="max-width:760px;">
+    <div class="modal-head"><h3>Chấm công nhanh (theo khoảng ngày)</h3><button class="modal-close" data-close>✕</button></div>
     <div class="modal-body">
-      <input type="hidden" id="ts-id">
-      <div class="form-grid">
-        <div class="field full"><label>Nhân viên *</label><select id="ts-employee" required></select></div>
-        <div class="field full"><label>Ngày *</label><input type="date" id="ts-date" required></div>
+      <div class="field full">
+        <label>Nhân viên * <a href="#" id="ts-emp-all" style="font-weight:500;margin-left:8px;">Chọn tất cả</a> · <a href="#" id="ts-emp-none" style="font-weight:500;">Bỏ chọn</a></label>
+        <div class="ts-emp-list" id="ts-emp-list"></div>
       </div>
-      <div class="field full" style="border-top:1px solid var(--line);padding-top:14px;margin-top:6px;">
-        <label style="font-size:13px;font-weight:700;color:var(--ink);">☀️ Ca Sáng</label>
+      <p class="helper-text" style="margin:6px 0 0;">Mỗi ca chọn khoảng ngày + dự án + số giờ riêng. Ca nào để trống Số giờ thì giữ nguyên dữ liệu cũ của ca đó. Ngày đã có chấm công sẽ được ghi đè đúng ca được chọn.</p>
+      <div class="ts-shift-box">
+        <h4>☀️ Ca Sáng</h4>
+        <div class="form-grid">
+          <div class="field"><label>Từ ngày</label><input type="date" id="ts-sang-from"></div>
+          <div class="field"><label>Đến ngày</label><input type="date" id="ts-sang-to"></div>
+          <div class="field"><label>Dự án</label><select id="ts-sang-project"><option value="">— Không có —</option></select></div>
+          <div class="field"><label>Số giờ</label><input type="number" step="any" min="0" id="ts-sang-hours" placeholder="Để trống = không chấm ca này"></div>
+        </div>
       </div>
-      <div class="form-grid">
-        <div class="field"><label>Dự án</label><select id="ts-sang-project"><option value="">— Không có —</option></select></div>
-        <div class="field"><label>Số giờ</label><input type="number" step="any" min="0" id="ts-sang-hours" placeholder="0"></div>
+      <div class="ts-shift-box">
+        <h4>🌤 Ca Chiều</h4>
+        <div class="form-grid">
+          <div class="field"><label>Từ ngày</label><input type="date" id="ts-chieu-from"></div>
+          <div class="field"><label>Đến ngày</label><input type="date" id="ts-chieu-to"></div>
+          <div class="field"><label>Dự án</label><select id="ts-chieu-project"><option value="">— Không có —</option></select></div>
+          <div class="field"><label>Số giờ</label><input type="number" step="any" min="0" id="ts-chieu-hours" placeholder="Để trống = không chấm ca này"></div>
+        </div>
       </div>
-      <div class="field full" style="border-top:1px solid var(--line);padding-top:14px;margin-top:6px;">
-        <label style="font-size:13px;font-weight:700;color:var(--ink);">🌤 Ca Chiều</label>
+      <div class="ts-shift-box">
+        <h4>🌙 Ca Tối (từ 17:01 — tự tính Tăng ca)</h4>
+        <div class="form-grid">
+          <div class="field"><label>Từ ngày</label><input type="date" id="ts-toi-from"></div>
+          <div class="field"><label>Đến ngày</label><input type="date" id="ts-toi-to"></div>
+          <div class="field"><label>Dự án</label><select id="ts-toi-project"><option value="">— Không có —</option></select></div>
+          <div class="field"><label>Số giờ (tăng ca)</label><input type="number" step="any" min="0" id="ts-toi-hours" placeholder="Để trống = không chấm ca này"></div>
+        </div>
       </div>
-      <div class="form-grid">
-        <div class="field"><label>Dự án</label><select id="ts-chieu-project"><option value="">— Không có —</option></select></div>
-        <div class="field"><label>Số giờ</label><input type="number" step="any" min="0" id="ts-chieu-hours" placeholder="0"></div>
-      </div>
-      <div class="field full" style="border-top:1px solid var(--line);padding-top:14px;margin-top:6px;">
-        <label style="font-size:13px;font-weight:700;color:var(--ink);">🌙 Ca Tối (từ 17:01 — tự tính Tăng ca)</label>
-      </div>
-      <div class="form-grid">
-        <div class="field"><label>Dự án</label><select id="ts-toi-project"><option value="">— Không có —</option></select></div>
-        <div class="field"><label>Số giờ (tăng ca)</label><input type="number" step="any" min="0" id="ts-toi-hours" placeholder="0"></div>
-      </div>
-      <div class="form-grid">
-        <div class="field full"><label>Ghi chú</label><input id="ts-note"></div>
+      <div class="form-grid" style="margin-top:10px;">
+        <div class="field"><label style="display:flex;align-items:center;gap:6px;"><input type="checkbox" id="ts-skip-sunday" style="width:auto;"> Bỏ qua Chủ nhật</label></div>
+        <div class="field"><label>Ghi chú</label><input id="ts-note"></div>
       </div>
     </div>
     <div class="modal-foot"><button class="btn btn-ghost" data-close>Hủy</button><button class="btn btn-primary" id="save-ts-btn">Lưu chấm công</button></div>

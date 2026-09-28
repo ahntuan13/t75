@@ -297,17 +297,34 @@ tr td.tx-subhead-empty{color:var(--ink-faint);font-style:italic;font-size:12.5px
 .chart-total-box.revenue .val{background:#C0392B;}
 .chart-total-box.profit .val{background:#7A9A3B;}
 .exp-block{border-top:1px solid var(--line);padding-top:12px;margin-top:8px;}
-#ts-grid-table{border-collapse:separate;border-spacing:3px;}
-#ts-grid-table td[data-grid-cell]{
-  border:1.5px solid var(--line); border-radius:8px; text-align:center;
-  font-weight:700; font-size:13px; transition:all .12s; background:var(--card);
-  padding:6px 4px;
-}
-#ts-grid-table td[data-grid-cell]:hover{
-  border-color:var(--primary); background:var(--primary-dim); transform:scale(1.05); box-shadow:0 2px 8px rgba(79,110,247,.25);
-}
-#ts-grid-table th{white-space:nowrap;text-align:center;}
+/* ===== Lưới chấm công dạng Excel: mỗi ngày 3 cột Sáng / Chiều / Tối, mỗi ô 2 tầng (Dự án / Số giờ) ===== */
+#ts-grid-table{border-collapse:separate;border-spacing:0;width:max-content;min-width:100%;}
+#ts-grid-table th{white-space:nowrap;text-align:center;padding:6px 4px;}
+#ts-grid-table th.ts-shift-th{font-size:10px;padding:3px 2px;letter-spacing:0;}
+#ts-grid-table th.ts-day-th{border-bottom:1px solid var(--line);}
 #ts-grid-table td:first-child, #ts-grid-table th:first-child{text-align:left;}
+#ts-grid-table td.ts-cell{padding:0;min-width:92px;width:92px;max-width:92px;vertical-align:top;}
+#ts-grid-table td.ts-cell.ts-day-end, #ts-grid-table th.ts-day-end{border-right:2px solid var(--ink-faint) !important;}
+#ts-grid-table tr:hover td.ts-cell{background:inherit;}
+.ts-cell-proj{display:flex;align-items:stretch;border-bottom:1px dashed var(--line);}
+.ts-cell input{border:none;background:transparent;width:100%;min-width:0;box-sizing:border-box;font-family:inherit;color:var(--ink);outline:none;border-radius:0;}
+.ts-cell .ts-proj-input{font-size:10.5px;padding:4px 2px 4px 5px;text-align:left;text-overflow:ellipsis;}
+.ts-cell .ts-hours-input{font-size:13px;font-weight:700;padding:4px 2px;text-align:center;}
+.ts-cell input:focus{background:var(--primary-dim);box-shadow:inset 0 0 0 1.5px var(--primary);}
+.ts-cell input[readonly]{cursor:default;}
+.ts-proj-btn{flex:0 0 16px;border:none;background:transparent;color:var(--ink-faint);cursor:pointer;font-size:10px;padding:0;}
+.ts-proj-btn:hover{color:var(--primary);background:var(--primary-dim);}
+.ts-cell.ts-unmatched .ts-proj-input{color:var(--red);}
+.ts-cell.ts-saving{opacity:.6;}
+#ts-proj-picker{position:fixed;z-index:3000;background:var(--card);border:1px solid var(--line);border-radius:10px;box-shadow:0 8px 24px rgba(0,0,0,.18);width:260px;max-height:320px;display:flex;flex-direction:column;}
+#ts-proj-picker input{margin:8px;padding:7px 9px;border:1px solid var(--line);border-radius:8px;font-size:13px;}
+#ts-proj-picker .ts-pick-list{overflow:auto;padding:0 4px 6px;}
+#ts-proj-picker .ts-pick-item{padding:7px 9px;border-radius:7px;cursor:pointer;font-size:13px;}
+#ts-proj-picker .ts-pick-item:hover,#ts-proj-picker .ts-pick-item.active{background:var(--primary-dim);color:var(--primary);}
+.ts-emp-list{max-height:180px;overflow:auto;border:1px solid var(--line);border-radius:10px;padding:6px 10px;display:grid;grid-template-columns:repeat(auto-fill,minmax(170px,1fr));gap:2px 10px;}
+.ts-emp-list label{display:flex;align-items:center;gap:6px;font-size:13px;font-weight:500;margin:0;padding:3px 0;cursor:pointer;}
+.ts-shift-box{border:1px solid var(--line);border-radius:12px;padding:10px 12px 2px;margin-top:10px;}
+.ts-shift-box h4{margin:0 0 8px;font-size:13px;}
 .exp-block-title{font-size:13px;font-weight:700;color:var(--ink);margin-bottom:8px;display:block;}
 .exp-row{display:flex;gap:10px;flex-wrap:wrap;margin-bottom:8px;}
 .exp-row .field label{font-size:11.5px;margin-bottom:4px;}
@@ -539,3 +556,6 @@ tr.tx-row-explained td:not(:last-child){text-decoration:line-through;}
   .print-only{display:block;}
   body{background:#fff;}
 }
+.ts-shift-box .form-grid{grid-template-columns:1fr 1fr 1.6fr 1fr;}
+@media (max-width:700px){ .ts-shift-box .form-grid{grid-template-columns:1fr 1fr;} }
+.ts-cell .ts-proj-input{line-height:1.45;}

@@ -64,11 +64,11 @@ function fillEmployeeSelects(){
     node.innerHTML = '<option value="">Tất cả nhân viên</option>' + EMPLOYEES.map(e=>`<option value="${e.id}">${escapeHtml(e.name)}</option>`).join('');
     if(cur) node.value = cur;
   }
-  const empSel = document.getElementById('ts-employee');
-  if(empSel){
-    const cur = empSel.value;
-    empSel.innerHTML = '<option value="">— Chọn nhân viên —</option>' + EMPLOYEES.map(e=>`<option value="${e.id}">${escapeHtml(e.name)}</option>`).join('');
-    if(cur) empSel.value = cur;
+  const empList = document.getElementById('ts-emp-list');
+  if(empList){
+    const checked = new Set(tsCheckedEmployeeIds());
+    empList.innerHTML = EMPLOYEES.map(e=>`<label><input type="checkbox" class="ts-emp-cb" value="${e.id}" ${checked.has(e.id)?'checked':''} style="width:auto;"> ${escapeHtml(e.name)}</label>`).join('')
+      || '<span class="helper-text">Chưa có nhân viên</span>';
   }
   // dropdown dự án cho 3 ca chấm công
   ['ts-sang-project','ts-chieu-project','ts-toi-project'].forEach(id=>{
@@ -340,74 +340,141 @@ document.getElementById('upload-timesheet-input')?.addEventListener('change', as
   }catch(err){ alert('Lỗi đọc file: ' + err.message); }
 });
 
-// ---------------- CHẤM CÔNG (3 ca) ----------------
-function openTimesheetModal(){
+// ---------------- CHẤM CÔNG NHANH (theo khoảng ngày, từng ca riêng) ----------------
+const TS_SHIFTS = ['sang','chieu','toi'];
+function tsCheckedEmployeeIds(){
+  return Array.from(document.querySelectorAll('#ts-emp-list .ts-emp-cb:checked')).map(cb=> cb.value);
+}
+function setTsCheckedEmployees(ids){
+  const set = new Set(ids||[]);
+  document.querySelectorAll('#ts-emp-list .ts-emp-cb').forEach(cb=> cb.checked = set.has(cb.value));
+}
+// Mở form chấm công nhanh. opts: {employeeIds, from, to, shifts:{sang:{projectId,hours},...}, note}
+function openTimesheetModal(opts){
   if(EMPLOYEES.length===0){ toast('Vui lòng thêm nhân viên trước'); return; }
-  document.getElementById('ts-id').value = '';
-  document.getElementById('ts-employee').value = '';
-  document.getElementById('ts-date').value = todayISO();
-  ['sang','chieu','toi'].forEach(shift=>{
-    document.getElementById(`ts-${shift}-project`).value = '';
-    document.getElementById(`ts-${shift}-hours`).value = '';
+  opts = opts || {};
+  fillEmployeeSelects();
+  setTsCheckedEmployees(opts.employeeIds || []);
+  const from = opts.from || todayISO();
+  const to = opts.to || from;
+  TS_SHIFTS.forEach(shift=>{
+    const sh = (opts.shifts||{})[shift] || {};
+    document.getElementById(`ts-${shift}-from`).value = from;
+    document.getElementById(`ts-${shift}-to`).value = to;
+    document.getElementById(`ts-${shift}-project`).value = sh.projectId || '';
+    document.getElementById(`ts-${shift}-hours`).value = sh.hours || '';
   });
-  document.getElementById('ts-note').value = '';
+  document.getElementById('ts-skip-sunday').checked = false;
+  document.getElementById('ts-note').value = opts.note || '';
   openModal('modal-timesheet');
 }
-document.getElementById('btn-add-timesheet')?.addEventListener('click', openTimesheetModal);
+document.getElementById('btn-add-timesheet')?.addEventListener('click', ()=> openTimesheetModal());
+document.getElementById('ts-emp-all')?.addEventListener('click', (e)=>{ e.preventDefault(); document.querySelectorAll('#ts-emp-list .ts-emp-cb').forEach(cb=> cb.checked = true); });
+document.getElementById('ts-emp-none')?.addEventListener('click', (e)=>{ e.preventDefault(); document.querySelectorAll('#ts-emp-list .ts-emp-cb').forEach(cb=> cb.checked = false); });
+// Đổi "Từ ngày" của 1 ca: nếu "Đến ngày" đang trước "Từ ngày" thì kéo theo cho khỏi lỗi
+TS_SHIFTS.forEach(shift=>{
+  document.getElementById(`ts-${shift}-from`)?.addEventListener('change', ()=>{
+    const f = document.getElementById(`ts-${shift}-from`), t = document.getElementById(`ts-${shift}-to`);
+    if(f.value && (!t.value || t.value < f.value)) t.value = f.value;
+  });
+});
 
 function openTimesheetEditModal(id){
   const t = TIMESHEETS.find(x=>x.id===id);
   if(!t) return;
-  document.getElementById('ts-id').value = id;
-  document.getElementById('ts-employee').value = t.employeeId || '';
-  document.getElementById('ts-date').value = t.date || '';
-  const shifts = t.shifts || {};
-  ['sang','chieu','toi'].forEach(shift=>{
-    const s = shifts[shift] || {};
-    document.getElementById(`ts-${shift}-project`).value = s.projectId || '';
-    document.getElementById(`ts-${shift}-hours`).value = s.hours || '';
-  });
-  document.getElementById('ts-note').value = t.note || '';
-  openModal('modal-timesheet');
+  const shifts = {};
+  TS_SHIFTS.forEach(k=>{ const s = (t.shifts||{})[k] || {}; shifts[k] = { projectId: s.projectId || '', hours: s.hours || '' }; });
+  openTimesheetModal({ employeeIds:[t.employeeId], from:t.date, to:t.date, shifts, note:t.note||'' });
+}
+
+function tsDateRange(from, to){
+  const out = [];
+  const [fy,fm,fd] = from.split('-').map(Number);
+  const [ty,tm,td] = to.split('-').map(Number);
+  const d = new Date(fy, fm-1, fd), end = new Date(ty, tm-1, td);
+  while(d <= end && out.length < 400){
+    out.push(`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`);
+    d.setDate(d.getDate()+1);
+  }
+  return out;
+}
+
+// Ghi nhiều ngày chấm công cùng lúc. changes: Map "empId|date" -> {sang?:shift, chieu?:shift, toi?:shift, note?}
+// Ca nào không có trong change thì giữ nguyên dữ liệu cũ. Ngày không còn ca nào có dữ liệu -> xóa dòng.
+async function writeTimesheetChanges(changes){
+  let batch = db.batch(), ops = 0, written = 0;
+  for(const [key, ch] of changes){
+    const [employeeId, date] = key.split('|');
+    const emp = EMPLOYEES.find(x=> x.id===employeeId);
+    const existing = TIMESHEETS.find(t=> t.employeeId===employeeId && t.date===date);
+    const shifts = {};
+    TS_SHIFTS.forEach(k=>{
+      const base = (existing && existing.shifts && existing.shifts[k]) || {projectId:'', projectName:'', hours:0};
+      shifts[k] = ch[k] ? ch[k] : { projectId: base.projectId||'', projectName: base.projectName||'', hours: Number(base.hours)||0 };
+    });
+    const empty = TS_SHIFTS.every(k=> !shifts[k].hours && !shifts[k].projectName && !shifts[k].projectId);
+    if(existing){
+      const ref = db.collection('timesheets').doc(existing.id);
+      if(empty){ batch.delete(ref); }
+      else {
+        const upd = { shifts, employeeName: emp ? emp.name : (existing.employeeName||''), updatedAt: firebase.firestore.FieldValue.serverTimestamp(), updatedBy: auth.currentUser.email };
+        if(ch.note !== undefined && ch.note !== '') upd.note = ch.note;
+        batch.update(ref, upd);
+      }
+    } else {
+      if(empty) continue;
+      batch.set(db.collection('timesheets').doc(`${employeeId}_${date}`), {
+        employeeId, employeeName: emp ? emp.name : '', date, shifts, note: ch.note || '',
+        createdAt: firebase.firestore.FieldValue.serverTimestamp(), createdBy: auth.currentUser.email,
+      }, {merge:true});
+    }
+    ops++; written++;
+    if(ops >= 400){ await batch.commit(); batch = db.batch(); ops = 0; }
+  }
+  if(ops > 0) await batch.commit();
+  return written;
 }
 
 document.getElementById('save-ts-btn').addEventListener('click', async ()=>{
-  const id = document.getElementById('ts-id').value;
-  const employeeId = document.getElementById('ts-employee').value;
-  const date = document.getElementById('ts-date').value;
-  if(!employeeId || !date){ toast('Vui lòng chọn nhân viên và ngày'); return; }
-  const emp = EMPLOYEES.find(x=>x.id===employeeId);
-
-  const buildShift = (key)=>{
-    const projectId = document.getElementById(`ts-${key}-project`).value;
+  const empIds = tsCheckedEmployeeIds();
+  if(!empIds.length){ toast('Vui lòng chọn ít nhất 1 nhân viên'); return; }
+  const skipSunday = document.getElementById('ts-skip-sunday').checked;
+  const note = document.getElementById('ts-note').value.trim();
+  const changes = new Map();
+  let shiftCount = 0;
+  for(const k of TS_SHIFTS){
+    const hoursRaw = document.getElementById(`ts-${k}-hours`).value;
+    if(hoursRaw === '' || hoursRaw === null) continue; // ca để trống -> không đụng tới
+    const hours = parseHours(hoursRaw);
+    const from = document.getElementById(`ts-${k}-from`).value;
+    const to = document.getElementById(`ts-${k}-to`).value || from;
+    const label = {sang:'Sáng', chieu:'Chiều', toi:'Tối'}[k];
+    if(!from){ toast(`Ca ${label}: vui lòng chọn Từ ngày`); return; }
+    if(to < from){ toast(`Ca ${label}: "Đến ngày" phải sau "Từ ngày"`); return; }
+    const projectId = document.getElementById(`ts-${k}-project`).value;
     const proj = projectId ? projectById(projectId) : null;
-    const hours = parseHours(document.getElementById(`ts-${key}-hours`).value);
-    return { projectId, projectName: proj ? proj.name : '', hours };
-  };
-  const shifts = { sang: buildShift('sang'), chieu: buildShift('chieu'), toi: buildShift('toi') };
-  if(!shifts.sang.hours && !shifts.chieu.hours && !shifts.toi.hours){
-    toast('Vui lòng nhập ít nhất 1 ca có số giờ'); return;
+    const shift = { projectId: projectId||'', projectName: proj ? proj.name : '', hours };
+    shiftCount++;
+    tsDateRange(from, to).forEach(date=>{
+      if(skipSunday){ const [y,m,d] = date.split('-').map(Number); if(new Date(y,m-1,d).getDay()===0) return; }
+      empIds.forEach(empId=>{
+        const key = `${empId}|${date}`;
+        const ch = changes.get(key) || { note };
+        ch[k] = shift;
+        changes.set(key, ch);
+      });
+    });
   }
-
-  const data = {
-    employeeId, employeeName: emp ? emp.name : '',
-    date, shifts,
-    note: document.getElementById('ts-note').value.trim(),
-  };
+  if(!shiftCount){ toast('Vui lòng nhập Số giờ cho ít nhất 1 ca'); return; }
+  const btn = document.getElementById('save-ts-btn');
+  btn.disabled = true; btn.textContent = '⏳ Đang lưu...';
   try{
-    if(id){
-      await db.collection('timesheets').doc(id).update(data);
-      toast('Đã cập nhật chấm công');
-      logActivity('update', {projectName:'Chấm công', content: data.employeeName+' - '+data.date, type:'OUT'});
-    } else {
-      data.createdAt = firebase.firestore.FieldValue.serverTimestamp();
-      data.createdBy = auth.currentUser.email;
-      await db.collection('timesheets').add(data);
-      toast('Đã lưu chấm công');
-      logActivity('create', {projectName:'Chấm công', content: data.employeeName+' - '+data.date, type:'OUT'});
-    }
+    const n = await writeTimesheetChanges(changes);
+    toast(`✅ Đã chấm công ${n} ngày-người`);
+    logActivity('update', {projectName:'Chấm công', content:`Chấm công nhanh ${empIds.length} nhân viên, ${n} ngày-người`, type:'OUT'});
     closeModal('modal-timesheet');
   }catch(err){ toast('Lỗi: '+err.message); }
+  finally{ btn.disabled = false; btn.textContent = 'Lưu chấm công'; }
 });
 
 function getFilteredTimesheets(){
@@ -557,55 +624,143 @@ function renderTimesheetGrid(){
     byEmpDay[`${t.employeeId}_${t.date}`] = t;
   });
 
+  const canEdit = !isSubAdmin();
+  const ro = canEdit ? '' : 'readonly tabindex="-1"';
+  const SHIFT_LABEL = {sang:'Sáng', chieu:'Chiều', toi:'Tối'};
+  const dayBg = (dm)=> dm.isHoliday ? 'var(--red-dim)' : dm.isSunday ? 'var(--gold-dim)' : (dm.isWeekend && !dm.isSunday) ? 'var(--blue-dim)' : '';
   const dayHeaderCells = dayMeta.map(dm=> {
     const isSat = dm.isWeekend && !dm.isSunday;
-    const bg = dm.isHoliday ? 'var(--red-dim)' : dm.isSunday ? 'var(--gold-dim)' : isSat ? 'var(--blue-dim)' : 'var(--bg-soft)';
+    const bg = dayBg(dm) || 'var(--bg-soft)';
     const color = dm.isHoliday ? 'var(--red)' : dm.isSunday ? '#9a6b00' : isSat ? 'var(--blue)' : 'var(--ink-dim)';
     const tip = dm.isHoliday ? dm.holidayName : (dm.isSunday ? 'Chủ nhật — hệ số x2' : isSat ? 'Thứ 7' : dm.dowLabel);
-    const mult = dm.multiplier > 1 ? `<div style="font-size:8.5px;font-weight:800;">x${dm.multiplier}</div>` : '';
-    return `<th style="min-width:52px;background:${bg};color:${color};" title="${escapeHtml(tip)}">${dm.d}<div style="font-size:9px;font-weight:600;opacity:.8;">${dm.isHoliday ? '🎌' : dm.dowLabel}</div>${mult}</th>`;
+    const mult = dm.multiplier > 1 ? ` · x${dm.multiplier}` : '';
+    return `<th colspan="3" class="ts-day-th ts-day-end" style="background:${bg};color:${color};" title="${escapeHtml(tip)}">${String(dm.d).padStart(2,'0')} <span style="font-size:10px;font-weight:600;opacity:.85;">${dm.isHoliday ? '🎌' : dm.dowLabel}${mult}</span></th>`;
   }).join('');
+  const shiftHeaderCells = dayMeta.map(dm=> TS_SHIFTS.map(k=>
+    `<th class="ts-shift-th${k==='toi' ? ' ts-day-end' : ''}" style="background:${dayBg(dm) || 'var(--bg-soft)'};${k==='toi' ? 'color:var(--gold);' : ''}">${SHIFT_LABEL[k]}</th>`).join('')).join('');
+
+  const orderedEmps = [];
   const empRow = (e)=>{
-    let monthTotal = 0;
+    const r = orderedEmps.length;
+    orderedEmps.push(e.id);
+    let totalReg = 0, totalOt = 0;
+    let c = 0;
     const cells = dayMeta.map(dm=>{
-      const d = dm.d;
-      const dateStr = `${y}-${String(m).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
-      const t = byEmpDay[`${e.id}_${dateStr}`];
-      const h = t ? tsHours(t) : {regular:0, ot:0, total:0};
-      monthTotal += h.total;
-      const label = h.total > 0 ? fmtHours(h.total) : '';
-      const otMark = h.ot > 0 ? `<div style="font-size:9.5px;color:var(--gold);">+${fmtHours(h.ot)} TC</div>` : '';
-      const cellBg = dm.isHoliday ? 'background:var(--red-dim);' : dm.isSunday ? 'background:var(--gold-dim);' : (dm.isWeekend && !dm.isSunday) ? 'background:var(--blue-dim);' : '';
-      return `<td class="num" style="cursor:pointer;padding:4px;${cellBg}${h.total>0?'':'color:var(--ink-faint);'}" data-grid-cell="${e.id}|${dateStr}">${label}${otMark}</td>`;
+      const t = byEmpDay[`${e.id}_${dm.dateStr}`];
+      const h = t ? tsHours(t) : {regular:0, ot:0};
+      totalReg += h.regular; totalOt += h.ot;
+      const bg = dayBg(dm);
+      return TS_SHIFTS.map(k=>{
+        const sh = (t && t.shifts && t.shifts[k]) || {};
+        const projName = sh.projectName || '';
+        const unmatched = projName && !sh.projectId && !PROJECTS.some(p=> p.name===projName);
+        const hours = sh.hours ? fmtHours(sh.hours).replace(/\./g,'') : '';
+        const attrs = `data-r="${r}" data-c="${c}" data-emp="${e.id}" data-date="${dm.dateStr}" data-shift="${k}"`;
+        c++;
+        return `<td class="ts-cell${k==='toi' ? ' ts-day-end' : ''}${unmatched ? ' ts-unmatched' : ''}" style="${bg ? 'background:'+bg+';' : ''}">
+          <div class="ts-cell-proj"><input class="ts-proj-input" ${attrs} value="${escapeHtml(projName)}" title="${escapeHtml(projName || 'Dự án ca ' + SHIFT_LABEL[k])}${unmatched ? ' — chưa khớp dự án nào trong danh sách' : ''}" placeholder="" ${ro}>${canEdit ? `<button type="button" class="ts-proj-btn" tabindex="-1" data-pick-proj="${r}|${c-1}" title="Chọn dự án">▾</button>` : ''}</div>
+          <input class="ts-hours-input" ${attrs} value="${hours}" inputmode="decimal" placeholder="" ${ro}>
+        </td>`;
+      }).join('');
     }).join('');
-    // "Tiền công" (đơn giá/ngày) — CHỈ áp dụng cho Công nhân (payType=daily); Kế toán tự nhập, lưu theo
-    // từng người + từng tháng (payrollAdjustments), dùng để tính Tổng thu nhập = Tiền công x Ngày công
-    // ở trang Bảng lương thay vì phải cài sẵn "Lương hiệu quả" cố định trong hồ sơ nhân viên.
-    // LƯU Ý: cột "Nhân viên" và "Tiền công" đều cố định (position:sticky) khi cuộn ngang — phải có
-    // width CỐ ĐỊNH khớp đúng với offset "left" của nhau, nếu không sẽ bị chồng chữ lên nhau.
     const adj = PAYROLL_ADJUSTMENTS.find(a=> a.employeeId===e.id && a.month===month);
     const tienCongCell = e.payType==='daily'
-      ? `<td style="position:sticky;left:${TS_NAME_COL_WIDTH}px;z-index:2;width:${TS_TIENCONG_COL_WIDTH}px;min-width:${TS_TIENCONG_COL_WIDTH}px;background:var(--card);"><input type="text" class="money-input" style="width:100%;box-sizing:border-box;" data-tiencong-emp="${e.id}" value="${adj && adj.tienCongNgay ? fmtNum(adj.tienCongNgay) : ''}" placeholder="0"></td>`
+      ? `<td style="position:sticky;left:${TS_NAME_COL_WIDTH}px;z-index:2;width:${TS_TIENCONG_COL_WIDTH}px;min-width:${TS_TIENCONG_COL_WIDTH}px;background:var(--card);"><input type="text" class="money-input" style="width:100%;box-sizing:border-box;" data-tiencong-emp="${e.id}" value="${adj && adj.tienCongNgay ? fmtNum(adj.tienCongNgay) : ''}" placeholder="0" ${ro}></td>`
       : `<td style="position:sticky;left:${TS_NAME_COL_WIDTH}px;z-index:2;width:${TS_TIENCONG_COL_WIDTH}px;min-width:${TS_TIENCONG_COL_WIDTH}px;background:var(--card);color:var(--ink-faint);">—</td>`;
-    return `<tr><td style="position:sticky;left:0;z-index:2;width:${TS_NAME_COL_WIDTH}px;min-width:${TS_NAME_COL_WIDTH}px;max-width:${TS_NAME_COL_WIDTH}px;overflow:hidden;text-overflow:ellipsis;background:var(--card);white-space:nowrap;" title="${escapeHtml(e.name)}"><strong>${escapeHtml(e.name)}</strong></td>${tienCongCell}${cells}<td class="num" style="font-weight:800;">${monthTotal}h</td></tr>`;
+    return `<tr><td style="position:sticky;left:0;z-index:2;width:${TS_NAME_COL_WIDTH}px;min-width:${TS_NAME_COL_WIDTH}px;max-width:${TS_NAME_COL_WIDTH}px;overflow:hidden;text-overflow:ellipsis;background:var(--card);white-space:nowrap;" title="${escapeHtml(e.name)}"><strong>${escapeHtml(e.name)}</strong></td>${tienCongCell}${cells}<td class="num" style="font-weight:800;white-space:nowrap;">${fmtHours(totalReg)}h${totalOt ? `<div style="font-size:11px;color:var(--gold);">+${fmtHours(totalOt)}h TC</div>` : ''}</td></tr>`;
   };
-  const groupHeaderRow = (label)=> `<tr class="tx-subhead"><td colspan="${days.length+3}"><strong>${label}</strong></td></tr>`;
+  const colCount = days.length*3 + 3;
+  const groupHeaderRow = (label)=> `<tr class="tx-subhead"><td colspan="${colCount}" style="position:sticky;left:0;"><strong>${label}</strong></td></tr>`;
   const managers = emps.filter(e=>e.payType!=='daily').sort((a,b)=> positionRank(a.position)-positionRank(b.position) || a.name.localeCompare(b.name,'vi'));
   const workers = emps.filter(e=>e.payType==='daily').sort((a,b)=> a.name.localeCompare(b.name,'vi'));
 
+  // Giữ nguyên ô đang gõ dở khi lưới được vẽ lại (vẽ lại xảy ra mỗi khi có dữ liệu chấm công mới từ máy chủ)
+  const act = document.activeElement;
+  let keep = null;
+  if(act && table.contains(act) && act.dataset && act.dataset.emp){
+    keep = { sel: `input.${act.classList.contains('ts-proj-input') ? 'ts-proj-input' : 'ts-hours-input'}[data-emp="${act.dataset.emp}"][data-date="${act.dataset.date}"][data-shift="${act.dataset.shift}"]`,
+      value: act.value, dirty: act.dataset.dirty === '1', pos: act.selectionStart };
+  }
+  const wrap = table.parentElement;
+  const scroll = wrap ? { l: wrap.scrollLeft, t: wrap.scrollTop } : null;
+
   table.innerHTML = `<thead><tr>
-    <th style="position:sticky;left:0;z-index:3;width:${TS_NAME_COL_WIDTH}px;min-width:${TS_NAME_COL_WIDTH}px;max-width:${TS_NAME_COL_WIDTH}px;background:var(--bg-soft);">Nhân viên</th><th style="position:sticky;left:${TS_NAME_COL_WIDTH}px;z-index:3;width:${TS_TIENCONG_COL_WIDTH}px;min-width:${TS_TIENCONG_COL_WIDTH}px;background:var(--bg-soft);">Tiền công</th>${dayHeaderCells}<th>Tổng giờ</th>
-  </tr></thead><tbody>
+    <th rowspan="2" style="position:sticky;left:0;z-index:6;width:${TS_NAME_COL_WIDTH}px;min-width:${TS_NAME_COL_WIDTH}px;max-width:${TS_NAME_COL_WIDTH}px;background:var(--bg-soft);">Nhân viên</th><th rowspan="2" style="position:sticky;left:${TS_NAME_COL_WIDTH}px;z-index:6;width:${TS_TIENCONG_COL_WIDTH}px;min-width:${TS_TIENCONG_COL_WIDTH}px;background:var(--bg-soft);">Tiền công</th>${dayHeaderCells}<th rowspan="2">Tổng giờ</th>
+  </tr><tr>${shiftHeaderCells}</tr></thead><tbody>
     ${managers.length ? groupHeaderRow('🔷 QUẢN LÝ') + managers.map(empRow).join('') : ''}
     ${workers.length ? groupHeaderRow('🔶 CÔNG NHÂN') + workers.map(empRow).join('') : ''}
   </tbody>`;
+  table.dataset.rows = orderedEmps.length;
+  table.dataset.cols = days.length*3;
+
+  if(scroll){ wrap.scrollLeft = scroll.l; wrap.scrollTop = scroll.t; }
+  if(keep){
+    const el = table.querySelector(keep.sel);
+    if(el){
+      if(keep.dirty){ el.value = keep.value; el.dataset.dirty = '1'; }
+      el.focus({preventScroll:true});
+      try{ el.setSelectionRange(keep.pos, keep.pos); }catch(_){}
+    }
+  }
 }
-document.getElementById('ts-grid-table')?.addEventListener('change', async (e)=>{
-  const empId = e.target.closest('[data-tiencong-emp]')?.dataset.tiencongEmp;
+
+// ----- Lưới chấm công: nhập trực tiếp trong ô (không mở popup) -----
+function tsGridInput(r, c, kind){
+  return document.querySelector(`#ts-grid-table input.${kind}[data-r="${r}"][data-c="${c}"]`);
+}
+function tsMatchProject(name){
+  const n = String(name||'').trim();
+  if(!n) return null;
+  return PROJECTS.find(p=> p.name === n) || PROJECTS.find(p=> p.name.trim().toLowerCase() === n.toLowerCase()) || null;
+}
+// Đọc 1 ca (dự án + số giờ) của 1 người-ngày ngay trên lưới
+function tsReadShiftFromGrid(empId, date, k){
+  const pIn = document.querySelector(`#ts-grid-table input.ts-proj-input[data-emp="${empId}"][data-date="${date}"][data-shift="${k}"]`);
+  const hIn = document.querySelector(`#ts-grid-table input.ts-hours-input[data-emp="${empId}"][data-date="${date}"][data-shift="${k}"]`);
+  const name = pIn ? pIn.value.trim() : '';
+  const proj = tsMatchProject(name);
+  return { projectId: proj ? proj.id : '', projectName: proj ? proj.name : name, hours: hIn ? parseHours(hIn.value) : 0 };
+}
+// Hàng đợi lưu: chụp giá trị NGAY lúc sửa (không đọc lại lúc ghi), để lưới có vẽ lại giữa chừng cũng không mất dữ liệu.
+let tsPendingSave = new Map(); // "empId|date" -> {sang?, chieu?, toi?}
+let tsSaveTimer = null;
+function tsQueueShift(empId, date, k, delay){
+  const key = `${empId}|${date}`;
+  const ch = tsPendingSave.get(key) || {};
+  ch[k] = tsReadShiftFromGrid(empId, date, k);
+  tsPendingSave.set(key, ch);
+  clearTimeout(tsSaveTimer);
+  tsSaveTimer = setTimeout(tsFlushSave, delay ?? 250);
+}
+async function tsFlushSave(){
+  if(!tsPendingSave.size) return;
+  const changes = tsPendingSave;
+  tsPendingSave = new Map();
+  try{
+    await writeTimesheetChanges(changes);
+    if(changes.size > 1) toast(`✅ Đã lưu ${changes.size} ngày chấm công`);
+  }catch(err){ toast('Lỗi lưu chấm công: ' + err.message); }
+}
+
+const tsGridTable = document.getElementById('ts-grid-table');
+tsGridTable?.addEventListener('input', (e)=>{
+  if(e.target.dataset && e.target.dataset.emp) e.target.dataset.dirty = '1';
+});
+tsGridTable?.addEventListener('change', async (e)=>{
+  const el = e.target;
+  if(el.dataset && el.dataset.emp && !el.readOnly){
+    if(el.classList.contains('ts-hours-input') && el.value.trim() && !parseHours(el.value) && el.value.trim() !== '0'){
+      toast('Số giờ không hợp lệ (vd: 4 · 7,5 · 7h30)'); return;
+    }
+    delete el.dataset.dirty;
+    tsQueueShift(el.dataset.emp, el.dataset.date, el.dataset.shift);
+    return;
+  }
+  const empId = el.closest('[data-tiencong-emp]')?.dataset.tiencongEmp;
   if(!empId) return;
-  formatMoneyInput(e.target);
+  formatMoneyInput(el);
   const month = document.getElementById('ts-filter-month').value || todayISO().slice(0,7);
-  const tienCongNgay = parseMoneyInput(e.target);
+  const tienCongNgay = parseMoneyInput(el);
   try{
     await db.collection('payrollAdjustments').doc(`${empId}_${month}`).set({
       employeeId: empId, month, tienCongNgay,
@@ -615,19 +770,98 @@ document.getElementById('ts-grid-table')?.addEventListener('change', async (e)=>
     toast('Đã lưu Tiền công');
   }catch(err){ toast('Lỗi lưu Tiền công: ' + err.message); }
 });
-document.getElementById('ts-grid-table')?.addEventListener('click', (e)=>{
-  const cell = e.target.closest('[data-grid-cell]');
-  if(!cell) return;
-  const [employeeId, date] = cell.dataset.gridCell.split('|');
-  const existing = TIMESHEETS.find(t=> t.employeeId===employeeId && t.date===date);
-  if(existing){
-    openTimesheetEditModal(existing.id);
-  } else {
-    openTimesheetModal();
-    document.getElementById('ts-employee').value = employeeId;
-    document.getElementById('ts-date').value = date;
+// Enter = xuống ô cùng cột của người bên dưới (giống Excel); mũi tên lên/xuống cũng vậy
+tsGridTable?.addEventListener('keydown', (e)=>{
+  const el = e.target;
+  if(!el.dataset || !el.dataset.emp) return;
+  const kind = el.classList.contains('ts-proj-input') ? 'ts-proj-input' : 'ts-hours-input';
+  const r = Number(el.dataset.r), c = Number(el.dataset.c);
+  let next = null;
+  if(e.key === 'Enter' || e.key === 'ArrowDown') next = tsGridInput(r+1, c, kind);
+  else if(e.key === 'ArrowUp') next = tsGridInput(r-1, c, kind);
+  else if(e.key === 'Escape'){ el.blur(); return; }
+  if(next || e.key === 'Enter'){
+    e.preventDefault();
+    if(next){ next.focus(); next.select(); } else el.blur();
   }
 });
+// Dán vùng ô copy từ Excel: mỗi cột = 1 ca (Sáng, Chiều, Tối, ngày kế tiếp...), mỗi dòng = 1 nhân viên.
+// Dán vào ô Dự án: các dòng xen kẽ "dòng Dự án" / "dòng Số giờ" giống file chấm công Excel gốc.
+tsGridTable?.addEventListener('paste', (e)=>{
+  const el = e.target;
+  if(!el.dataset || !el.dataset.emp || el.readOnly) return;
+  const text = (e.clipboardData || window.clipboardData).getData('text');
+  if(!text || !/[\t\n]/.test(text.replace(/\r?\n$/, ''))) return; // 1 ô đơn lẻ -> dán bình thường
+  e.preventDefault();
+  const lines = text.replace(/\r/g,'').replace(/\n$/,'').split('\n').map(l=> l.split('\t'));
+  const r0 = Number(el.dataset.r), c0 = Number(el.dataset.c);
+  const isProj = el.classList.contains('ts-proj-input');
+  const touched = new Map();
+  const put = (r, c, kind, val)=>{
+    const inp = tsGridInput(r, c, kind);
+    if(!inp) return;
+    inp.value = String(val).trim();
+    touched.set(`${inp.dataset.emp}|${inp.dataset.date}|${inp.dataset.shift}`, inp);
+  };
+  lines.forEach((cols, i)=>{
+    let r, kind;
+    if(isProj){ r = r0 + Math.floor(i/2); kind = i%2===0 ? 'ts-proj-input' : 'ts-hours-input'; }
+    else { r = r0 + i; kind = 'ts-hours-input'; }
+    cols.forEach((val, j)=> put(r, c0 + j, kind, val));
+  });
+  touched.forEach(inp=> tsQueueShift(inp.dataset.emp, inp.dataset.date, inp.dataset.shift, 100));
+});
+
+// Nút ▾ chọn dự án (chỉ nút nhỏ bên cạnh, không phải cả ô)
+function tsCloseProjPicker(){ document.getElementById('ts-proj-picker')?.remove(); }
+function tsOpenProjPicker(btn, inp){
+  tsCloseProjPicker();
+  const box = document.createElement('div');
+  box.id = 'ts-proj-picker';
+  box.innerHTML = `<input type="text" placeholder="🔍 Tìm dự án..."><div class="ts-pick-list"></div>`;
+  document.body.appendChild(box);
+  const rect = btn.getBoundingClientRect();
+  const top = Math.min(rect.bottom + 4, window.innerHeight - 330);
+  const left = Math.min(rect.left, window.innerWidth - 270);
+  box.style.top = Math.max(8, top) + 'px';
+  box.style.left = Math.max(8, left) + 'px';
+  const search = box.querySelector('input');
+  const list = box.querySelector('.ts-pick-list');
+  const choose = (name)=>{
+    inp.value = name;
+    tsCloseProjPicker();
+    tsQueueShift(inp.dataset.emp, inp.dataset.date, inp.dataset.shift);
+    const hours = tsGridInput(inp.dataset.r, inp.dataset.c, 'ts-hours-input');
+    if(hours){ hours.focus(); hours.select(); }
+  };
+  const draw = ()=>{
+    const q = search.value.trim().toLowerCase();
+    const items = PROJECTS.filter(p=> !q || p.name.toLowerCase().includes(q));
+    list.innerHTML = `<div class="ts-pick-item" data-name="">— Không có dự án —</div>` +
+      items.map(p=> `<div class="ts-pick-item" data-name="${escapeHtml(p.name)}">${escapeHtml(p.name)}</div>`).join('');
+  };
+  draw();
+  search.addEventListener('input', draw);
+  search.addEventListener('keydown', (e)=>{
+    if(e.key === 'Escape') tsCloseProjPicker();
+    if(e.key === 'Enter'){ const first = list.querySelectorAll('.ts-pick-item')[search.value.trim() ? 1 : 0]; if(first) choose(first.dataset.name); }
+  });
+  list.addEventListener('click', (e)=>{ const it = e.target.closest('.ts-pick-item'); if(it) choose(it.dataset.name); });
+  setTimeout(()=> search.focus(), 0);
+}
+tsGridTable?.addEventListener('click', (e)=>{
+  const btn = e.target.closest('[data-pick-proj]');
+  if(!btn) return;
+  e.stopPropagation();
+  const [r, c] = btn.dataset.pickProj.split('|');
+  const inp = tsGridInput(r, c, 'ts-proj-input');
+  if(inp) tsOpenProjPicker(btn, inp);
+});
+document.addEventListener('mousedown', (e)=>{
+  const picker = document.getElementById('ts-proj-picker');
+  if(picker && !picker.contains(e.target) && !e.target.closest('[data-pick-proj]')) tsCloseProjPicker();
+});
+tsGridTable?.parentElement?.addEventListener('scroll', tsCloseProjPicker);
 
 function renderTimesheetSummary(){
   const table = document.getElementById('ts-summary-table');
