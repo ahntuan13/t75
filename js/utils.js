@@ -10,6 +10,23 @@ function fmtNum(n){
   n = Math.round(Number(n) || 0);
   return n.toLocaleString('vi-VN', {maximumFractionDigits:0});
 }
+// Số giờ công: GIỮ NGUYÊN số lẻ (7,25h / 3,75h...) — KHÔNG làm tròn về 0,5h hay số nguyên.
+// Chỉ khử sai số dấu phẩy động của JS (vd 0.1+0.2) bằng cách cắt ở 4 chữ số thập phân khi HIỂN THỊ.
+function fmtHours(n){
+  const v = Math.round((Number(n) || 0) * 10000) / 10000;
+  return v.toLocaleString('vi-VN', {maximumFractionDigits:4});
+}
+// Đọc số giờ từ ô nhập / ô Excel: chấp nhận 7.5, "7,5", "7h30", "7:30", ô Excel định dạng giờ (Date).
+function parseHours(v){
+  if(v === null || v === undefined || v === '') return 0;
+  if(v instanceof Date && !isNaN(v)) return v.getHours() + v.getMinutes()/60 + v.getSeconds()/3600;
+  if(typeof v === 'number') return isFinite(v) ? v : 0;
+  const str = String(v).trim().toLowerCase().replace(/\s+/g,'');
+  const hm = str.match(/^(\d+)(?:h|:|g|giờ)(\d{1,2})?(?:p|ph|phút|m)?$/);
+  if(hm) return Number(hm[1]) + (hm[2] ? Number(hm[2])/60 : 0);
+  const num = Number(str.replace(/h$|giờ$/,'').replace(',', '.'));
+  return isFinite(num) ? num : 0;
+}
 function fmtDate(d){
   if(!d) return '—';
   let dt;

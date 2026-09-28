@@ -450,7 +450,7 @@ function buildProposalRows(orders){
     if(Array.isArray(o.explainAllocations) && o.explainAllocations.length){
       o.explainAllocations.forEach(a=>{
         rows.push({
-          project: a.projectName || '—', date: o.date, code: a.code || '',
+          project: a.projectName || '—', date: a.date || o.date, code: a.code || '',
           content: a.content || o.reason, description: a.description || '',
           unit: a.unit || '', qty: a.qty || 1, unitPrice: a.unitPrice || a.amount, amount: a.amount,
           note: '',
@@ -701,6 +701,8 @@ function advanceRemainingAmount(o){
 }
 
 function renderAdvanceTable(){
+  const repairBtn = document.getElementById('btn-repair-legacy-explain');
+  if(repairBtn) repairBtn.style.display = isAdmin() ? '' : 'none';
   const table = document.getElementById('advance-table');
   if(!table) return;
   const rows = getFilteredAdvances();
@@ -828,6 +830,7 @@ function renderExplainBlockHtml(id){
     <div class="exp-block" data-exp-block="${id}">
       <label class="exp-block-title">Giải chi ${id}${removeBtn}</label>
       <div class="exp-row">
+        <div class="field"><label>Ngày giải chi</label><input type="date" id="exp${id}-date"></div>
         <div class="field grow2"><label>Dự án</label><select id="exp${id}-project"><option value="">— Không chọn (INDIRECT) —</option></select></div>
         <div class="field"><label>Mã (code)</label>
           <select id="exp${id}-code">
@@ -883,6 +886,8 @@ function appendExplainBlockDom(id){
   container.insertAdjacentHTML('beforeend', renderExplainBlockHtml(id));
   const sel = document.getElementById(`exp${id}-project`);
   if(sel) sel.innerHTML = '<option value="">— Không chọn —</option>' + PROJECTS.map(p=>`<option value="${p.id}">${escapeHtml(p.name)}</option>`).join('');
+  const dateEl = document.getElementById(`exp${id}-date`);
+  if(dateEl) dateEl.value = todayISO(); // khung mới thêm: mặc định ngày hôm nay, KT sửa lại nếu cần
   setExpImagePreview(id, 'invoice', '');
   setExpImagePreview(id, 'transfer', '');
 }
@@ -1020,7 +1025,6 @@ function openOrderExplainModal(orderId){
   const o = ORDERS.find(x=>x.id===orderId);
   if(!o) return;
   document.getElementById('exp-order-id').value = orderId;
-  document.getElementById('exp-date').value = todayISO();
   document.getElementById('exp-payee').value = o.payee || '';
   document.getElementById('exp-summary').innerHTML =
     `<strong>${escapeHtml(ORDER_TYPE_LABELS[o.orderType]||'Tạm ứng')}</strong> — ${escapeHtml(o.reason)}<br>Số tiền lệnh gốc: <strong>${fmtVND(o.amount)}</strong>`;
@@ -1035,9 +1039,24 @@ function openOrderExplainModal(orderId){
   explainBlockPrev = {};
   renderAllExplainBlocks();
 
+  const allTxForDate = allTxWithCollection();
   explainBlockIds.forEach(id=>{
     explainBlockPrev[id] = existing[id-1] || null;
     const a = existing[id-1] || {};
+    // Ngày giải chi RIÊNG của từng khung: lấy từ khoản đã lưu; dữ liệu cũ chưa lưu ngày thì lấy theo ngày
+    // của giao dịch Thu Chi tương ứng; khung trống thì mặc định hôm nay.
+    let blockDate = a.date || '';
+    if(!blockDate && a.transactionId){
+      const linked = allTxForDate.find(t=> t.id === a.transactionId);
+      if(linked && linked.date) blockDate = linked.date;
+    }
+    if(!blockDate && existing[id-1]){
+      // Dữ liệu cũ chưa có ID giao dịch: dò theo ghi chú cũ + số tiền để giữ đúng ngày đã giải chi
+      const oldNotes = [legacyExplainNote(o), oldestExplainNote(o)];
+      const m = allTxForDate.find(t=> (t.sourceOrderId === o.id || (!t.sourceOrderId && oldNotes.includes(t.note))) && Number(t.amount) === Number(a.amount));
+      if(m && m.date) blockDate = m.date;
+    }
+    document.getElementById(`exp${id}-date`).value = blockDate || todayISO();
     document.getElementById(`exp${id}-project`).value = a.projectId || '';
     document.getElementById(`exp${id}-code`).value = a.code || '';
     document.getElementById(`exp${id}-content`).value = a.content || '';
@@ -1064,6 +1083,8 @@ function allTxWithCollection(){
 // Dòng ghi chú mà các bản CŨ dùng khi tạo giao dịch Giải chi (trước khi có liên kết sourceOrderId) — dùng
 // để nhận diện lại các giao dịch cũ của đúng lệnh này.
 function legacyExplainNote(o){ return `Tự động tạo từ Giải chi Lệnh tạm ứng (${o.payee}) — ${o.reason}`; }
+// Mẫu ghi chú của bản ĐẦU TIÊN (trước cả mẫu "Tự động tạo từ Giải chi…").
+function oldestExplainNote(o){ return `Giải chi từ Lệnh tạm ứng (${o.payee}) — ${o.reason}`; }
 function isExplainGeneratedNote(note){ return typeof note === 'string' && note.startsWith('Tự động tạo từ Giải chi'); }
 
 document.getElementById('save-explain-btn')?.addEventListener('click', async ()=>{
@@ -1071,18 +1092,21 @@ document.getElementById('save-explain-btn')?.addEventListener('click', async ()=
   const orderId = document.getElementById('exp-order-id').value;
   const o = ORDERS.find(x=>x.id===orderId);
   if(!o) return;
-  const date = document.getElementById('exp-date').value || todayISO();
   const prevAllocations = Array.isArray(o.explainAllocations) ? o.explainAllocations : [];
 
   // ---- 1. Đọc dữ liệu từ các khung trên form ----
   const blocks = [];
+  const missingDateBlocks = [];
   explainBlockIds.forEach(i=>{
     const projectId = document.getElementById(`exp${i}-project`).value;
     const amount = parseMoneyInput(document.getElementById(`exp${i}-amount`));
     if(!amount) return; // khung không có Số tiền -> bỏ qua
     const proj = projectId ? projectById(projectId) : null;
     const prev = explainBlockPrev[i] || null;
+    const date = document.getElementById(`exp${i}-date`)?.value || '';
+    if(!date) missingDateBlocks.push(i);
     blocks.push({
+      date,
       projectId: projectId || '', projectName: proj ? proj.name : '',
       code: document.getElementById(`exp${i}-code`).value || (projectId ? '' : 'INDIRECT'),
       content: document.getElementById(`exp${i}-content`).value.trim() || o.reason,
@@ -1097,6 +1121,7 @@ document.getElementById('save-explain-btn')?.addEventListener('click', async ()=
     });
   });
   if(blocks.length === 0){ toast('Vui lòng điền ít nhất 1 khung Giải chi (nhập Số tiền)'); return; }
+  if(missingDateBlocks.length){ toast(`Vui lòng chọn Ngày giải chi cho khung ${missingDateBlocks.join(', ')}`); return; }
 
   // ---- 2. Chốt chặn an toàn trước khi lưu ----
   const keptPrevCount = blocks.filter(b=> b._prev).length;
@@ -1121,7 +1146,9 @@ document.getElementById('save-explain-btn')?.addEventListener('click', async ()=
     const txById = (id)=> allTx.find(t=> t.id===id) || null;
     const linkedTx = allTx.filter(t=> t.sourceOrderId === orderId);        // giao dịch đã gắn liên kết (bản mới)
     const legacyNote = legacyExplainNote(o);
-    const legacyTx = allTx.filter(t=> !t.sourceOrderId && t.note === legacyNote && Number(t.amount) > 0 && t.id !== o.transactionId); // giao dịch bản cũ, chưa gắn liên kết
+    const oldestNote = oldestExplainNote(o);
+    const claimedByOtherOrder = new Set(ORDERS.filter(x=> x.id !== orderId).flatMap(x=> (x.explainAllocations||[]).map(a=> a.transactionId).filter(Boolean)));
+    const legacyTx = allTx.filter(t=> !t.sourceOrderId && (t.note === legacyNote || t.note === oldestNote) && Number(t.amount) > 0 && t.id !== o.transactionId && !claimedByOtherOrder.has(t.id)); // giao dịch bản cũ, chưa gắn liên kết
     const usedIds = new Set();
 
     const batch = db.batch();
@@ -1142,7 +1169,7 @@ document.getElementById('save-explain-btn')?.addEventListener('click', async ()=
       const targetCollection = b.projectId ? 'transactions' : 'fixedCosts';
       const txData = {
         type:'OUT', projectId: b.projectId, projectName: b.projectName,
-        date, code: b.code, content: b.content, description: b.description,
+        date: b.date, code: b.code, content: b.content, description: b.description,
         unit: b.unit, qty: b.qty, unitPrice: b.unitPrice, amount: b.amount,
         invoiceNumber:'', invoiceDate:'', bankName:'', bankAccount:'', bankHolder:'', transferDate:'',
         note: legacyNote,
@@ -1260,7 +1287,7 @@ function openExplainCleanupModal(orderId){
   const legacyNote = legacyExplainNote(o);
   const activeIds = new Set((o.explainAllocations||[]).map(a=> a.transactionId).filter(Boolean));
   cleanupCandidates = allTx
-    .filter(t=> t.id !== o.transactionId && (t.sourceOrderId === orderId || t.note === legacyNote || t.note === `Giải chi từ Lệnh tạm ứng (${o.payee}) — ${o.reason}`))
+    .filter(t=> t.id !== o.transactionId && (t.sourceOrderId === orderId || t.note === legacyNote || t.note === oldestExplainNote(o)))
     .map(t=> ({ ...t, _active: activeIds.has(t.id) }));
   // Các dòng 0đ đã bị "vô hiệu" bởi bản cũ (mất liên kết lệnh) — hiện thêm để Admin dọn luôn nếu muốn.
   const zeroed = allTx.filter(t=> Number(t.amount)===0 && typeof t.note==='string' && /^\[Đã (xóa khỏi Giải chi|chuyển sang khoản khác)/.test(t.note))
@@ -1304,3 +1331,263 @@ async function runExplainCleanup(){
     closeModal('modal-explain-cleanup');
   }catch(err){ toast('Lỗi khi xóa: ' + err.message); }
 }
+
+
+// =============================================================
+// 🛠 SỬA DỮ LIỆU GIẢI CHI CŨ HÀNG LOẠT (Admin)
+// Bản sửa lỗi trùng trước đây chỉ có tác dụng với lệnh giải chi MỚI (có liên kết sourceOrderId). Các lệnh
+// tạm ứng CŨ không có liên kết đó nên mỗi lần bấm "Lưu giải trình" lại sinh thêm 1 bộ giao dịch trùng.
+// Công cụ này quét TẤT CẢ lệnh tạm ứng, với mỗi lệnh:
+//  - Gom mọi giao dịch Giải chi của lệnh (theo liên kết, theo ID đã lưu, hoặc theo 2 mẫu ghi chú cũ).
+//  - Lấy danh sách giải chi đang lưu trên lệnh làm CHUẨN: mỗi khoản giữ lại ĐÚNG 1 giao dịch khớp nhất
+//    (ưu tiên dòng có đính kèm, rồi dòng mới nhất). Lệnh mất danh sách giải chi -> giữ 1 dòng cho mỗi nhóm
+//    giống hệt nhau (dự án + mã + nội dung + diễn giải + số tiền) và dựng lại danh sách từ đó.
+//  - Các dòng còn lại (bản trùng / bản cũ) bị xóa; file đính kèm ở bản trùng được chuyển sang dòng giữ lại.
+//  - Gắn liên kết cố định (sourceOrderId/sourceAllocKey/transactionId) để về sau không bao giờ trùng nữa.
+//  - Xóa các dòng 0đ "[Đã xóa khỏi Giải chi…]" / "[Đã chuyển sang khoản khác…]" còn sót lại.
+// Có bảng xem trước, Admin chọn lệnh nào cần sửa rồi mới ghi.
+// =============================================================
+function ensureLegacyRepairModal(){
+  if(document.getElementById('modal-legacy-explain-repair')) return;
+  document.body.insertAdjacentHTML('beforeend', `
+    <div class="modal-backdrop" id="modal-legacy-explain-repair">
+      <div class="modal" style="max-width:1100px;width:100%;">
+        <div class="modal-head"><h3>🛠 Sửa dữ liệu Giải chi của các lệnh tạm ứng cũ</h3><button class="modal-close" data-close>✕</button></div>
+        <div class="modal-body">
+          <div id="legacy-repair-summary" class="tx-view-note" style="margin-bottom:12px;"></div>
+          <div class="table-wrap"><table class="data" id="legacy-repair-table"></table></div>
+        </div>
+        <div class="modal-foot">
+          <button class="btn btn-ghost" data-close>Đóng</button>
+          <button class="btn btn-primary" id="legacy-repair-run-btn">🛠 Sửa các lệnh đã chọn</button>
+        </div>
+      </div>
+    </div>`);
+  document.getElementById('legacy-repair-run-btn').addEventListener('click', runLegacyExplainRepair);
+  document.getElementById('legacy-repair-table').addEventListener('click', (e)=>{
+    const t = e.target.closest('[data-toggle-repair-detail]');
+    if(!t) return;
+    const row = document.getElementById(`legacy-repair-detail-${t.dataset.toggleRepairDetail}`);
+    if(row) row.style.display = row.style.display === 'none' ? '' : 'none';
+  });
+}
+
+const ZEROED_EXPLAIN_NOTE_RE = /^\[Đã (xóa khỏi Giải chi|chuyển sang khoản khác)/;
+function explainTxKey(x){
+  return [x.projectId||'', x.code||'', String(x.content||'').trim(), String(x.description||'').trim(), Number(x.amount)||0].join('|');
+}
+function txHasAttachment(t){ return !!(t.invoiceImage || t.transferImage); }
+function txCreatedSec(t){ return (t.createdAt && (t.createdAt.seconds || (t.createdAt.toDate && t.createdAt.toDate().getTime()/1000))) || 0; }
+// Chọn dòng "tốt nhất" để giữ trong 1 nhóm trùng: có đính kèm > đã gắn liên kết > mới nhất
+function pickBestTx(list){
+  return list.slice().sort((a,b)=>
+    (txHasAttachment(b)?1:0) - (txHasAttachment(a)?1:0) ||
+    (b.sourceOrderId?1:0) - (a.sourceOrderId?1:0) ||
+    txCreatedSec(b) - txCreatedSec(a))[0];
+}
+
+let legacyRepairPlans = [];
+// ctx: { claimedBy: Map txId -> orderId (giao dịch đã thuộc về 1 lệnh cụ thể), noteCount: Map note -> số lệnh dùng chung ghi chú đó }
+function buildLegacyRepairPlan(o, allTx, ctx){
+  const orderId = o.id;
+  const noteList = [legacyExplainNote(o), oldestExplainNote(o)];
+  // Ghi chú cũ chỉ ghi "Người nhận — Lý do": nếu 2 lệnh khác nhau trùng cả người nhận lẫn lý do (vd "Tạm ứng
+  // lương" hằng tháng) thì KHÔNG thể biết giao dịch thuộc lệnh nào -> không đụng tới các dòng đó (báo riêng).
+  const uniqueNotes = new Set(noteList.filter(n=> (ctx.noteCount.get(n)||0) <= 1));
+  const sharedNotes = new Set(noteList.filter(n=> (ctx.noteCount.get(n)||0) > 1));
+  const allocs = Array.isArray(o.explainAllocations) ? o.explainAllocations : [];
+  const allocTxIds = new Set(allocs.map(a=> a.transactionId).filter(Boolean));
+  const ownedByOther = (t)=> ctx.claimedBy.has(t.id) && ctx.claimedBy.get(t.id) !== orderId;
+  const candidates = allTx.filter(t=> t.id !== o.transactionId && Number(t.amount) > 0 && !ownedByOther(t) &&
+    (t.sourceOrderId === orderId || allocTxIds.has(t.id) || (!t.sourceOrderId && uniqueNotes.has(t.note))));
+  const ambiguous = allTx.filter(t=> t.id !== o.transactionId && Number(t.amount) > 0 && !t.sourceOrderId && !ctx.claimedBy.has(t.id) && sharedNotes.has(t.note));
+  const zeroed = allTx.filter(t=> Number(t.amount)===0 && typeof t.note==='string' && ZEROED_EXPLAIN_NOTE_RE.test(t.note) &&
+    (t.sourceOrderId === orderId || [...uniqueNotes].some(n=> t.note.includes(n))));
+  if(!candidates.length && !zeroed.length) return null;
+
+  const used = new Set();
+  const keeps = []; // {tx, alloc}
+  const missing = []; // allocation không còn giao dịch nào -> tạo lại
+  if(allocs.length){
+    allocs.forEach(a=>{
+      const free = candidates.filter(t=> !used.has(t.id));
+      let tx = (a.transactionId && free.find(t=> t.id===a.transactionId)) ||
+               (a.allocKey && free.find(t=> t.sourceAllocKey===a.allocKey)) || null;
+      if(!tx){
+        const exact = free.filter(t=> explainTxKey(t) === explainTxKey(a));
+        const loose = exact.length ? exact : free.filter(t=> Number(t.amount)===Number(a.amount) && (t.projectId||'')===(a.projectId||''));
+        const looser = loose.length ? loose : free.filter(t=> Number(t.amount)===Number(a.amount));
+        if(looser.length) tx = pickBestTx(looser);
+      }
+      if(!tx){
+        // Có thể giao dịch thật của khoản này nằm trong nhóm ghi chú dùng chung -> nhận lại nếu khớp y hệt
+        tx = ambiguous.find(t=> !ctx.takenAmbiguous.has(t.id) && explainTxKey(t) === explainTxKey(a)) || null;
+        if(tx) ctx.takenAmbiguous.add(tx.id);
+      }
+      if(tx){ used.add(tx.id); keeps.push({tx, alloc:a}); }
+      else missing.push(a);
+    });
+  } else {
+    // Lệnh không còn danh sách giải chi: gom nhóm giống hệt nhau (bỏ qua ngày), giữ 1 dòng mỗi nhóm
+    const groups = {};
+    candidates.forEach(t=>{ (groups[explainTxKey(t)] = groups[explainTxKey(t)] || []).push(t); });
+    Object.values(groups).forEach(list=>{
+      const tx = pickBestTx(list);
+      used.add(tx.id);
+      keeps.push({tx, alloc:null});
+    });
+  }
+  const dups = candidates.filter(t=> !used.has(t.id));
+
+  // Có cần sửa không? (trùng, dòng 0đ, thiếu giao dịch, hoặc chưa gắn liên kết đầy đủ)
+  const needsLink = keeps.some(({tx, alloc})=> tx.sourceOrderId !== orderId || !alloc || alloc.transactionId !== tx.id || !alloc.allocKey || tx.sourceAllocKey !== alloc.allocKey || !alloc.date);
+  if(!dups.length && !zeroed.length && !missing.length && !needsLink) return null;
+  const ambiguousLeft = ambiguous.filter(t=> !used.has(t.id));
+  // Còn dòng ghi chú dùng chung chưa rõ chủ -> KHÔNG tạo bổ sung (tránh sinh thêm bản trùng), giữ nguyên khoản đó
+  const skipCreate = ambiguousLeft.length > 0;
+  return { o, keeps, dups, zeroed, missing: skipCreate ? [] : missing, keptAsIs: skipCreate ? missing : [], needsLink, ambiguous: ambiguousLeft };
+}
+
+function openLegacyExplainRepairModal(){
+  if(!isAdmin()){ toast('Chỉ Admin được dùng công cụ này.'); return; }
+  ensureLegacyRepairModal();
+  const allTx = allTxWithCollection();
+  const advances = ORDERS.filter(isAdvanceOrder);
+  const ctx = { claimedBy: new Map(), noteCount: new Map(), takenAmbiguous: new Set() };
+  advances.forEach(o=>{
+    (o.explainAllocations||[]).forEach(a=>{ if(a.transactionId) ctx.claimedBy.set(a.transactionId, o.id); });
+    new Set([legacyExplainNote(o), oldestExplainNote(o)]).forEach(n=> ctx.noteCount.set(n, (ctx.noteCount.get(n)||0) + 1));
+  });
+  allTx.forEach(t=>{ if(t.sourceOrderId && !ctx.claimedBy.has(t.id)) ctx.claimedBy.set(t.id, t.sourceOrderId); });
+  legacyRepairPlans = advances.map(o=> buildLegacyRepairPlan(o, allTx, ctx)).filter(Boolean);
+  // Dòng 0đ vô hiệu không gán được cho lệnh nào (do lệnh đã bị đổi tên/xóa) — dọn chung
+  const assignedZero = new Set(legacyRepairPlans.flatMap(p=> p.zeroed.map(z=> z.id)));
+  const strayZeroed = allTx.filter(t=> Number(t.amount)===0 && typeof t.note==='string' && ZEROED_EXPLAIN_NOTE_RE.test(t.note) && !assignedZero.has(t.id));
+  legacyRepairPlans.strayZeroed = strayZeroed;
+
+  const totalDup = legacyRepairPlans.reduce((s,p)=> s + p.dups.length, 0);
+  const totalDupAmount = legacyRepairPlans.reduce((s,p)=> s + p.dups.reduce((x,t)=> x + Number(t.amount||0), 0), 0);
+  const totalZero = legacyRepairPlans.reduce((s,p)=> s + p.zeroed.length, 0) + strayZeroed.length;
+  document.getElementById('legacy-repair-summary').innerHTML = legacyRepairPlans.length || strayZeroed.length
+    ? `Tìm thấy <strong>${legacyRepairPlans.length}</strong> lệnh tạm ứng cần sửa · <span style="color:var(--red)"><strong>${totalDup}</strong> giao dịch trùng (${fmtVND(totalDupAmount)})</span> sẽ bị xóa khỏi Thu chi / Chi phí gián tiếp · <strong>${totalZero}</strong> dòng 0đ vô hiệu sẽ được dọn.<br>` +
+      `Mỗi khoản giải chi đang lưu trên lệnh sẽ giữ lại ĐÚNG 1 giao dịch (ưu tiên dòng có đính kèm). Bấm vào tên lệnh để xem chi tiết từng dòng. <strong>Nên bấm "Sao lưu ngay" ở trang Lịch sử trước khi sửa.</strong>`
+    : '✅ Không có lệnh tạm ứng cũ nào bị trùng hoặc thiếu liên kết Giải chi — dữ liệu đã sạch.';
+
+  const txLine = (t, tag)=> `<div style="font-size:12px;">${tag} ${fmtDate(t.date)} · ${escapeHtml(t.projectName||'Chi phí gián tiếp')} · ${escapeHtml(t.content||'')}${t.description ? ' — '+escapeHtml(t.description) : ''} · <strong>${fmtVND(t.amount||0)}</strong>${txHasAttachment(t) ? ' 📎' : ''}</div>`;
+  const table = document.getElementById('legacy-repair-table');
+  table.innerHTML = legacyRepairPlans.length ? `<thead><tr><th><input type="checkbox" id="legacy-repair-all" checked></th><th>Lệnh tạm ứng</th><th>Số tiền lệnh</th><th>Giữ lại</th><th>Xóa trùng</th><th>Dòng 0đ</th><th>Tạo bổ sung</th><th>Tổng giải chi sau khi sửa</th></tr></thead><tbody>` +
+    legacyRepairPlans.map((p, i)=>{
+      const after = p.keeps.reduce((s,k)=> s + Number((k.alloc||k.tx).amount||0), 0) + p.missing.concat(p.keptAsIs).reduce((s,a)=> s + Number(a.amount||0), 0);
+      return `<tr>
+        <td><input type="checkbox" class="legacy-repair-cb" data-idx="${i}" checked></td>
+        <td><a href="#" data-toggle-repair-detail="${i}" onclick="return false;"><strong>${escapeHtml(p.o.payee||'')}</strong> — ${escapeHtml(p.o.reason||'')}</a><div class="helper-text">${fmtDate(p.o.date)}</div></td>
+        <td class="num">${fmtVND(p.o.amount||0)}</td>
+        <td class="num">${p.keeps.length}</td>
+        <td class="num" style="color:var(--red);">${p.dups.length ? `${p.dups.length} (${fmtVND(p.dups.reduce((x,t)=> x+Number(t.amount||0),0))})` : '—'}</td>
+        <td class="num">${p.zeroed.length || '—'}</td>
+        <td class="num">${p.missing.length || '—'}</td>
+        <td class="num"><strong>${fmtVND(after)}</strong></td>
+      </tr>
+      <tr id="legacy-repair-detail-${i}" style="display:none;"><td></td><td colspan="7">
+        ${p.keeps.map(k=> txLine(k.tx, '<span class="tag tag-in">Giữ</span>')).join('')}
+        ${p.dups.map(t=> txLine(t, '<span class="tag tag-out">Xóa trùng</span>')).join('')}
+        ${p.zeroed.map(t=> txLine(t, '<span class="tag tag-gold">Dòng 0đ</span>')).join('')}
+        ${p.missing.map(a=> txLine(a, '<span class="tag tag-blue">Tạo bổ sung</span>')).join('')}
+        ${p.ambiguous.length ? `<div class="helper-text" style="margin-top:6px;">⚠️ ${p.ambiguous.length} dòng có ghi chú trùng với lệnh khác cùng người nhận + lý do — KHÔNG tự xử lý, dùng nút 🧹 của từng lệnh nếu cần dọn tay.</div>` : ''}
+      </td></tr>`;
+    }).join('') + `</tbody>`
+    : '';
+  document.getElementById('legacy-repair-all')?.addEventListener('change', (e)=>{
+    document.querySelectorAll('.legacy-repair-cb').forEach(cb=> cb.checked = e.target.checked);
+  });
+  document.getElementById('legacy-repair-run-btn').style.display = (legacyRepairPlans.length || strayZeroed.length) ? '' : 'none';
+  openModal('modal-legacy-explain-repair');
+}
+
+async function runLegacyExplainRepair(){
+  const picked = Array.from(document.querySelectorAll('.legacy-repair-cb:checked')).map(cb=> legacyRepairPlans[Number(cb.dataset.idx)]).filter(Boolean);
+  const stray = legacyRepairPlans.strayZeroed || [];
+  if(!picked.length && !stray.length){ toast('Chưa chọn lệnh nào.'); return; }
+  const dupCount = picked.reduce((s,p)=> s + p.dups.length, 0);
+  if(!confirm(`Sửa ${picked.length} lệnh tạm ứng?\n\n- Xóa ${dupCount} giao dịch trùng\n- Dọn ${picked.reduce((s,p)=> s+p.zeroed.length, 0) + stray.length} dòng 0đ vô hiệu\n- Gắn lại liên kết cố định cho các khoản giải chi\n\nViệc xóa không hoàn tác được (trừ khi khôi phục từ bản sao lưu). Tiếp tục?`)) return;
+
+  const btn = document.getElementById('legacy-repair-run-btn');
+  if(btn){ btn.disabled = true; btn.textContent = '⏳ Đang sửa...'; }
+  let fixedOrders = 0, deleted = 0, created = 0;
+  const deletedIds = new Set();
+  try{
+    // Dòng 0đ không thuộc lệnh nào: xóa theo lô riêng
+    for(let i=0; i<stray.length; i+=400){
+      const b = db.batch();
+      stray.slice(i, i+400).forEach(t=>{ b.delete(db.collection(t._col).doc(t.id)); deletedIds.add(t.id); });
+      await b.commit();
+      deleted += Math.min(400, stray.length - i);
+    }
+    // Mỗi lệnh = 1 lần ghi nguyên khối (hoặc sửa xong cả lệnh, hoặc không đổi gì)
+    for(const p of picked){
+      const o = p.o;
+      const batch = db.batch();
+      const legacyNote = legacyExplainNote(o);
+      const newAllocs = [];
+      p.keeps.forEach(({tx, alloc})=>{
+        const src = alloc || tx;
+        const allocKey = (alloc && alloc.allocKey) || tx.sourceAllocKey || genAllocKey();
+        const upd = { sourceOrderId: o.id, sourceAllocKey: allocKey, note: legacyNote };
+        // Chuyển file đính kèm từ bản trùng sang dòng giữ lại nếu dòng giữ lại chưa có
+        const sameGroupDups = p.dups.filter(d=> explainTxKey(d) === explainTxKey(tx));
+        if(!tx.invoiceImage){ const d = sameGroupDups.find(x=> x.invoiceImage); if(d){ upd.invoiceImage = d.invoiceImage; upd.invoiceStatus = 'issued'; } }
+        if(!tx.transferImage){ const d = sameGroupDups.find(x=> x.transferImage); if(d){ upd.transferImage = d.transferImage; upd.transferStatus = 'done'; } }
+        batch.update(db.collection(tx._col).doc(tx.id), upd);
+        newAllocs.push({
+          date: tx.date || (alloc && alloc.date) || o.date || todayISO(),
+          projectId: src.projectId || '', projectName: src.projectName || '',
+          code: src.code || '', content: src.content || o.reason, description: src.description || '',
+          unit: src.unit || '', qty: Number(src.qty) || 1, unitPrice: Number(src.unitPrice) || 0, amount: Number(src.amount) || 0,
+          invoiceImage: upd.invoiceImage || tx.invoiceImage || (alloc && alloc.invoiceImage) || '',
+          transferImage: upd.transferImage || tx.transferImage || (alloc && alloc.transferImage) || '',
+          allocKey, transactionId: tx.id, transactionCollection: tx._col,
+        });
+      });
+      p.missing.forEach(a=>{
+        const col = a.projectId ? 'transactions' : 'fixedCosts';
+        const ref = db.collection(col).doc();
+        const allocKey = a.allocKey || genAllocKey();
+        const date = a.date || o.date || todayISO();
+        batch.set(ref, {
+          type:'OUT', projectId: a.projectId||'', projectName: a.projectName||'', date,
+          code: a.code || (a.projectId ? '' : 'INDIRECT'), content: a.content || o.reason, description: a.description || '',
+          unit: a.unit||'', qty: Number(a.qty)||1, unitPrice: Number(a.unitPrice)||0, amount: Number(a.amount)||0,
+          invoiceNumber:'', invoiceDate:'', bankName:'', bankAccount:'', bankHolder:'', transferDate:'',
+          note: legacyNote, invoiceImage: a.invoiceImage||'', transferImage: a.transferImage||'',
+          invoiceStatus: a.invoiceImage ? 'issued' : 'pending', transferStatus: a.transferImage ? 'done' : 'pending',
+          sourceOrderId: o.id, sourceAllocKey: allocKey,
+          createdAt: firebase.firestore.FieldValue.serverTimestamp(), createdBy: auth.currentUser.email,
+        });
+        newAllocs.push({ ...a, date, allocKey, transactionId: ref.id, transactionCollection: col });
+        created++;
+      });
+      p.keptAsIs.forEach(a=> newAllocs.push({ ...a })); // khoản chưa xác định được giao dịch -> giữ nguyên như cũ
+      p.dups.concat(p.zeroed).forEach(t=>{
+        if(deletedIds.has(t.id)) return;
+        batch.delete(db.collection(t._col).doc(t.id)); deletedIds.add(t.id); deleted++;
+      });
+      const orderUpd = { explainAllocations: newAllocs };
+      if(newAllocs.length) orderUpd.explainedAt = o.explainedAt || firebase.firestore.FieldValue.serverTimestamp();
+      batch.update(db.collection('paymentOrders').doc(o.id), orderUpd);
+      const originalTx = o.transactionId ? allTxWithCollection().find(t=> t.id===o.transactionId) : null;
+      if(originalTx && newAllocs.length && originalTx.advanceExplainStatus !== 'explained'){
+        batch.update(db.collection(originalTx._col).doc(originalTx.id), { advanceExplainStatus:'explained', movedToTransactionId: o.id });
+      }
+      await batch.commit();
+      fixedOrders++;
+    }
+    toast(`✅ Đã sửa ${fixedOrders} lệnh · xóa ${deleted} dòng trùng/0đ${created ? ` · tạo bổ sung ${created} dòng` : ''}`);
+    logActivity('update', {projectName:'Sửa dữ liệu Giải chi cũ', content:`Sửa ${fixedOrders} lệnh tạm ứng, xóa ${deleted} dòng trùng`, type:'OUT'});
+    closeModal('modal-legacy-explain-repair');
+  }catch(err){
+    toast(`Lỗi khi sửa (đã sửa xong ${fixedOrders} lệnh trước khi lỗi): ` + err.message);
+  }finally{
+    if(btn){ btn.disabled = false; btn.textContent = '🛠 Sửa các lệnh đã chọn'; }
+  }
+}
+document.getElementById('btn-repair-legacy-explain')?.addEventListener('click', openLegacyExplainRepairModal);

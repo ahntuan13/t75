@@ -377,6 +377,7 @@
         <div class="topbar">
           <div><h2>Lệnh tạm ứng</h2><div class="sub">Xem lại các lệnh Tạm ứng thanh toán / Tạm ứng lương</div></div>
           <div class="topbar-actions">
+            <button class="btn btn-ghost" id="btn-repair-legacy-explain" style="display:none;" title="Chỉ Admin — sửa trùng lặp/liên kết Giải chi của các lệnh tạm ứng CŨ">🛠 Sửa dữ liệu Giải chi cũ</button>
             <button class="btn btn-ghost" id="btn-print-advance-selected">🖨 In các lệnh đã chọn</button>
             <button class="btn btn-primary" id="btn-add-advance">+ Tạo lệnh tạm ứng</button>
           </div>
@@ -886,8 +887,7 @@
       <input type="hidden" id="exp-order-id">
       <div id="exp-summary" class="tx-view-note" style="margin-bottom:14px;"></div>
       <div class="form-grid">
-        <div class="field"><label>Ngày giải trình</label><input type="date" id="exp-date"></div>
-        <div class="field"><label>Người/đơn vị nhận chi (gốc)</label><input id="exp-payee" disabled></div>
+        <div class="field full"><label>Người/đơn vị nhận chi (gốc)</label><input id="exp-payee" disabled></div>
         <p class="helper-text field full" style="margin:0;">Do 1 lệnh tạm ứng có thể được chi cho nhiều dự án khác nhau, mỗi khung bên dưới là 1 khoản phân bổ cho 1 dự án — bấm "+ Thêm khung Giải chi" nếu cần nhiều hơn. Chi phí sẽ tự động cộng vào đúng dự án tương ứng trong Thu Chi.</p>
 
         <div id="exp-blocks-container"></div>
@@ -1036,21 +1036,21 @@
       </div>
       <div class="form-grid">
         <div class="field"><label>Dự án</label><select id="ts-sang-project"><option value="">— Không có —</option></select></div>
-        <div class="field"><label>Số giờ</label><input type="number" step="0.5" id="ts-sang-hours" placeholder="0"></div>
+        <div class="field"><label>Số giờ</label><input type="number" step="any" min="0" id="ts-sang-hours" placeholder="0"></div>
       </div>
       <div class="field full" style="border-top:1px solid var(--line);padding-top:14px;margin-top:6px;">
         <label style="font-size:13px;font-weight:700;color:var(--ink);">🌤 Ca Chiều</label>
       </div>
       <div class="form-grid">
         <div class="field"><label>Dự án</label><select id="ts-chieu-project"><option value="">— Không có —</option></select></div>
-        <div class="field"><label>Số giờ</label><input type="number" step="0.5" id="ts-chieu-hours" placeholder="0"></div>
+        <div class="field"><label>Số giờ</label><input type="number" step="any" min="0" id="ts-chieu-hours" placeholder="0"></div>
       </div>
       <div class="field full" style="border-top:1px solid var(--line);padding-top:14px;margin-top:6px;">
         <label style="font-size:13px;font-weight:700;color:var(--ink);">🌙 Ca Tối (từ 17:01 — tự tính Tăng ca)</label>
       </div>
       <div class="form-grid">
         <div class="field"><label>Dự án</label><select id="ts-toi-project"><option value="">— Không có —</option></select></div>
-        <div class="field"><label>Số giờ (tăng ca)</label><input type="number" step="0.5" id="ts-toi-hours" placeholder="0"></div>
+        <div class="field"><label>Số giờ (tăng ca)</label><input type="number" step="any" min="0" id="ts-toi-hours" placeholder="0"></div>
       </div>
       <div class="form-grid">
         <div class="field full"><label>Ghi chú</label><input id="ts-note"></div>

@@ -104,8 +104,8 @@ function openEmployeeModal(id){
     document.getElementById('pa-month').value = month;
     document.getElementById('pa-modal-title').textContent = `Điều chỉnh lương tháng ${month}`;
     document.getElementById('pa-summary').innerHTML = e.payType==='daily'
-      ? `Ngày công quy đổi: <strong>${r.ngayCong} công</strong> (từ ${r.totalHours}h giờ công thực tế, đã tính hệ số Lễ/CN/ca Tối) × Tiền công/ngày: <strong>${fmtVND(r.tienCongNgay > 0 ? r.tienCongNgay : (e.effectiveRate||0))}</strong>${r.tienCongNgay>0 ? '' : ' (chưa nhập ở Chấm công, đang tạm dùng Lương hiệu quả)'} = Tổng thu nhập (trước khấu trừ): <strong>${fmtVND(r.totalIncome)}</strong>`
-      : `Tổng giờ công: <strong>${r.totalHours}h</strong> · Tổng thu nhập (trước khấu trừ): <strong>${fmtVND(r.totalIncome)}</strong>`;
+      ? `Ngày công quy đổi: <strong>${fmtHours(r.ngayCong)} công</strong> (từ ${fmtHours(r.totalHours)}h giờ công thực tế, đã tính hệ số Lễ/CN/ca Tối) × Tiền công/ngày: <strong>${fmtVND(r.tienCongNgay > 0 ? r.tienCongNgay : (e.effectiveRate||0))}</strong>${r.tienCongNgay>0 ? '' : ' (chưa nhập ở Chấm công, đang tạm dùng Lương hiệu quả)'} = Tổng thu nhập (trước khấu trừ): <strong>${fmtVND(r.totalIncome)}</strong>`
+      : `Tổng giờ công: <strong>${fmtHours(r.totalHours)}h</strong> · Tổng thu nhập (trước khấu trừ): <strong>${fmtVND(r.totalIncome)}</strong>`;
     setMoneyInputValue(document.getElementById('pa-bhxh'), r.adj.bhxhOverride ?? Math.round(Number(e.contractSalary||0)*0.105));
     setMoneyInputValue(document.getElementById('pa-tamung'), r.adj.tamUngCuoiThang);
     setMoneyInputValue(document.getElementById('pa-ungtuan'), r.adj.tienUngMrTuan);
@@ -320,7 +320,7 @@ document.getElementById('upload-timesheet-input')?.addEventListener('change', as
           const hours = hoursRow[col+offset];
           if(!projectName && !hours) return {projectId:'', projectName:'', hours:0};
           const proj = PROJECTS.find(p=> p.name === projectName);
-          return { projectId: proj ? proj.id : '', projectName: projectName || '', hours: Number(hours)||0 };
+          return { projectId: proj ? proj.id : '', projectName: projectName || '', hours: parseHours(hours) };
         };
         const shifts = { sang: buildShift(0), chieu: buildShift(1), toi: buildShift(2) };
         if(!shifts.sang.hours && !shifts.chieu.hours && !shifts.toi.hours) continue; // ngày không có công -> bỏ qua, không tạo dòng rỗng
@@ -381,7 +381,7 @@ document.getElementById('save-ts-btn').addEventListener('click', async ()=>{
   const buildShift = (key)=>{
     const projectId = document.getElementById(`ts-${key}-project`).value;
     const proj = projectId ? projectById(projectId) : null;
-    const hours = Number(document.getElementById(`ts-${key}-hours`).value) || 0;
+    const hours = parseHours(document.getElementById(`ts-${key}-hours`).value);
     return { projectId, projectName: proj ? proj.name : '', hours };
   };
   const shifts = { sang: buildShift('sang'), chieu: buildShift('chieu'), toi: buildShift('toi') };
@@ -430,7 +430,7 @@ function tsHours(t){
 
 function shiftCell(shift){
   if(!shift || !shift.hours) return '<span class="helper-text">—</span>';
-  return `<div>${escapeHtml(shift.projectName||'—')}</div><div class="num" style="font-size:11.5px;color:var(--ink-faint);">${shift.hours}h</div>`;
+  return `<div>${escapeHtml(shift.projectName||'—')}</div><div class="num" style="font-size:11.5px;color:var(--ink-faint);">${fmtHours(shift.hours)}h</div>`;
 }
 
 function renderTimesheetTable(){
@@ -452,9 +452,9 @@ function renderTimesheetTable(){
       <td>${shiftCell(s.sang)}</td>
       <td>${shiftCell(s.chieu)}</td>
       <td>${shiftCell(s.toi)}</td>
-      <td class="num">${h.regular}h</td>
-      <td class="num" style="color:var(--gold);">${h.ot}h</td>
-      <td class="num"><strong>${h.total}h</strong></td>
+      <td class="num">${fmtHours(h.regular)}h</td>
+      <td class="num" style="color:var(--gold);">${fmtHours(h.ot)}h</td>
+      <td class="num"><strong>${fmtHours(h.total)}h</strong></td>
       <td>
         <div class="row-actions">
           ${!isSubAdmin() ? `<button class="icon-btn" data-edit-ts="${t.id}" title="Sửa">✎</button>` : ''}
@@ -573,8 +573,8 @@ function renderTimesheetGrid(){
       const t = byEmpDay[`${e.id}_${dateStr}`];
       const h = t ? tsHours(t) : {regular:0, ot:0, total:0};
       monthTotal += h.total;
-      const label = h.total > 0 ? h.total : '';
-      const otMark = h.ot > 0 ? `<div style="font-size:9.5px;color:var(--gold);">+${h.ot} TC</div>` : '';
+      const label = h.total > 0 ? fmtHours(h.total) : '';
+      const otMark = h.ot > 0 ? `<div style="font-size:9.5px;color:var(--gold);">+${fmtHours(h.ot)} TC</div>` : '';
       const cellBg = dm.isHoliday ? 'background:var(--red-dim);' : dm.isSunday ? 'background:var(--gold-dim);' : (dm.isWeekend && !dm.isSunday) ? 'background:var(--blue-dim);' : '';
       return `<td class="num" style="cursor:pointer;padding:4px;${cellBg}${h.total>0?'':'color:var(--ink-faint);'}" data-grid-cell="${e.id}|${dateStr}">${label}${otMark}</td>`;
     }).join('');
@@ -651,9 +651,9 @@ function renderTimesheetSummary(){
   </tr></thead><tbody>${list.map(r=>`
     <tr>
       <td><strong>${escapeHtml(r.name)}</strong></td>
-      <td class="num">${r.regular}h</td>
-      <td class="num" style="color:var(--gold);">${r.ot}h</td>
-      <td class="num"><strong>${r.regular+r.ot}h</strong></td>
+      <td class="num">${fmtHours(r.regular)}h</td>
+      <td class="num" style="color:var(--gold);">${fmtHours(r.ot)}h</td>
+      <td class="num"><strong>${fmtHours(r.regular+r.ot)}h</strong></td>
       <td>${[...r.projects].map(p=>`<span class="tag tag-gray">${escapeHtml(p)}</span>`).join(' ') || '—'}</td>
     </tr>`).join('')}</tbody>`;
 }
@@ -688,7 +688,7 @@ function computeEmployeeSalary(emp, month){
   // "Tiền công" (đơn giá/ngày) giờ có thể do Kế toán TỰ NHẬP trực tiếp ở trang Chấm công (ô mới) —
   // nếu có nhập thì Tổng thu nhập = Tiền công x Ngày công; nếu chưa nhập thì dùng tạm "Lương hiệu quả"
   // đã cài trong hồ sơ nhân viên như trước (để không phá vỡ dữ liệu cũ khi chưa ai nhập Tiền công).
-  const ngayCong = Math.round((weightedHours/8)*100)/100;
+  const ngayCong = weightedHours/8; // KHÔNG làm tròn — giữ đúng số giờ lẻ đã chấm
   const tienCongNgay = Number(adj.tienCongNgay || 0);
   const totalIncome = emp.payType === 'daily'
     ? Math.round(ngayCong * (tienCongNgay > 0 ? tienCongNgay : Number(emp.effectiveRate||0)))
@@ -746,7 +746,7 @@ function renderPayrollSummary(){
     return `<tr>
       <td><strong>${escapeHtml(r.emp.name)}</strong><div class="helper-text">${escapeHtml(r.emp.position||'')}</div></td>
       <td class="num">${r.tienCongNgay > 0 ? fmtVND(r.tienCongNgay) : '<span class="helper-text">Chưa nhập</span>'}</td>
-      <td class="num">${r.ngayCong} công</td>
+      <td class="num">${fmtHours(r.ngayCong)} công</td>
       <td class="num">${fmtVND(r.totalIncome)}</td>
       <td class="num" style="color:var(--red);">${fmtVND(r.bhxh)}</td>
       <td class="num" style="color:var(--red);">${fmtVND(otherDeduct)}</td>
@@ -963,7 +963,7 @@ async function ensureVietnameseFont(doc){
 }
 function payslipRowsFor(emp, r, days, dayRate){
   return [
-    [1, 'TỔNG CÔNG [2]=[1]/8', `${days} công`],
+    [1, 'TỔNG CÔNG [2]=[1]/8', `${fmtHours(days)} công`],
     [2, 'ĐƠN GIÁ', fmtVND(dayRate)],
     [3, 'THÀNH TIỀN [4]=[2]×[3]', fmtVND(r.totalIncome)],
     [4, 'TIỀN TẠM ỨNG CUỐI THÁNG', fmtVND(r.tamUng)],
