@@ -32,7 +32,7 @@ const ORDER_TYPE_LABELS = {
 };
 const ADVANCE_TYPES = ['advance_purchase', 'advance_salary'];
 function isAdvanceOrder(o){ return ADVANCE_TYPES.includes(o.orderType); }
-const OUR_COMPANY = { name: 'Công ty TNHH DVKT Cách Nhiệt Tuấn 75', bank: '0914 288 146 – Eximbank – Đồng Nai', taxCode: '3604002848' };
+const OUR_COMPANY = { name: 'Công ty TNHH DVKT Cách Nhiệt Tuấn 75', bank: '0914 288 146', bankName: 'Eximbank – Đồng Nai', taxCode: '3604002848' };
 function isIncomeOrder(o){ return o.orderType === 'income'; }
 
 // context: 'payment' (mở từ trang Lệnh chi) | 'income' (mở từ trang Lệnh thu) | 'advance' (mở từ trang Lệnh tạm ứng)
@@ -78,6 +78,8 @@ function openOrderModal(id, context, presetType){
   const newIncome = !id && isIncome;
   document.getElementById('order-payee').value = o.payee || (newIncome ? OUR_COMPANY.name : '');
   document.getElementById('order-payee-bank').value = o.payeeBank || (newIncome ? OUR_COMPANY.bank : '');
+  document.getElementById('order-payee-bankname').value = o.payeeBankName || (newIncome ? OUR_COMPANY.bankName : '');
+  hidePayeeSuggest();
   document.getElementById('order-payee-tax').value = o.payeeTaxCode || (newIncome ? OUR_COMPANY.taxCode : '');
   document.getElementById('order-reason').value = o.reason || '';
   setMoneyInputValue(document.getElementById('order-amount'), o.amount);
@@ -115,12 +117,106 @@ function openOrderModal(id, context, presetType){
   openModal('modal-order');
 }
 
-// Danh sách nhân viên (lấy từ mục Bảng lương) để gợi ý chọn nhanh ở ô "Người/đơn vị nhận chi"
-function fillOrderPayeeDatalist(){
-  const dl = document.getElementById('order-payee-employees');
-  if(!dl) return;
-  dl.innerHTML = (typeof EMPLOYEES!=='undefined' ? EMPLOYEES : []).map(e=>`<option value="${escapeHtml(e.name)}">`).join('');
+// ---------- Gợi ý "Người/đơn vị nhận" khi gõ ----------
+// Danh bạ gộp từ: mục Chuyển khoản (chủ TK / STK / ngân hàng của các giao dịch), các lệnh đã tạo trước đó,
+// Dự án (tên khách hàng + MST) và nhân viên. Chọn 1 dòng -> tự điền STK, Ngân hàng, MST (ô nào không có thì để KT gõ tay).
+function fillOrderPayeeDatalist(){ /* giữ tên hàm cũ cho các chỗ đang gọi — danh bạ giờ dựng động khi gõ */ }
+function vnFold(str){
+  return String(str||'').normalize('NFD').replace(/[̀-ͯ]/g,'').replace(/đ/g,'d').replace(/Đ/g,'D').toLowerCase().replace(/\s+/g,' ').trim();
 }
+function buildPayeeDirectory(){
+  const map = new Map(); // key = tên đã chuẩn hóa
+  const add = (name, info, srcTime)=>{
+    const n = String(name||'').trim();
+    if(!n || n.length < 2) return;
+    const key = vnFold(n);
+    const cur = map.get(key) || { name: n, account:'', bankName:'', taxCode:'', src:new Set(), t:0 };
+    // thông tin mới hơn được ưu tiên, nhưng không ghi đè bằng ô trống
+    const newer = (srcTime||0) >= cur.t;
+    ['account','bankName','taxCode'].forEach(k=>{ if(info[k] && (newer || !cur[k])) cur[k] = String(info[k]).trim(); });
+    if(info.src) cur.src.add(info.src);
+    if(newer){ cur.t = srcTime||0; }
+    map.set(key, cur);
+  };
+  const ts = (x)=> (x && x.createdAt && x.createdAt.seconds) || 0;
+  const txs = (typeof TRANSACTIONS!=='undefined' ? TRANSACTIONS : []).concat(typeof FIXEDCOSTS!=='undefined' ? FIXEDCOSTS : []);
+  txs.forEach(t=>{ if(t.bankHolder) add(t.bankHolder, { account: t.bankAccount, bankName: t.bankName, src:'Chuyển khoản' }, ts(t)); });
+  (typeof ORDERS!=='undefined' ? ORDERS : []).forEach(o=>{
+    if(o.orderType === 'income') return; // bên nhận của lệnh thu là công ty mình
+    add(o.payee, { account: o.payeeBank, bankName: o.payeeBankName, taxCode: o.payeeTaxCode, src:'Lệnh đã tạo' }, ts(o));
+  });
+  (typeof PROJECTS!=='undefined' ? PROJECTS : []).forEach(p=>{
+    if(p.customer) add(p.customer, { taxCode: p.taxCode, src:'Dự án' }, 0);
+    (p.contracts||[]).forEach(c=>{ if(c && c.customer) add(c.customer, { taxCode: c.taxCode, src:'Dự án' }, 0); });
+  });
+  (typeof EMPLOYEES!=='undefined' ? EMPLOYEES : []).forEach(e=> add(e.name, { account: e.bankAccount, bankName: e.bankName, src:'Nhân viên' }, 0));
+  // MST: nếu tên trùng khách hàng trong Dự án thì lấy MST từ Dự án khi còn thiếu
+  return Array.from(map.values());
+}
+let payeeSuggestItems = [], payeeSuggestActive = -1;
+function hidePayeeSuggest(){ const b = document.getElementById('order-payee-suggest'); if(b){ b.style.display='none'; b.innerHTML=''; } payeeSuggestItems = []; payeeSuggestActive = -1; }
+function highlightMatch(name, q){
+  if(!q) return escapeHtml(name);
+  const folded = vnFold(name);
+  // vnFold giữ nguyên độ dài ký tự (trừ gộp khoảng trắng) -> tìm vị trí trên chuỗi gốc đã gộp khoảng trắng
+  const plain = String(name).replace(/\s+/g,' ').trim();
+  const i = folded.indexOf(q);
+  if(i < 0) return escapeHtml(plain);
+  return escapeHtml(plain.slice(0,i)) + '<mark>' + escapeHtml(plain.slice(i, i+q.length)) + '</mark>' + escapeHtml(plain.slice(i+q.length));
+}
+function showPayeeSuggest(){
+  const input = document.getElementById('order-payee');
+  const box = document.getElementById('order-payee-suggest');
+  if(!input || !box) return;
+  const q = vnFold(input.value);
+  if(!q){ hidePayeeSuggest(); return; }
+  const words = q.split(' ');
+  const dir = buildPayeeDirectory();
+  payeeSuggestItems = dir.filter(d=> { const f = vnFold(d.name); return words.every(w=> f.includes(w)); })
+    .sort((a,b)=> (vnFold(a.name).startsWith(q)?0:1) - (vnFold(b.name).startsWith(q)?0:1) || b.t - a.t || a.name.localeCompare(b.name,'vi'))
+    .slice(0, 12);
+  if(!payeeSuggestItems.length || (payeeSuggestItems.length===1 && vnFold(payeeSuggestItems[0].name)===q && document.getElementById('order-payee-bank').value)){ hidePayeeSuggest(); return; }
+  payeeSuggestActive = -1;
+  box.innerHTML = payeeSuggestItems.map((d,i)=>{
+    const det = [d.account ? 'STK '+d.account : '', d.bankName, d.taxCode ? 'MST '+d.taxCode : ''].filter(Boolean).join(' · ');
+    return `<div class="payee-ac-item" data-payee-idx="${i}"><div class="n">${highlightMatch(d.name, words[0])}</div><div class="d">${escapeHtml(det || 'Chưa có STK/ngân hàng/MST')} · <em>${escapeHtml([...d.src].join(', '))}</em></div></div>`;
+  }).join('');
+  box.style.display = '';
+}
+function pickPayeeSuggest(i){
+  const d = payeeSuggestItems[i];
+  if(!d) return;
+  document.getElementById('order-payee').value = d.name;
+  // chỉ điền những ô có dữ liệu; ô không có thì giữ nguyên để KT gõ tay
+  if(d.account) document.getElementById('order-payee-bank').value = d.account;
+  if(d.bankName) document.getElementById('order-payee-bankname').value = d.bankName;
+  if(d.taxCode) document.getElementById('order-payee-tax').value = d.taxCode;
+  hidePayeeSuggest();
+}
+(function initPayeeAutocomplete(){
+  const input = document.getElementById('order-payee');
+  const box = document.getElementById('order-payee-suggest');
+  if(!input || !box) return;
+  input.addEventListener('input', showPayeeSuggest);
+  input.addEventListener('focus', ()=>{ if(input.value.trim()) showPayeeSuggest(); });
+  input.addEventListener('keydown', (e)=>{
+    if(box.style.display === 'none' || !payeeSuggestItems.length) return;
+    const items = box.querySelectorAll('.payee-ac-item');
+    if(e.key === 'ArrowDown' || e.key === 'ArrowUp'){
+      e.preventDefault();
+      payeeSuggestActive = (payeeSuggestActive + (e.key==='ArrowDown'?1:-1) + items.length) % items.length;
+      items.forEach((el,i)=> el.classList.toggle('active', i===payeeSuggestActive));
+      items[payeeSuggestActive]?.scrollIntoView({block:'nearest'});
+    } else if(e.key === 'Enter' && payeeSuggestActive >= 0){
+      e.preventDefault(); pickPayeeSuggest(payeeSuggestActive);
+    } else if(e.key === 'Escape'){ hidePayeeSuggest(); }
+  });
+  box.addEventListener('mousedown', (e)=>{
+    const it = e.target.closest('[data-payee-idx]');
+    if(it){ e.preventDefault(); pickPayeeSuggest(Number(it.dataset.payeeIdx)); }
+  });
+  input.addEventListener('blur', ()=> setTimeout(hidePayeeSuggest, 150));
+})();
 
 // Khi chọn "Tạm ứng lương": gợi ý sẵn Lý do chi theo tháng hiện tại (chỉ khi đang trống, không ghi đè)
 function applyAdvanceSalaryDefaults(isNew){
@@ -238,6 +334,7 @@ document.getElementById('save-order-btn').addEventListener('click', async ()=>{
       payee, reason, amount,
       payeeBank: document.getElementById('order-payee-bank').value.trim(),
       payeeTaxCode: document.getElementById('order-payee-tax').value.trim(),
+      payeeBankName: document.getElementById('order-payee-bankname').value.trim(),
       requester: document.getElementById('order-requester').value.trim(),
       explanation: document.getElementById('order-explanation').value.trim(),
       attachment: currentOrderAttachment,
@@ -322,7 +419,7 @@ async function decideOrderApproval(id, decision){
         unit:'', qty:0, unitPrice:0, amount: o.amount,
         invoiceNumber: '', invoiceDate: '',
         invoiceStatus: 'pending',
-        bankName:'', bankAccount: o.payeeBank||'', bankHolder: o.payee||'', transferDate:'',
+        bankName: o.payeeBankName||'', bankAccount: o.payeeBank||'', bankHolder: o.payee||'', transferDate:'',
         note:`Tự động tạo từ ${isAdvance ? 'Lệnh tạm ứng' : (isIncome ? 'Lệnh thu' : 'Lệnh chi')} (${o.payee})${o.payeeTaxCode ? ' — MST: '+o.payeeTaxCode : ''}`,
         // QUAN TRỌNG: khoản này đã được duyệt xong bên Lệnh thu/chi rồi — gán rõ "approved" ở ngay đây,
         // KHÔNG để trống, để tránh trường hợp giao dịch (khi update lại 1 giao dịch đã có sẵn qua o.transactionId)
@@ -399,7 +496,7 @@ async function repairOrderLink(orderId){
         date: o.date, code: o.code || (o.projectId?'':'INDIRECT'),
         content: o.reason, description: `Chi cho ${o.payee}`,
         unit:'', qty:0, unitPrice:0, amount: o.amount,
-        invoiceNumber:'', invoiceDate:'', bankName:'', bankAccount: o.payeeBank||'', bankHolder: o.payee||'', transferDate:'',
+        invoiceNumber:'', invoiceDate:'', bankName: o.payeeBankName||'', bankAccount: o.payeeBank||'', bankHolder: o.payee||'', transferDate:'',
         note:`Tạo lại từ Lệnh chi (${o.payee}) — sửa liên kết bị lạc`,
         createdAt: firebase.firestore.FieldValue.serverTimestamp(), createdBy: auth.currentUser.email,
       });

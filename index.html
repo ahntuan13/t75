@@ -941,10 +941,13 @@
         <div class="field full"><label id="order-payer-label">Người/đơn vị chi</label><input id="order-payer" placeholder="VD: Công ty TNHH DVKT Cách Nhiệt Tuấn 75"></div>
         <div class="field full">
           <label id="order-payee-label">Người/đơn vị nhận chi *</label>
-          <input id="order-payee" list="order-payee-employees" required autocomplete="off">
-          <datalist id="order-payee-employees"></datalist>
+          <div class="payee-ac-wrap">
+            <input id="order-payee" required autocomplete="off" placeholder="Gõ vài chữ để tìm trong danh sách, hoặc gõ tay tên mới">
+            <div class="payee-ac-list" id="order-payee-suggest" style="display:none;"></div>
+          </div>
         </div>
         <div class="field"><label>Số tài khoản nhận (STK)</label><input id="order-payee-bank"></div>
+        <div class="field"><label>Ngân hàng / chi nhánh</label><input id="order-payee-bankname" placeholder="VD: Vietcombank – CN Đồng Nai"></div>
         <div class="field"><label>MST</label><input id="order-payee-tax"></div>
         <div class="field full"><label id="order-reason-label">Lý do chi *</label><input id="order-reason" required placeholder="VD: Thanh toán vật tư đợt 2"></div>
         <div class="field"><label>Số tiền *</label><input type="text" id="order-amount" required placeholder="0"></div>

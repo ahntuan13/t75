@@ -559,3 +559,11 @@ tr.tx-row-explained td:not(:last-child){text-decoration:line-through;}
 .ts-shift-box .form-grid{grid-template-columns:1fr 1fr 1.6fr 1fr;}
 @media (max-width:700px){ .ts-shift-box .form-grid{grid-template-columns:1fr 1fr;} }
 .ts-cell .ts-proj-input{line-height:1.45;}
+
+.payee-ac-wrap{position:relative;}
+.payee-ac-list{position:absolute;left:0;right:0;top:calc(100% + 4px);z-index:50;background:var(--card);border:1px solid var(--line);border-radius:10px;box-shadow:0 8px 24px rgba(0,0,0,.15);max-height:260px;overflow:auto;padding:4px;}
+.payee-ac-item{padding:7px 10px;border-radius:8px;cursor:pointer;line-height:1.35;}
+.payee-ac-item:hover,.payee-ac-item.active{background:var(--primary-dim);}
+.payee-ac-item .n{font-weight:600;font-size:13.5px;color:var(--ink);}
+.payee-ac-item .d{font-size:11.5px;color:var(--ink-faint);}
+.payee-ac-item mark{background:transparent;color:var(--primary);font-weight:800;}
