@@ -4,13 +4,13 @@
 //
 // LƯU Ý QUAN TRỌNG: mỗi khi sửa code (css/js/html), nên đổi CACHE_VERSION bên dưới lên 1 số mới —
 // nếu không, người dùng đã cài app có thể vẫn thấy bản cũ do trình duyệt dùng lại cache.
-const CACHE_VERSION = 'v2026-09-30-2';
+const CACHE_VERSION = 'v2026-09-30-3';
 const CACHE_NAME = `t75-app-shell-${CACHE_VERSION}`;
 
 const APP_SHELL_FILES = [
   './',
   './index.html',
-  './css/style.css',
+  './css/style.css?v=' + CACHE_VERSION,
   './manifest.json',
   './assets/logo-t75.jpg',
   './assets/icon-192.png',
@@ -20,7 +20,7 @@ const APP_SHELL_FILES = [
 self.addEventListener('install', (event) => {
   self.skipWaiting();
   event.waitUntil(
-    caches.open(CACHE_NAME).then((cache) => cache.addAll(APP_SHELL_FILES).catch(()=>{}))
+    caches.open(CACHE_NAME).then((cache) => cache.addAll(APP_SHELL_FILES.map((u)=> new Request(u, {cache:'reload'}))).catch(()=>{}))
   );
 });
 

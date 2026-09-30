@@ -155,32 +155,66 @@ function buildPayeeDirectory(){
 }
 let payeeSuggestItems = [], payeeSuggestActive = -1;
 function hidePayeeSuggest(){ const b = document.getElementById('order-payee-suggest'); if(b){ b.style.display='none'; b.innerHTML=''; } payeeSuggestItems = []; payeeSuggestActive = -1; }
-function highlightMatch(name, q){
-  if(!q) return escapeHtml(name);
-  const folded = vnFold(name);
-  // vnFold giữ nguyên độ dài ký tự (trừ gộp khoảng trắng) -> tìm vị trí trên chuỗi gốc đã gộp khoảng trắng
-  const plain = String(name).replace(/\s+/g,' ').trim();
-  const i = folded.indexOf(q);
-  if(i < 0) return escapeHtml(plain);
-  return escapeHtml(plain.slice(0,i)) + '<mark>' + escapeHtml(plain.slice(i, i+q.length)) + '</mark>' + escapeHtml(plain.slice(i+q.length));
+// Có dấu trong từ gõ -> so khớp CÓ dấu (gõ "đa" chỉ ra "Đam", không ra "Da"); không dấu -> so khớp bỏ dấu.
+function hasVnMark(str){ return /[^\x00-\x7F]/.test(String(str||'').normalize('NFC')); }
+function vnLower(str){ return String(str||'').normalize('NFC').toLowerCase().replace(/\s+/g,' ').trim(); }
+// Tìm theo ĐẦU TỪ: mỗi từ gõ phải khớp phần đầu của 1 từ trong tên. Trả về danh sách [start,end] để tô đậm, hoặc null.
+function payeeMatchRanges(name, query){
+  const plain = String(name||'').normalize('NFC').replace(/\s+/g,' ').trim();
+  const qWords = vnLower(query).split(' ').filter(Boolean);
+  if(!qWords.length) return null;
+  const words = [];
+  plain.replace(/\S+/g, (w, idx)=>{ words.push({w, idx}); return w; });
+  const used = new Set(), ranges = [];
+  for(const q of qWords){
+    const strict = hasVnMark(q);
+    const qq = strict ? q : vnFold(q);
+    const hit = words.findIndex((x, i)=> !used.has(i) && (strict ? vnLower(x.w) : vnFold(x.w)).startsWith(qq));
+    if(hit < 0) return null;
+    used.add(hit);
+    ranges.push([words[hit].idx, words[hit].idx + q.length]);
+  }
+  return { plain, ranges, firstWord: Math.min(...[...used]) };
+}
+function highlightRanges(plain, ranges){
+  const sorted = ranges.slice().sort((a,b)=> a[0]-b[0]);
+  let out = '', pos = 0;
+  sorted.forEach(([a,b])=>{ if(a < pos) return; out += escapeHtml(plain.slice(pos,a)) + '<b>' + escapeHtml(plain.slice(a,b)) + '</b>'; pos = b; });
+  return out + escapeHtml(plain.slice(pos));
+}
+function ensurePayeeSuggestStyle(){
+  if(document.getElementById('payee-ac-style')) return;
+  const st = document.createElement('style');
+  st.id = 'payee-ac-style';
+  st.textContent = `
+    .payee-ac-wrap{position:relative;}
+    .payee-ac-list{position:absolute;left:0;right:0;top:calc(100% + 4px);z-index:60;background:var(--card,#fff);border:1px solid var(--line,#e3e6ef);border-radius:10px;box-shadow:0 10px 28px rgba(0,0,0,.16);max-height:280px;overflow:auto;padding:4px;}
+    .payee-ac-item{padding:10px 12px;border-radius:8px;cursor:pointer;font-size:14px;line-height:1.35;color:var(--ink,#1c2233);border-left:3px solid transparent;}
+    .payee-ac-item + .payee-ac-item{margin-top:2px;}
+    .payee-ac-item:hover,.payee-ac-item.active{background:var(--primary-dim,#e8edff);border-left-color:var(--primary,#4f6ef7);}
+    .payee-ac-item b{color:var(--primary,#4f6ef7);font-weight:800;}
+    .payee-ac-empty{padding:10px 12px;font-size:12.5px;color:var(--ink-faint,#8a90a2);}`;
+  document.head.appendChild(st);
 }
 function showPayeeSuggest(){
   const input = document.getElementById('order-payee');
   const box = document.getElementById('order-payee-suggest');
   if(!input || !box) return;
-  const q = vnFold(input.value);
+  ensurePayeeSuggestStyle();
+  const q = input.value.trim();
   if(!q){ hidePayeeSuggest(); return; }
-  const words = q.split(' ');
-  const dir = buildPayeeDirectory();
-  payeeSuggestItems = dir.filter(d=> { const f = vnFold(d.name); return words.every(w=> f.includes(w)); })
-    .sort((a,b)=> (vnFold(a.name).startsWith(q)?0:1) - (vnFold(b.name).startsWith(q)?0:1) || b.t - a.t || a.name.localeCompare(b.name,'vi'))
-    .slice(0, 12);
-  if(!payeeSuggestItems.length || (payeeSuggestItems.length===1 && vnFold(payeeSuggestItems[0].name)===q && document.getElementById('order-payee-bank').value)){ hidePayeeSuggest(); return; }
+  const matches = [];
+  buildPayeeDirectory().forEach(d=>{
+    const m = payeeMatchRanges(d.name, q);
+    if(m) matches.push({ d, m });
+  });
+  // Ưu tiên: khớp ngay từ đầu tên > khớp ở từ sớm hơn > giao dịch gần đây > theo ABC
+  matches.sort((a,b)=> a.m.firstWord - b.m.firstWord || b.d.t - a.d.t || a.d.name.localeCompare(b.d.name,'vi'));
+  const top = matches.slice(0, 10);
+  payeeSuggestItems = top.map(x=> x.d);
+  if(!top.length || (top.length===1 && vnFold(top[0].d.name)===vnFold(q))){ hidePayeeSuggest(); return; }
   payeeSuggestActive = -1;
-  box.innerHTML = payeeSuggestItems.map((d,i)=>{
-    const det = [d.account ? 'STK '+d.account : '', d.bankName, d.taxCode ? 'MST '+d.taxCode : ''].filter(Boolean).join(' · ');
-    return `<div class="payee-ac-item" data-payee-idx="${i}"><div class="n">${highlightMatch(d.name, words[0])}</div><div class="d">${escapeHtml(det || 'Chưa có STK/ngân hàng/MST')} · <em>${escapeHtml([...d.src].join(', '))}</em></div></div>`;
-  }).join('');
+  box.innerHTML = top.map((x,i)=> `<div class="payee-ac-item" data-payee-idx="${i}" title="${escapeHtml(x.m.plain)}">${highlightRanges(x.m.plain, x.m.ranges)}</div>`).join('');
   box.style.display = '';
 }
 function pickPayeeSuggest(i){
@@ -210,6 +244,12 @@ function pickPayeeSuggest(i){
     } else if(e.key === 'Enter' && payeeSuggestActive >= 0){
       e.preventDefault(); pickPayeeSuggest(payeeSuggestActive);
     } else if(e.key === 'Escape'){ hidePayeeSuggest(); }
+  });
+  box.addEventListener('mousemove', (e)=>{
+    const it = e.target.closest('[data-payee-idx]');
+    if(!it) return;
+    payeeSuggestActive = Number(it.dataset.payeeIdx);
+    box.querySelectorAll('.payee-ac-item').forEach(el=> el.classList.toggle('active', el===it));
   });
   box.addEventListener('mousedown', (e)=>{
     const it = e.target.closest('[data-payee-idx]');
