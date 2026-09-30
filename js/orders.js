@@ -32,6 +32,7 @@ const ORDER_TYPE_LABELS = {
 };
 const ADVANCE_TYPES = ['advance_purchase', 'advance_salary'];
 function isAdvanceOrder(o){ return ADVANCE_TYPES.includes(o.orderType); }
+const OUR_COMPANY = { name: 'Công ty TNHH DVKT Cách Nhiệt Tuấn 75', bank: '0914 288 146 – Eximbank – Đồng Nai', taxCode: '3604002848' };
 function isIncomeOrder(o){ return o.orderType === 'income'; }
 
 // context: 'payment' (mở từ trang Lệnh chi) | 'income' (mở từ trang Lệnh thu) | 'advance' (mở từ trang Lệnh tạm ứng)
@@ -73,9 +74,11 @@ function openOrderModal(id, context, presetType){
   document.getElementById('order-code').value = o.code || '';
   typeSelect.value = o.orderType || presetType || (effectiveContext === 'advance' ? 'advance_purchase' : (isIncome ? 'income' : 'payment'));
   document.getElementById('order-payer').value = o.payer || (id || isIncome ? '' : 'Công ty TNHH DVKT Cách Nhiệt Tuấn 75');
-  document.getElementById('order-payee').value = o.payee || '';
-  document.getElementById('order-payee-bank').value = o.payeeBank || '';
-  document.getElementById('order-payee-tax').value = o.payeeTaxCode || '';
+  // Lệnh thu MỚI: bên nhận tiền luôn là công ty mình -> điền sẵn tên + STK + MST công ty (vẫn sửa được nếu cần)
+  const newIncome = !id && isIncome;
+  document.getElementById('order-payee').value = o.payee || (newIncome ? OUR_COMPANY.name : '');
+  document.getElementById('order-payee-bank').value = o.payeeBank || (newIncome ? OUR_COMPANY.bank : '');
+  document.getElementById('order-payee-tax').value = o.payeeTaxCode || (newIncome ? OUR_COMPANY.taxCode : '');
   document.getElementById('order-reason').value = o.reason || '';
   setMoneyInputValue(document.getElementById('order-amount'), o.amount);
   document.getElementById('order-requester').value = o.requester || (auth.currentUser ? auth.currentUser.email : '');
