@@ -8,16 +8,20 @@ service cloud.firestore {
     function myRole() {
       return get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role;
     }
+    // SUPER ADMIN — tài khoản chủ hệ thống, toàn quyền mọi thứ. Phải KHỚP với SUPER_ADMIN_EMAILS trong js/users.js.
+    function isSuperAdmin() {
+      return isSignedIn() && request.auth.token.email == 'ahntuan13@gmail.com';
+    }
     function isAdmin() {
-      return isSignedIn() && myRole() == 'admin';
+      return isSignedIn() && (isSuperAdmin() || myRole() == 'admin');
     }
     function isSubAdmin() {
-      return isSignedIn() && myRole() == 'subadmin';
+      return isSignedIn() && !isSuperAdmin() && myRole() == 'subadmin';
     }
     // Dùng để CHẶN Sub-admin (Giám đốc) khỏi các thao tác "Giải trình" —
     // GĐ chỉ được Xem + Duyệt/Từ chối, việc giải chi thuộc về Kế toán (User) và Admin.
     function isNotSubAdmin() {
-      return isSignedIn() && myRole() != 'subadmin';
+      return isSignedIn() && (isSuperAdmin() || myRole() != 'subadmin');
     }
     // Nhận diện giao dịch được HỆ THỐNG tự tạo khi 1 Lệnh chi/Tạm ứng được DUYỆT
     // (không phải do người dùng tự tay tạo/giải trình) — cho phép việc này xảy ra
@@ -85,7 +89,13 @@ service cloud.firestore {
       // 1) Người dùng tự tạo hồ sơ CỦA CHÍNH MÌNH lần đầu đăng nhập (mặc định role=user).
       // 2) Admin tạo/gán hồ sơ (kèm vai trò) cho một người khác (kể cả người đó chưa từng đăng nhập).
       allow create: if isSignedIn() && (request.auth.uid == uid || isAdmin());
-      allow update, delete: if isAdmin();
+      // Hồ sơ của Super Admin: chỉ chính Super Admin sửa/xóa được (Admin khác không hạ quyền được).
+      allow update, delete: if isSuperAdmin() || (isAdmin() && resource.data.email != 'ahntuan13@gmail.com');
+    }
+
+    // Super Admin: toàn quyền đọc/ghi MỌI collection (kể cả collection thêm mới sau này).
+    match /{document=**} {
+      allow read, write: if isSuperAdmin();
     }
 
     match /projects/{id} {

@@ -59,7 +59,7 @@ function renderProjectsTable(){
       : p.status==='warranty' ? '<span class="tag tag-gold">Còn 5% bảo hành</span>'
       : '<span class="tag tag-in">Đang thực hiện</span>';
     return `<tr>
-      <td><strong>${escapeHtml(p.name)}</strong><div class="helper-text">${escapeHtml(p.customer||'')}${p.taxCode? ' • MST: '+escapeHtml(p.taxCode):''}${p.contractNumber? ' • HĐ: '+escapeHtml(p.contractNumber):''}</div></td>
+      <td><strong>${escapeHtml(p.name)}</strong><div class="helper-text">${escapeHtml(p.customer||'')}${p.taxCode? ' • MST: '+escapeHtml(p.taxCode):''}${projectContractLabel(p)}</div>${projectHdFilesHtml(p)}</td>
       <td>${escapeHtml(p.code||'—')}${(Array.isArray(p.contractFiles)&&p.contractFiles.length) ? ` <a href="${p.contractFiles[0].url}" target="_blank" class="tag tag-blue" title="Xem file hợp đồng (${p.contractFiles.length} file)">📎 HĐ${p.contractFiles.length>1?' ×'+p.contractFiles.length:''}</a>` : ((p.contractFileUrl||p.contractFile||p.contractLink) ? ` <a href="${p.contractFileUrl||p.contractFile||p.contractLink}" target="_blank" class="tag tag-blue" title="Xem file hợp đồng">📎 HĐ</a>` : '')}</td>
       <td>${statusTag}</td>
       <td class="num">${fmtVND(p.contractValue)}</td>
@@ -99,19 +99,99 @@ let currentContractFiles = []; // [{url, name, uploadedAt}]
 let currentPaymentDossierFiles = []; // [{url, name, uploadedAt}] — hồ sơ thanh toán, tách riêng khỏi "file đính kèm khác"
 let currentContractInfo = [null,null,null,null,null]; // 5 slot: {name, fileUrl, fileName} | null — ứng với "Thông tin HĐ 1..5"
 
-function renderContractInfoStatus(i){
-  const el = document.getElementById(`proj-hd${i}-status`);
-  if(!el) return;
-  const info = currentContractInfo[i-1];
-  if(info && info.fileUrl){
-    el.innerHTML = `<a href="${info.fileUrl}" target="_blank" class="tag tag-blue">📎 ${escapeHtml(info.fileName||'Xem file')}</a> <button type="button" class="btn btn-ghost btn-sm" data-remove-hd="${i}">Xóa file</button>`;
-    el.querySelector('[data-remove-hd]')?.addEventListener('click', ()=>{
-      currentContractInfo[i-1] = { ...(currentContractInfo[i-1]||{}), fileUrl:'', fileName:'' };
-      renderContractInfoStatus(i);
-    });
-  } else {
-    el.innerHTML = `<span class="helper-text">Chưa có file.</span>`;
+// Tên/số các hợp đồng của dự án (lấy từ các khung "Thông tin HĐ"; dự án cũ chưa có thì dùng số HĐ nhập trước đây)
+function projectContractLabel(p){
+  const names = (Array.isArray(p.contractInfo) ? p.contractInfo : []).filter(c=> c && c.name).map(c=> c.name);
+  const label = names.length ? names.join(', ') : (p.contractNumber || '');
+  return label ? ' • HĐ: ' + escapeHtml(label) : '';
+}
+// Link nhanh tới file Hợp đồng + các Hồ sơ thanh toán của từng HĐ, hiện ngay dưới tên dự án
+function projectHdFilesHtml(p){
+  const rows = (Array.isArray(p.contractInfo) ? p.contractInfo : []).map((c, idx)=>{
+    if(!c) return '';
+    const links = [];
+    if(c.fileUrl) links.push(`<a href="${c.fileUrl}" target="_blank" rel="noopener" class="tag tag-blue" title="${escapeHtml(c.fileName||'Hợp đồng')}">📎 Hợp đồng</a>`);
+    (c.paymentFiles||[]).forEach((f, j)=> links.push(`<a href="${f.url}" target="_blank" rel="noopener" class="tag tag-gold" title="${escapeHtml(f.name||'')}">📎 HSTT lần ${j+1}</a>`));
+    return links.length ? `<div style="margin-top:4px;font-size:11.5px;"><span class="helper-text">HĐ ${idx+1}:</span> ${links.join(' ')}</div>` : '';
+  }).join('');
+  return rows;
+}
+
+// Dựng 5 khung "Thông tin HĐ 1..5" (mỗi khung: thông tin HĐ + file HỢP ĐỒNG + các file HỒ SƠ THANH TOÁN lần 1, 2, 3…)
+function renderProjectHdBlocks(){
+  const box = document.getElementById('proj-hd-blocks');
+  if(!box) return;
+  box.innerHTML = [1,2,3,4,5].map(i=> `
+    <div class="exp-block">
+      <label class="exp-block-title">Thông tin HĐ ${i}</label>
+      <div class="exp-row">
+        <div class="field grow2"><label>Tên/Số hợp đồng</label><input id="proj-hd${i}-name" placeholder="VD: HĐ đợt ${i} - ..."></div>
+        <div class="field"><label>Giá trị HĐ (đã VAT)</label><input type="text" id="proj-hd${i}-value" placeholder="0"></div>
+      </div>
+      <div class="exp-row">
+        <div class="field"><label>Chi phí dự toán</label><input type="text" id="proj-hd${i}-cost-budget" placeholder="0"></div>
+        <div class="field"><label>Doanh thu dự toán</label><input type="text" id="proj-hd${i}-revenue-budget" placeholder="0"></div>
+        <div class="field"><label>Ngày ký</label><input type="date" id="proj-hd${i}-date"></div>
+      </div>
+      <div class="exp-row" style="align-items:flex-start;">
+        <div class="field">
+          <label>📎 Hợp đồng</label>
+          <div id="proj-hd${i}-status" style="margin-bottom:6px;"></div>
+          <button type="button" class="btn btn-ghost btn-sm" data-hd-pick-file="${i}">⬆ Chọn file hợp đồng</button>
+          <input type="file" id="proj-hd${i}-file" style="display:none;">
+        </div>
+        <div class="field">
+          <label>📎 Hồ sơ thanh toán (HSTT lần 1, lần 2…)</label>
+          <div id="proj-hd${i}-hstt-list" style="margin-bottom:6px;"></div>
+          <button type="button" class="btn btn-ghost btn-sm" id="proj-hd${i}-hstt-add" data-hd-pick-hstt="${i}">+ Thêm HSTT</button>
+          <input type="file" id="proj-hd${i}-hstt-input" style="display:none;">
+        </div>
+      </div>
+    </div>`).join('');
+}
+renderProjectHdBlocks(); // phải dựng TRƯỚC khi gắn sự kiện cho các ô bên dưới
+document.getElementById('proj-hd-blocks')?.addEventListener('click', (e)=>{
+  const pick = e.target.closest('[data-hd-pick-file]')?.dataset.hdPickFile;
+  if(pick){ document.getElementById(`proj-hd${pick}-file`).click(); return; }
+  const pickHstt = e.target.closest('[data-hd-pick-hstt]')?.dataset.hdPickHstt;
+  if(pickHstt){ document.getElementById(`proj-hd${pickHstt}-hstt-input`).click(); return; }
+  const rmFile = e.target.closest('[data-remove-hd]')?.dataset.removeHd;
+  if(rmFile){
+    const i = Number(rmFile);
+    currentContractInfo[i-1] = { ...(currentContractInfo[i-1]||{}), fileUrl:'', fileName:'' };
+    renderContractInfoStatus(i);
+    return;
   }
+  const rmHstt = e.target.closest('[data-remove-hstt]')?.dataset.removeHstt;
+  if(rmHstt){
+    const [i, idx] = rmHstt.split(':').map(Number);
+    const info = { ...(currentContractInfo[i-1]||{}) };
+    info.paymentFiles = (info.paymentFiles||[]).filter((_, k)=> k !== idx);
+    currentContractInfo[i-1] = info;
+    renderContractInfoStatus(i);
+  }
+});
+
+function renderContractInfoStatus(i){
+  const info = currentContractInfo[i-1] || {};
+  const el = document.getElementById(`proj-hd${i}-status`);
+  if(el){
+    el.innerHTML = info.fileUrl
+      ? `<a href="${info.fileUrl}" target="_blank" rel="noopener" class="tag tag-blue">📎 ${escapeHtml(info.fileName||'Xem hợp đồng')}</a> <button type="button" class="btn btn-ghost btn-sm" data-remove-hd="${i}">Xóa</button>`
+      : `<span class="helper-text">Chưa có file hợp đồng.</span>`;
+  }
+  const list = document.getElementById(`proj-hd${i}-hstt-list`);
+  const files = Array.isArray(info.paymentFiles) ? info.paymentFiles : [];
+  if(list){
+    list.innerHTML = files.length
+      ? files.map((f, idx)=> `<div style="display:flex;align-items:center;gap:8px;margin-bottom:5px;">
+          <a href="${f.url}" target="_blank" rel="noopener" class="tag tag-gold" title="${escapeHtml(f.name||'')}">📎 HSTT lần ${idx+1}: ${escapeHtml(f.name||'Xem file')}</a>
+          <button type="button" class="btn btn-ghost btn-sm" data-remove-hstt="${i}:${idx}">Xóa</button>
+        </div>`).join('')
+      : `<span class="helper-text">Chưa có hồ sơ thanh toán nào.</span>`;
+  }
+  const addBtn = document.getElementById(`proj-hd${i}-hstt-add`);
+  if(addBtn) addBtn.textContent = `+ Thêm HSTT lần ${files.length+1}`;
 }
 
 // Tổng Chi phí dự toán / Doanh thu dự toán của cả dự án LUÔN bằng tổng cộng của 5 khung "Thông tin HĐ" —
@@ -123,9 +203,7 @@ function recalcProjectBudgetTotals(){
     totalRevenue += parseMoneyInput(document.getElementById(`proj-hd${i}-revenue-budget`));
     totalContractValue += parseMoneyInput(document.getElementById(`proj-hd${i}-value`));
   }
-  setMoneyInputValue(document.getElementById('project-cost-budget'), totalCost);
-  setMoneyInputValue(document.getElementById('project-revenue-budget'), totalRevenue);
-  setMoneyInputValue(document.getElementById('project-contract-value'), totalContractValue);
+  return { costBudget: totalCost, revenueBudget: totalRevenue, contractValue: totalContractValue };
 }
 
 for(let i=1;i<=5;i++){
@@ -146,16 +224,25 @@ for(let i=1;i<=5;i++){
       const projName = document.getElementById('project-name').value.trim() || 'KhongTenDuAn';
       const folder = 'Projects/' + projName.replace(/[^\w\-]+/g, '_') + '/HD' + i;
       const result = await msUploadFile(file, folder, (pct)=> toast(`⏳ Đang tải "${file.name}"... ${pct}%`));
-      currentContractInfo[i-1] = {
-        name: document.getElementById(`proj-hd${i}-name`).value.trim(),
-        value: parseMoneyInput(document.getElementById(`proj-hd${i}-value`)),
-        costBudget: parseMoneyInput(document.getElementById(`proj-hd${i}-cost-budget`)),
-        revenueBudget: parseMoneyInput(document.getElementById(`proj-hd${i}-revenue-budget`)),
-        signDate: document.getElementById(`proj-hd${i}-date`).value,
-        fileUrl: result.webUrl, fileName: result.name,
-      };
+      currentContractInfo[i-1] = { ...(currentContractInfo[i-1]||{}), fileUrl: result.webUrl, fileName: result.name };
       renderContractInfoStatus(i);
-      toast('Đã thêm file cho HĐ ' + i);
+      toast('Đã thêm file hợp đồng cho HĐ ' + i);
+    }catch(err){ toast(friendlyMsError(err)); }
+  });
+  document.getElementById(`proj-hd${i}-hstt-input`)?.addEventListener('change', async (e)=>{
+    const file = e.target.files[0];
+    e.target.value = '';
+    if(!file) return;
+    toast(`⏳ Đang tải "${file.name}" lên OneDrive...`);
+    try{
+      const projName = document.getElementById('project-name').value.trim() || 'KhongTenDuAn';
+      const folder = 'Projects/' + projName.replace(/[^\w\-]+/g, '_') + '/HD' + i + '/HoSoThanhToan';
+      const result = await msUploadFile(file, folder, (pct)=> toast(`⏳ Đang tải "${file.name}"... ${pct}%`));
+      const info = { ...(currentContractInfo[i-1]||{}) };
+      info.paymentFiles = (info.paymentFiles||[]).concat([{ url: result.webUrl, name: result.name, uploadedAt: new Date().toISOString() }]);
+      currentContractInfo[i-1] = info;
+      renderContractInfoStatus(i);
+      toast(`Đã thêm HSTT lần ${info.paymentFiles.length} cho HĐ ${i}`);
     }catch(err){ toast(friendlyMsError(err)); }
   });
 }
@@ -251,16 +338,8 @@ function openProjectModal(id){
   document.getElementById('project-code').value = p.code || '';
   document.getElementById('project-customer').value = p.customer || '';
   document.getElementById('project-tax-code').value = p.taxCode || '';
-  document.getElementById('project-contract-number').value = p.contractNumber || '';
   document.getElementById('project-contract-link').value = p.contractLink || '';
-  setMoneyInputValue(document.getElementById('project-contract-value'), p.contractValue);
-  setMoneyInputValue(document.getElementById('project-cost-budget'), p.costBudget);
-  setMoneyInputValue(document.getElementById('project-revenue-budget'), p.revenueBudget);
   document.getElementById('project-status').value = p.status || 'active';
-  document.getElementById('project-sign-date').value = p.signDate || (id ? '' : todayISO());
-  document.getElementById('project-completion-date').value = p.completionDate || '';
-  document.getElementById('project-warranty-years').value = p.warrantyYears || '';
-  document.getElementById('project-warranty-start').value = p.warrantyStartDate || '';
   document.getElementById('project-note').value = p.note || '';
   // ưu tiên mảng nhiều file mới (contractFiles); nếu dự án cũ chỉ có 1 file (contractFileUrl/contractFile) thì tự chuyển thành mảng 1 phần tử
   if(Array.isArray(p.contractFiles) && p.contractFiles.length){
@@ -273,7 +352,10 @@ function openProjectModal(id){
   document.getElementById('project-file-input').value = '';
   currentPaymentDossierFiles = Array.isArray(p.paymentDossierFiles) ? p.paymentDossierFiles.slice() : [];
   document.getElementById('project-payment-file-input').value = '';
-  currentContractInfo = Array.isArray(p.contractInfo) ? p.contractInfo.slice(0,5) : [];
+  currentContractInfo = Array.isArray(p.contractInfo) ? p.contractInfo.slice(0,5).map(c=> c ? { ...c, paymentFiles: Array.isArray(c.paymentFiles) ? c.paymentFiles.slice() : [] } : null) : [];
+  // Hồ sơ thanh toán chung của dự án (kiểu cũ): chỉ hiện khi dự án đã có file ở đó — hồ sơ mới đính kèm theo từng HĐ
+  const dossierField = document.getElementById('project-payment-dossier-field');
+  if(dossierField) dossierField.style.display = currentPaymentDossierFiles.length ? '' : 'none';
   while(currentContractInfo.length < 5) currentContractInfo.push(null);
   for(let i=1;i<=5;i++){
     const info = currentContractInfo[i-1];
@@ -293,15 +375,6 @@ function openProjectModal(id){
 
 document.getElementById('btn-add-project')?.addEventListener('click', ()=> openProjectModal(null));
 
-// Tự ghi lại "Ngày bắt đầu tính bảo hành" đúng thời điểm chuyển Trạng thái sang "Còn giữ 5% bảo hành"
-// (chỉ ghi 1 lần khi CHUYỂN SANG, không ghi đè lại nếu đã có sẵn từ trước).
-document.getElementById('project-status')?.addEventListener('change', (e)=>{
-  const warrantyStartEl = document.getElementById('project-warranty-start');
-  if(e.target.value === 'warranty' && !warrantyStartEl.value){
-    warrantyStartEl.value = todayISO();
-  }
-});
-
 document.getElementById('save-project-btn').addEventListener('click', async ()=>{
   const id = document.getElementById('project-id').value;
   const name = document.getElementById('project-name').value.trim();
@@ -311,16 +384,10 @@ document.getElementById('save-project-btn').addEventListener('click', async ()=>
     code: document.getElementById('project-code').value.trim(),
     customer: document.getElementById('project-customer').value.trim(),
     taxCode: document.getElementById('project-tax-code').value.trim(),
-    contractNumber: document.getElementById('project-contract-number').value.trim(),
     contractLink: document.getElementById('project-contract-link').value.trim(),
-    contractValue: parseMoneyInput(document.getElementById('project-contract-value')),
-    costBudget: parseMoneyInput(document.getElementById('project-cost-budget')),
-    revenueBudget: parseMoneyInput(document.getElementById('project-revenue-budget')),
+    // Giá trị HĐ / Chi phí dự toán / Doanh thu dự toán của DỰ ÁN = tổng của các khung "Thông tin HĐ" (không còn ô nhập riêng)
+    ...recalcProjectBudgetTotals(),
     status: document.getElementById('project-status').value,
-    signDate: document.getElementById('project-sign-date').value,
-    completionDate: document.getElementById('project-completion-date').value,
-    warrantyYears: document.getElementById('project-warranty-years').value,
-    warrantyStartDate: document.getElementById('project-warranty-start').value,
     note: document.getElementById('project-note').value.trim(),
     contractFiles: currentContractFiles,
     paymentDossierFiles: currentPaymentDossierFiles,
@@ -331,8 +398,9 @@ document.getElementById('save-project-btn').addEventListener('click', async ()=>
       const revenueBudget = parseMoneyInput(document.getElementById(`proj-hd${i}-revenue-budget`));
       const signDate = document.getElementById(`proj-hd${i}-date`).value;
       const info = currentContractInfo[i-1];
-      if(!name && !value && !costBudget && !revenueBudget && !signDate && !(info && info.fileUrl)) return null;
-      return { name, value, costBudget, revenueBudget, signDate, fileUrl: info ? (info.fileUrl||'') : '', fileName: info ? (info.fileName||'') : '' };
+      const paymentFiles = (info && Array.isArray(info.paymentFiles)) ? info.paymentFiles : [];
+      if(!name && !value && !costBudget && !revenueBudget && !signDate && !(info && info.fileUrl) && !paymentFiles.length) return null;
+      return { name, value, costBudget, revenueBudget, signDate, fileUrl: info ? (info.fileUrl||'') : '', fileName: info ? (info.fileName||'') : '', paymentFiles };
     }),
     // xóa field cũ (single-file) để tránh dữ liệu thừa/nhầm lẫn khi đọc lại
     contractFileUrl: firebase.firestore.FieldValue.delete(),
@@ -340,6 +408,9 @@ document.getElementById('save-project-btn').addEventListener('click', async ()=>
     contractFileName: firebase.firestore.FieldValue.delete(),
     contractFileType: firebase.firestore.FieldValue.delete(),
   };
+  // Ghi lại ngày bắt đầu giữ bảo hành đúng lúc dự án CHUYỂN SANG "Còn giữ 5% bảo hành" (chỉ ghi 1 lần)
+  const before = id ? (projectById(id) || {}) : {};
+  if(data.status === 'warranty' && !before.warrantyStartDate) data.warrantyStartDate = todayISO();
   try{
     if(id){
       await db.collection('projects').doc(id).update(data);

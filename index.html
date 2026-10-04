@@ -15,7 +15,7 @@
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
 <meta name="apple-mobile-web-app-title" content="T75">
 
-<link rel="stylesheet" href="css/style.css?v=v2026-09-30-3">
+<link rel="stylesheet" href="css/style.css?v=v2026-10-04-1">
 </head>
 <body>
 
@@ -236,9 +236,8 @@
       <!-- TRANSACTIONS -->
       <div class="view" id="view-transactions">
         <div class="topbar">
-          <div><h2>Thu chi dự án</h2><div class="sub">Ghi nhận dòng tiền vào/ra theo dự án</div></div>
+          <div><h2>Thu chi dự án</h2><div class="sub">Dòng tiền vào/ra theo dự án — mọi giao dịch được tạo từ Lệnh thu / chi / tạm ứng</div></div>
           <div class="topbar-actions">
-            <button class="btn btn-primary" id="btn-add-tx" style="display:none;">+ Nhập giao dịch</button>
             <button class="btn btn-ghost" id="btn-export-tx" style="display:none;">⬇ Xuất Excel (theo bộ lọc)</button>
             <button class="btn btn-ghost" id="btn-upload-thu" style="display:none;">⬆ Upload Thu (Excel)</button>
             <button class="btn btn-ghost" id="btn-upload-chi" style="display:none;">⬆ Upload Chi (Excel)</button>
@@ -377,7 +376,7 @@
         <div class="topbar">
           <div><h2>Lệnh tạm ứng</h2><div class="sub">Xem lại các lệnh Tạm ứng thanh toán / Tạm ứng lương</div></div>
           <div class="topbar-actions">
-            <button class="btn btn-ghost" id="btn-repair-legacy-explain" style="display:none;" title="Chỉ Admin — sửa trùng lặp/liên kết Giải chi của các lệnh tạm ứng CŨ">🛠 Sửa dữ liệu Giải chi cũ</button>
+            <button class="btn btn-ghost" id="btn-repair-legacy-explain" style="display:none;" title="Chỉ Super Admin — sửa trùng lặp/liên kết Giải chi của các lệnh tạm ứng CŨ">🛠 Sửa dữ liệu Giải chi cũ</button>
             <button class="btn btn-ghost" id="btn-print-advance-selected">🖨 In các lệnh đã chọn</button>
             <button class="btn btn-primary" id="btn-add-advance">+ Tạo lệnh tạm ứng</button>
           </div>
@@ -608,114 +607,13 @@
         <div class="field"><label>Mã dự án</label><input id="project-code" placeholder="VD: NTGLOBAL"></div>
         <div class="field"><label>Khách hàng</label><input id="project-customer"></div>
         <div class="field"><label>MST (Mã số thuế)</label><input id="project-tax-code" placeholder="VD: 0312345678"></div>
-        <div class="field"><label>Số hợp đồng</label><input id="project-contract-number" placeholder="VD: 12/2026/HĐKT-XYZ"></div>
-        <div class="field"><label>Giá trị hợp đồng (đã VAT) <span style="font-weight:400;color:var(--ink-faint);">(tự tính = tổng HĐ 1-5)</span></label><input type="text" id="project-contract-value" placeholder="0" readonly style="background:var(--bg-soft);"></div>
-        <div class="field"><label>Chi phí dự toán <span style="font-weight:400;color:var(--ink-faint);">(tự tính = tổng HĐ 1-5)</span></label><input type="text" id="project-cost-budget" placeholder="0" readonly style="background:var(--bg-soft);"></div>
-        <div class="field"><label>Doanh thu dự toán <span style="font-weight:400;color:var(--ink-faint);">(tự tính = tổng HĐ 1-5)</span></label><input type="text" id="project-revenue-budget" placeholder="0" readonly style="background:var(--bg-soft);"></div>
-        <div class="field"><label>Ngày ký hợp đồng</label><input type="date" id="project-sign-date"></div>
-        <div class="field"><label>Ngày hoàn thành</label><input type="date" id="project-completion-date"></div>
-        <div class="field">
-          <label>Thời gian bảo hành</label>
-          <select id="project-warranty-years">
-            <option value="">— Không áp dụng —</option>
-            <option value="1">1 năm</option>
-            <option value="2">2 năm</option>
-            <option value="3">3 năm</option>
-            <option value="4">4 năm</option>
-            <option value="5">5 năm</option>
-          </select>
-        </div>
-        <div class="field">
-          <label>Ngày bắt đầu tính bảo hành</label>
-          <input type="date" id="project-warranty-start" disabled>
-          <div class="helper-text">Tự ghi lại ngày khi bạn chuyển Trạng thái sang "Còn giữ 5% bảo hành".</div>
-        </div>
         <div class="field full">
-          <label>📎 Đính kèm hồ sơ dự án (1 dự án có thể có nhiều HĐ khác nhau — mỗi HĐ 1 file riêng)</label>
+          <label>📎 Thông tin & hồ sơ từng hợp đồng (1 dự án có thể có nhiều HĐ — mỗi HĐ đính kèm riêng file Hợp đồng và các Hồ sơ thanh toán lần 1, lần 2…)</label>
           <div class="helper-text" style="margin-bottom:4px;">Không giới hạn dung lượng file (file lớn sẽ tự động tải theo từng phần, hiện % tiến độ). Lần đầu upload cần bấm "🔗 Kết nối OneDrive" ở cuối menu bên trái trước. Upload xong bấm thẳng vào tên file để xem lại.</div>
         </div>
-        <div class="exp-block">
-          <label class="exp-block-title">Thông tin HĐ 1</label>
-          <div class="exp-row">
-            <div class="field grow2"><label>Tên/Số hợp đồng</label><input id="proj-hd1-name" placeholder="VD: HĐ đợt 1 - ..."></div>
-            <div class="field"><label>Giá trị HĐ</label><input type="text" id="proj-hd1-value" placeholder="0"></div>
-          </div>
-          <div class="exp-row">
-            <div class="field"><label>Chi phí dự toán</label><input type="text" id="proj-hd1-cost-budget" placeholder="0"></div>
-            <div class="field"><label>Doanh thu dự toán</label><input type="text" id="proj-hd1-revenue-budget" placeholder="0"></div>
-          </div>
-          <div class="exp-row">
-            <div class="field"><label>Ngày ký</label><input type="date" id="proj-hd1-date"></div>
-            <div class="field grow2"><label>File đính kèm</label><input type="file" id="proj-hd1-file"></div>
-          </div>
-          <div id="proj-hd1-status" class="helper-text" style="margin-top:2px;"></div>
-        </div>
-        <div class="exp-block">
-          <label class="exp-block-title">Thông tin HĐ 2</label>
-          <div class="exp-row">
-            <div class="field grow2"><label>Tên/Số hợp đồng</label><input id="proj-hd2-name" placeholder="VD: HĐ đợt 2 - ..."></div>
-            <div class="field"><label>Giá trị HĐ</label><input type="text" id="proj-hd2-value" placeholder="0"></div>
-          </div>
-          <div class="exp-row">
-            <div class="field"><label>Chi phí dự toán</label><input type="text" id="proj-hd2-cost-budget" placeholder="0"></div>
-            <div class="field"><label>Doanh thu dự toán</label><input type="text" id="proj-hd2-revenue-budget" placeholder="0"></div>
-          </div>
-          <div class="exp-row">
-            <div class="field"><label>Ngày ký</label><input type="date" id="proj-hd2-date"></div>
-            <div class="field grow2"><label>File đính kèm</label><input type="file" id="proj-hd2-file"></div>
-          </div>
-          <div id="proj-hd2-status" class="helper-text" style="margin-top:2px;"></div>
-        </div>
-        <div class="exp-block">
-          <label class="exp-block-title">Thông tin HĐ 3</label>
-          <div class="exp-row">
-            <div class="field grow2"><label>Tên/Số hợp đồng</label><input id="proj-hd3-name" placeholder="VD: HĐ đợt 3 - ..."></div>
-            <div class="field"><label>Giá trị HĐ</label><input type="text" id="proj-hd3-value" placeholder="0"></div>
-          </div>
-          <div class="exp-row">
-            <div class="field"><label>Chi phí dự toán</label><input type="text" id="proj-hd3-cost-budget" placeholder="0"></div>
-            <div class="field"><label>Doanh thu dự toán</label><input type="text" id="proj-hd3-revenue-budget" placeholder="0"></div>
-          </div>
-          <div class="exp-row">
-            <div class="field"><label>Ngày ký</label><input type="date" id="proj-hd3-date"></div>
-            <div class="field grow2"><label>File đính kèm</label><input type="file" id="proj-hd3-file"></div>
-          </div>
-          <div id="proj-hd3-status" class="helper-text" style="margin-top:2px;"></div>
-        </div>
-        <div class="exp-block">
-          <label class="exp-block-title">Thông tin HĐ 4</label>
-          <div class="exp-row">
-            <div class="field grow2"><label>Tên/Số hợp đồng</label><input id="proj-hd4-name" placeholder="VD: HĐ đợt 4 - ..."></div>
-            <div class="field"><label>Giá trị HĐ</label><input type="text" id="proj-hd4-value" placeholder="0"></div>
-          </div>
-          <div class="exp-row">
-            <div class="field"><label>Chi phí dự toán</label><input type="text" id="proj-hd4-cost-budget" placeholder="0"></div>
-            <div class="field"><label>Doanh thu dự toán</label><input type="text" id="proj-hd4-revenue-budget" placeholder="0"></div>
-          </div>
-          <div class="exp-row">
-            <div class="field"><label>Ngày ký</label><input type="date" id="proj-hd4-date"></div>
-            <div class="field grow2"><label>File đính kèm</label><input type="file" id="proj-hd4-file"></div>
-          </div>
-          <div id="proj-hd4-status" class="helper-text" style="margin-top:2px;"></div>
-        </div>
-        <div class="exp-block">
-          <label class="exp-block-title">Thông tin HĐ 5</label>
-          <div class="exp-row">
-            <div class="field grow2"><label>Tên/Số hợp đồng</label><input id="proj-hd5-name" placeholder="VD: HĐ đợt 5 - ..."></div>
-            <div class="field"><label>Giá trị HĐ</label><input type="text" id="proj-hd5-value" placeholder="0"></div>
-          </div>
-          <div class="exp-row">
-            <div class="field"><label>Chi phí dự toán</label><input type="text" id="proj-hd5-cost-budget" placeholder="0"></div>
-            <div class="field"><label>Doanh thu dự toán</label><input type="text" id="proj-hd5-revenue-budget" placeholder="0"></div>
-          </div>
-          <div class="exp-row">
-            <div class="field"><label>Ngày ký</label><input type="date" id="proj-hd5-date"></div>
-            <div class="field grow2"><label>File đính kèm</label><input type="file" id="proj-hd5-file"></div>
-          </div>
-          <div id="proj-hd5-status" class="helper-text" style="margin-top:2px;"></div>
-        </div>
-        <div class="field">
-          <label>Hồ sơ thanh toán (có thể đính kèm nhiều file)</label>
+        <div id="proj-hd-blocks" style="display:contents;"></div>
+        <div class="field" id="project-payment-dossier-field">
+          <label>Hồ sơ thanh toán chung (đính kèm trước đây — hồ sơ mới nên đính kèm vào đúng HĐ ở trên)</label>
           <div id="project-payment-files-list" style="margin-bottom:8px;"></div>
           <button type="button" class="btn btn-ghost btn-sm" id="project-add-payment-file-btn">+ Thêm file đính kèm</button>
           <input type="file" id="project-payment-file-input" style="display:none;">
@@ -1110,23 +1008,23 @@
 <script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/html2pdf.js@0.10.1/dist/html2pdf.bundle.min.js"></script>
-<script src="js/firebase-config.js?v=v2026-09-30-3"></script>
-<script src="js/utils.js?v=v2026-09-30-3"></script>
-<script src="js/onedrive.js?v=v2026-09-30-3"></script>
-<script src="js/activitylog.js?v=v2026-09-30-3"></script>
-<script src="js/auth.js?v=v2026-09-30-3"></script>
-<script src="js/projects.js?v=v2026-09-30-3"></script>
-<script src="js/transactions.js?v=v2026-09-30-3"></script>
-<script src="js/fixedcosts.js?v=v2026-09-30-3"></script>
-<script src="js/notifications.js?v=v2026-09-30-3"></script>
-<script src="js/invoice-ocr.js?v=v2026-09-30-3"></script>
-<script src="js/import.js?v=v2026-09-30-3"></script>
-<script src="js/invoices-transfers.js?v=v2026-09-30-3"></script>
-<script src="js/reports.js?v=v2026-09-30-3"></script>
-<script src="js/orders.js?v=v2026-09-30-3"></script>
-<script src="js/payroll.js?v=v2026-09-30-3"></script>
-<script src="js/users.js?v=v2026-09-30-3"></script>
-<script src="js/app.js?v=v2026-09-30-3"></script>
+<script src="js/firebase-config.js?v=v2026-10-04-1"></script>
+<script src="js/utils.js?v=v2026-10-04-1"></script>
+<script src="js/onedrive.js?v=v2026-10-04-1"></script>
+<script src="js/activitylog.js?v=v2026-10-04-1"></script>
+<script src="js/auth.js?v=v2026-10-04-1"></script>
+<script src="js/projects.js?v=v2026-10-04-1"></script>
+<script src="js/transactions.js?v=v2026-10-04-1"></script>
+<script src="js/fixedcosts.js?v=v2026-10-04-1"></script>
+<script src="js/notifications.js?v=v2026-10-04-1"></script>
+<script src="js/invoice-ocr.js?v=v2026-10-04-1"></script>
+<script src="js/import.js?v=v2026-10-04-1"></script>
+<script src="js/invoices-transfers.js?v=v2026-10-04-1"></script>
+<script src="js/reports.js?v=v2026-10-04-1"></script>
+<script src="js/orders.js?v=v2026-10-04-1"></script>
+<script src="js/payroll.js?v=v2026-10-04-1"></script>
+<script src="js/users.js?v=v2026-10-04-1"></script>
+<script src="js/app.js?v=v2026-10-04-1"></script>
 <script>
   // Đăng ký Service Worker để có thể "Cài đặt ứng dụng" (PWA) — chỉ đăng ký khi trình duyệt hỗ trợ.
   if('serviceWorker' in navigator){

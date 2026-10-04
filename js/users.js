@@ -14,7 +14,13 @@ let CURRENT_ROLE = 'user'; // 'admin' | 'subadmin' | 'user' — mặc định an
 let CURRENT_USER_NAME = '';
 let APP_USERS = [];
 
-function isAdmin(){ return CURRENT_ROLE === 'admin'; }
+// SUPER ADMIN — tài khoản chủ hệ thống: toàn quyền mọi thứ (bao gồm mọi quyền Admin), không ai hạ quyền được,
+// và là tài khoản DUY NHẤT thấy các công cụ sửa dữ liệu hàng loạt (vd "🛠 Sửa dữ liệu Giải chi cũ").
+// Danh sách này phải KHỚP với hàm isSuperAdmin() trong firestore.rules.
+const SUPER_ADMIN_EMAILS = ['ahntuan13@gmail.com'];
+function isSuperAdminEmail(email){ return SUPER_ADMIN_EMAILS.includes(String(email||'').trim().toLowerCase()); }
+function isSuperAdmin(){ return !!(auth.currentUser && isSuperAdminEmail(auth.currentUser.email)); }
+function isAdmin(){ return CURRENT_ROLE === 'admin' || isSuperAdmin(); }
 function isSubAdmin(){ return CURRENT_ROLE === 'subadmin'; }
 // Được XEM đầy đủ các mục quản trị/báo cáo (Admin hoặc Sub-admin) — nhưng KHÔNG đồng nghĩa được sửa/xóa
 function canView(){ return isAdmin() || isSubAdmin(); }
@@ -31,12 +37,16 @@ async function ensureUserRole(){
       const r = snap.data().role;
       CURRENT_ROLE = (r === 'admin' || r === 'subadmin') ? r : 'user';
       CURRENT_USER_NAME = snap.data().name || email.split('@')[0];
+      if(isSuperAdmin() && r !== 'admin'){
+        // Super Admin luôn là Admin — tự sửa lại hồ sơ nếu bị ai đó đổi vai trò
+        try{ await ref.set({ role:'admin' }, {merge:true}); }catch(_){}
+      }
     } else {
       // Tài khoản đăng nhập lần đầu -> tự tạo hồ sơ với quyền User (an toàn).
       // Quyền Admin/Sub-admin phải được một Admin khác gán tay (xem README).
       CURRENT_USER_NAME = email.split('@')[0];
       await ref.set({
-        email, role:'user', name: CURRENT_USER_NAME,
+        email, role: isSuperAdmin() ? 'admin' : 'user', name: CURRENT_USER_NAME,
         createdAt: firebase.firestore.FieldValue.serverTimestamp()
       });
       CURRENT_ROLE = 'user';
@@ -46,6 +56,7 @@ async function ensureUserRole(){
     CURRENT_ROLE = 'user';
     CURRENT_USER_NAME = email.split('@')[0];
   }
+  if(isSuperAdmin()) CURRENT_ROLE = 'admin';
   applyRolePermissions();
   if(isAdmin()){
     listenAppUsers();
@@ -60,7 +71,7 @@ const ROLE_LABELS = {
 
 function applyRolePermissions(){
   const label = document.getElementById('user-role-label');
-  if(label) label.textContent = ROLE_LABELS[CURRENT_ROLE] || 'Thành viên';
+  if(label) label.textContent = isSuperAdmin() ? 'Super Admin (toàn quyền)' : (ROLE_LABELS[CURRENT_ROLE] || 'Thành viên');
   // Admin và Sub-admin (GĐ) được XEM: Báo cáo (dòng tiền theo kỳ, lãi lỗ). "Dự án" thì AI CŨNG xem được
   // (kể cả Kế toán) — Kế toán chỉ bị chặn riêng khoản TẠO MỚI dự án (xem thêm bên dưới), không phải ẩn cả trang.
   // Quản trị người dùng & Lịch sử chỉnh sửa: CHỈ Admin.
@@ -202,11 +213,11 @@ function renderUsersTable(){
     ${APP_USERS.map(u=>`<tr>
       <td><strong>${escapeHtml(u.email)}</strong></td>
       <td>${escapeHtml(u.name||'—')}</td>
-      <td>${roleLabel(u.role)}</td>
-      <td style="font-size:12.5px;line-height:1.5;">${ROLE_PERMISSIONS_DETAIL[u.role] || ROLE_PERMISSIONS_DETAIL.user}</td>
+      <td>${isSuperAdminEmail(u.email) ? '<span class="tag tag-red">Super Admin</span>' : roleLabel(u.role)}</td>
+      <td style="font-size:12.5px;line-height:1.5;">${isSuperAdminEmail(u.email) ? '<strong>Toàn quyền mọi mục</strong> (gồm mọi quyền Admin) + công cụ sửa dữ liệu hàng loạt. Không ai đổi/hạ quyền được tài khoản này.' : (ROLE_PERMISSIONS_DETAIL[u.role] || ROLE_PERMISSIONS_DETAIL.user)}</td>
       <td class="mono" style="font-size:11px;color:var(--ink-faint);">${escapeHtml(u.id)}</td>
       <td><div class="row-actions">
-        <button class="icon-btn" data-edit-user="${u.id}" title="Sửa quyền">✎</button>
+        ${(isSuperAdminEmail(u.email) && !isSuperAdmin()) ? '' : `<button class="icon-btn" data-edit-user="${u.id}" title="Sửa quyền">✎</button>`}
       </div></td>
     </tr>`).join('')}</tbody>`;
 }
@@ -231,6 +242,7 @@ document.getElementById('save-user-btn')?.addEventListener('click', async ()=>{
   const role = document.getElementById('user-role').value;
   if(!uid){ toast('Vui lòng nhập UID (copy từ Firebase Console > Authentication > Users)'); return; }
   if(!email){ toast('Vui lòng nhập email'); return; }
+  if(isSuperAdminEmail(email) && role !== 'admin'){ toast('Tài khoản Super Admin luôn giữ toàn quyền — không đổi vai trò được.'); return; }
   try{
     await db.collection('users').doc(uid).set({
       email, name, role,

@@ -473,7 +473,8 @@ async function decideOrderApproval(id, decision){
       // TẠM (dự kiến), phải chờ KT bấm Giải chi ghi rõ dự án/số tiền chính thức mới coi là số liệu cuối cùng.
       // Không gắn dự án -> vào Chi phí gián tiếp. Có gắn dự án -> vào thẳng Thu Chi dự án nhưng vẫn "Chờ giải chi".
       if(isAdvance){
-        txData.advanceExplainStatus = 'pending';
+        // Lệnh đã giải chi (1 phần/đủ) mà được duyệt lại: dòng gốc chỉ giữ phần CHƯA giải chi, tránh tính trùng
+        Object.assign(txData, advanceOriginalTxState(o, o.explainAllocations));
       }
       if(o.transactionId){
         // QUAN TRỌNG: cập nhật đúng NƠI giao dịch liên kết ĐANG THỰC SỰ NẰM (o.transactionCollection),
@@ -842,7 +843,7 @@ function advanceRemainingAmount(o){
 
 function renderAdvanceTable(){
   const repairBtn = document.getElementById('btn-repair-legacy-explain');
-  if(repairBtn) repairBtn.style.display = isAdmin() ? '' : 'none';
+  if(repairBtn) repairBtn.style.display = isSuperAdmin() ? '' : 'none'; // chỉ tài khoản Super Admin thấy nút này
   const table = document.getElementById('advance-table');
   if(!table) return;
   const rows = getFilteredAdvances();
@@ -929,11 +930,25 @@ function handleOrderTableClick(e){
   if(approveId) decideOrderApproval(approveId, 'approved');
   if(rejectId) decideOrderApproval(rejectId, 'rejected');
   if(delId){
-    if(confirmDelete('Xóa dòng này? Nếu đã được duyệt và tự động ghi vào Thu chi/Chi phí gián tiếp, khoản tương ứng cũng sẽ bị xóa theo.')){
-      const ord = ORDERS.find(x=>x.id===delId);
+    const ord = ORDERS.find(x=>x.id===delId);
+    const explainTxs = ord ? explainTxOfOrder(ord) : [];
+    if(confirmDelete('Xóa dòng này? Nếu đã được duyệt và tự động ghi vào Thu chi/Chi phí gián tiếp, khoản tương ứng cũng sẽ bị xóa theo.'
+        + (explainTxs.length ? `\n\nLệnh này đã Giải chi ${explainTxs.length} khoản — các khoản Giải chi đó cũng sẽ bị xóa khỏi Thu chi / Chi phí gián tiếp.` : ''))){
       db.collection('paymentOrders').doc(delId).delete().then(async ()=>{
         if(ord && ord.transactionId){
           try{ await db.collection(ord.transactionCollection || 'transactions').doc(ord.transactionId).delete(); }catch(err){}
+        }
+        // Dọn các khoản Giải chi của lệnh vừa xóa (trước đây bị bỏ sót -> còn nằm lại trong Thu chi dù lệnh đã xóa)
+        if(explainTxs.length){
+          try{
+            const b = db.batch();
+            explainTxs.forEach(t=>{
+              const ref = db.collection(t._col).doc(t.id);
+              if(isAdmin() || isExplainGeneratedNote(t.note)) b.delete(ref);
+              else b.update(ref, { amount: 0, note: `[Đã xóa khỏi Giải chi ngày ${todayISO()}] ${t.note||''}` });
+            });
+            await b.commit();
+          }catch(err){ toast('Đã xóa lệnh, nhưng chưa dọn được các khoản Giải chi: ' + err.message); }
         }
         toast('Đã xóa');
         if(ord) logActivity('delete', {projectName: isAdvanceOrder(ord)?'Lệnh tạm ứng':'Lệnh chi', content: ord.reason, amount: ord.amount, type:'OUT'});
@@ -960,6 +975,28 @@ let currentExpTransferImages = {};
 // từng làm lệch thứ tự và sinh giao dịch trùng).
 let explainBlockPrev = {};
 let explainSaving = false; // chống bấm "Lưu giải trình" 2 lần liên tiếp (cũng từng gây tạo trùng giao dịch)
+let explainSession = 0;     // tăng mỗi lần mở form Giải chi
+let explainUploading = 0;   // số file đang tải lên dở dang — chặn Lưu cho tới khi tải xong (tránh lưu thiếu file)
+// Trạng thái đúng của KHOẢN TẠM ỨNG GỐC (dòng Chi tạo ra khi lệnh được duyệt) theo số đã giải chi:
+//  - chưa giải chi gì      -> giữ nguyên số tiền lệnh, "Chờ giải chi"
+//  - giải chi MỘT PHẦN     -> dòng gốc chỉ còn PHẦN CHƯA GIẢI CHI, vẫn "Chờ giải chi" (vẫn tính vào tổng Chi)
+//  - giải chi đủ / vượt    -> dòng gốc "Đã giải chi" (không tính nữa — số chính thức là các khoản giải chi)
+// Trước đây cứ giải chi 1 phần là cả dòng gốc bị loại khỏi tổng Chi -> phần chưa giải chi bị "mất" khỏi báo cáo.
+function advanceOriginalTxState(o, allocations){
+  const full = Number(o.amount||0);
+  const list = Array.isArray(allocations) ? allocations : [];
+  if(!list.length) return { amount: full, advanceExplainStatus: 'pending' };
+  const total = list.reduce((s,a)=> s + Number(a.amount||0), 0);
+  const remaining = Math.max(0, full - total);
+  return remaining > 0
+    ? { amount: remaining, advanceOriginalAmount: full, advanceExplainStatus: 'pending' }
+    : { amount: full, advanceOriginalAmount: full, advanceExplainStatus: 'explained' };
+}
+// Mọi giao dịch do Giải chi của 1 lệnh sinh ra (theo liên kết hoặc theo danh sách giải chi lưu trên lệnh)
+function explainTxOfOrder(o){
+  const ids = new Set((o.explainAllocations||[]).map(a=> a.transactionId).filter(Boolean));
+  return allTxWithCollection().filter(t=> t.id !== o.transactionId && (t.sourceOrderId === o.id || ids.has(t.id)));
+}
 function genAllocKey(){ return 'a' + Date.now().toString(36) + Math.random().toString(36).slice(2,8); }
 
 function renderExplainBlockHtml(id){
@@ -1095,12 +1132,16 @@ document.getElementById('exp-blocks-container')?.addEventListener('change', asyn
     const file = e.target.files[0];
     if(!file) return;
     toast(`⏳ Đang tải "${file.name}" lên OneDrive công ty...`);
+    const session = explainSession;
+    explainUploading++;
     try{
       const result = await msUploadFile(file, `LenhTamUng/GiaiChi/HoaDon`, (pct)=> toast(`⏳ Đang tải lên... ${pct}%`));
+      if(session !== explainSession || !explainBlockIds.includes(id)){ toast('File tải xong nhưng form Giải chi đã đóng/đổi lệnh — vui lòng chọn lại file.'); return; }
       currentExpInvoiceImages[id] = { url: result.webUrl, name: result.name };
       setExpImagePreview(id, 'invoice', currentExpInvoiceImages[id]);
       toast('Đã tải hóa đơn lên OneDrive');
     }catch(err){ toast(friendlyMsError(err)); }
+    finally{ if(session === explainSession) explainUploading = Math.max(0, explainUploading-1); e.target.value = ''; }
     return;
   }
   if(transferMatch){
@@ -1108,12 +1149,16 @@ document.getElementById('exp-blocks-container')?.addEventListener('change', asyn
     const file = e.target.files[0];
     if(!file) return;
     toast(`⏳ Đang tải "${file.name}" lên OneDrive công ty...`);
+    const session = explainSession;
+    explainUploading++;
     try{
       const result = await msUploadFile(file, `LenhTamUng/GiaiChi/ChuyenKhoan`, (pct)=> toast(`⏳ Đang tải lên... ${pct}%`));
+      if(session !== explainSession || !explainBlockIds.includes(id)){ toast('File tải xong nhưng form Giải chi đã đóng/đổi lệnh — vui lòng chọn lại file.'); return; }
       currentExpTransferImages[id] = { url: result.webUrl, name: result.name };
       setExpImagePreview(id, 'transfer', currentExpTransferImages[id]);
       toast('Đã tải chứng từ CK lên OneDrive');
     }catch(err){ toast(friendlyMsError(err)); }
+    finally{ if(session === explainSession) explainUploading = Math.max(0, explainUploading-1); e.target.value = ''; }
     return;
   }
 });
@@ -1171,6 +1216,8 @@ function openOrderExplainModal(orderId){
 
   // Số khung mặc định = số khoản đã giải chi từ trước (nếu có), tối thiểu 5 khung như cũ để KT quen tay —
   // KHÔNG còn giới hạn TỐI ĐA nữa, bấm "+ Thêm khung Giải chi" để thêm bao nhiêu khung tùy nhu cầu.
+  explainSession++; // file đang tải dở của lần mở trước (lệnh khác) sẽ không bị gắn nhầm vào lệnh này
+  explainUploading = 0;
   const existing = Array.isArray(o.explainAllocations) ? o.explainAllocations : [];
   const blockCount = Math.max(5, existing.length);
   explainBlockIds = Array.from({length: blockCount}, (_,i)=> i+1);
@@ -1205,8 +1252,11 @@ function openOrderExplainModal(orderId){
     document.getElementById(`exp${id}-qty`).value = a.qty || 1;
     setMoneyInputValue(document.getElementById(`exp${id}-price`), a.unitPrice);
     setMoneyInputValue(document.getElementById(`exp${id}-amount`), a.amount);
-    currentExpInvoiceImages[id] = a.invoiceImage || '';
-    currentExpTransferImages[id] = a.transferImage || '';
+    // File đính kèm: giao dịch Thu Chi liên kết là NGUỒN CHUẨN — KT có thể đã đính kèm/xóa file ở trang
+    // Hóa đơn / Chuyển khoản sau khi giải chi; nếu chỉ đọc bản sao lưu trên lệnh thì khi lưu lại sẽ ghi đè mất file đó.
+    const linkedTx = a.transactionId ? allTxForDate.find(t=> t.id === a.transactionId) : null;
+    currentExpInvoiceImages[id] = (linkedTx ? linkedTx.invoiceImage : a.invoiceImage) || '';
+    currentExpTransferImages[id] = (linkedTx ? linkedTx.transferImage : a.transferImage) || '';
     setExpImagePreview(id, 'invoice', currentExpInvoiceImages[id]);
     setExpImagePreview(id, 'transfer', currentExpTransferImages[id]);
   });
@@ -1229,6 +1279,7 @@ function isExplainGeneratedNote(note){ return typeof note === 'string' && note.s
 
 document.getElementById('save-explain-btn')?.addEventListener('click', async ()=>{
   if(explainSaving) return; // đang lưu dở -> bỏ qua cú bấm thứ 2, tránh tạo trùng
+  if(explainUploading > 0){ toast('⏳ File đính kèm đang tải lên dở — chờ tải xong rồi bấm Lưu để không bị thiếu file.'); return; }
   const orderId = document.getElementById('exp-order-id').value;
   const o = ORDERS.find(x=>x.id===orderId);
   if(!o) return;
@@ -1307,18 +1358,30 @@ document.getElementById('save-explain-btn')?.addEventListener('click', async ()=
 
       const allocKey = (prev && prev.allocKey) || genAllocKey();
       const targetCollection = b.projectId ? 'transactions' : 'fixedCosts';
+      // Phần do FORM GIẢI CHI quản lý — luôn ghi theo form
       const txData = {
         type:'OUT', projectId: b.projectId, projectName: b.projectName,
         date: b.date, code: b.code, content: b.content, description: b.description,
         unit: b.unit, qty: b.qty, unitPrice: b.unitPrice, amount: b.amount,
-        invoiceNumber:'', invoiceDate:'', bankName:'', bankAccount:'', bankHolder:'', transferDate:'',
         note: legacyNote,
         invoiceImage: b.invoiceImage || '', transferImage: b.transferImage || '',
-        invoiceStatus: b.invoiceImage ? 'issued' : 'pending',
-        transferStatus: b.transferImage ? 'done' : 'pending',
         sourceOrderId: orderId,      // liên kết ngược về lệnh tạm ứng gốc
         sourceAllocKey: allocKey,    // mã cố định của khung giải chi này
       };
+      // Phần do trang HÓA ĐƠN / CHUYỂN KHOẢN quản lý (số HĐ, ngày HĐ, ngân hàng, trạng thái...) — KHÔNG được
+      // ghi đè về rỗng mỗi lần lưu lại Giải chi (lỗi cũ: lưu lại giải chi là mất số hóa đơn/thông tin CK đã nhập).
+      // Giao dịch MỚI thì khởi tạo rỗng; giao dịch đã có thì giữ nguyên, chỉ đổi trạng thái khi file thay đổi.
+      const KEEP_FIELDS = ['invoiceNumber','invoiceDate','bankName','bankAccount','bankHolder','transferDate'];
+      if(existing){
+        if(b.invoiceImage) txData.invoiceStatus = 'issued';
+        else if(existing.invoiceImage) txData.invoiceStatus = 'pending';   // vừa gỡ file hóa đơn ở form này
+        if(b.transferImage) txData.transferStatus = 'done';
+        else if(existing.transferImage) txData.transferStatus = 'pending'; // vừa gỡ file chuyển khoản ở form này
+      } else {
+        KEEP_FIELDS.forEach(k=> txData[k] = '');
+        txData.invoiceStatus = b.invoiceImage ? 'issued' : 'pending';
+        txData.transferStatus = b.transferImage ? 'done' : 'pending';
+      }
       if(approvalTarget){
         Object.assign(txData, { approvalStatus:'pending', approverRole: approvalTarget, approverEmail,
           approvalSubmittedAt: firebase.firestore.FieldValue.serverTimestamp(), approvedBy:'', approvedAt:'' });
@@ -1330,10 +1393,21 @@ document.getElementById('save-explain-btn')?.addEventListener('click', async ()=
         batch.update(ref, txData);
       } else {
         if(existing){
-          // Đổi dự án khiến khoản phải chuyển giữa Thu Chi <-> Chi phí gián tiếp -> xóa bản cũ, tạo bản mới
-          batch.delete(db.collection(existing._col).doc(existing.id));
+          // Đổi dự án khiến khoản phải chuyển giữa Thu Chi <-> Chi phí gián tiếp -> bỏ bản cũ, tạo bản mới ở nơi mới,
+          // MANG THEO thông tin hóa đơn/chuyển khoản/duyệt đã có của bản cũ.
+          ['invoiceNumber','invoiceDate','bankName','bankAccount','bankHolder','transferDate','invoiceStatus','transferStatus',
+           'approvalStatus','approverRole','approverEmail','approvedBy','approvedAt'].forEach(k=>{
+            if(txData[k] === undefined && existing[k] !== undefined) txData[k] = existing[k];
+          });
+          const oldRef = db.collection(existing._col).doc(existing.id);
+          // Kế toán chỉ được XÓA dòng do Giải chi sinh ra (theo luật Firestore) — dòng kiểu cũ thì vô hiệu về 0đ
+          if(isAdmin() || isExplainGeneratedNote(existing.note)) batch.delete(oldRef);
+          else batch.update(oldRef, { amount: 0, note: `[Đã chuyển sang khoản khác khi sửa Giải chi ngày ${todayISO()}] ${existing.note||''}` });
         }
         ref = db.collection(targetCollection).doc();
+        ['invoiceNumber','invoiceDate','bankName','bankAccount','bankHolder','transferDate'].forEach(k=>{ if(txData[k] === undefined) txData[k] = ''; });
+        if(txData.invoiceStatus === undefined) txData.invoiceStatus = b.invoiceImage ? 'issued' : 'pending';
+        if(txData.transferStatus === undefined) txData.transferStatus = b.transferImage ? 'done' : 'pending';
         txData.createdAt = firebase.firestore.FieldValue.serverTimestamp();
         txData.createdBy = auth.currentUser.email;
         batch.set(ref, txData);
@@ -1370,7 +1444,7 @@ document.getElementById('save-explain-btn')?.addEventListener('click', async ()=
     const originalTx = o.transactionId ? txById(o.transactionId) : null;
     if(originalTx){
       batch.update(db.collection(originalTx._col).doc(originalTx.id), {
-        advanceExplainStatus: 'explained',
+        ...advanceOriginalTxState(o, savedAllocations),
         movedToTransactionId: orderId,
         explainedAt: firebase.firestore.FieldValue.serverTimestamp(),
         explainedBy: auth.currentUser.email,
@@ -1581,15 +1655,21 @@ function buildLegacyRepairPlan(o, allTx, ctx){
 
   // Có cần sửa không? (trùng, dòng 0đ, thiếu giao dịch, hoặc chưa gắn liên kết đầy đủ)
   const needsLink = keeps.some(({tx, alloc})=> tx.sourceOrderId !== orderId || !alloc || alloc.transactionId !== tx.id || !alloc.allocKey || tx.sourceAllocKey !== alloc.allocKey || !alloc.date);
-  if(!dups.length && !zeroed.length && !missing.length && !needsLink) return null;
+  // Khoản tạm ứng GỐC có đang đúng trạng thái theo số đã giải chi không (giải chi 1 phần thì dòng gốc phải còn phần chưa giải chi)
+  const afterAllocs = keeps.map(k=> ({ amount: Number((k.alloc||k.tx).amount||0) })).concat(missing.map(a=> ({ amount: Number(a.amount||0) })));
+  const originalTx = o.transactionId ? allTx.find(t=> t.id === o.transactionId) : null;
+  const expectOrig = advanceOriginalTxState(o, afterAllocs);
+  const origFix = !!(originalTx && afterAllocs.length && (originalTx.advanceExplainStatus !== expectOrig.advanceExplainStatus || Number(originalTx.amount||0) !== Number(expectOrig.amount)));
+  if(!dups.length && !zeroed.length && !missing.length && !needsLink && !origFix) return null;
   const ambiguousLeft = ambiguous.filter(t=> !used.has(t.id));
   // Còn dòng ghi chú dùng chung chưa rõ chủ -> KHÔNG tạo bổ sung (tránh sinh thêm bản trùng), giữ nguyên khoản đó
   const skipCreate = ambiguousLeft.length > 0;
-  return { o, keeps, dups, zeroed, missing: skipCreate ? [] : missing, keptAsIs: skipCreate ? missing : [], needsLink, ambiguous: ambiguousLeft };
+  return { o, keeps, dups, zeroed, missing: skipCreate ? [] : missing, keptAsIs: skipCreate ? missing : [], needsLink, ambiguous: ambiguousLeft,
+    origFix, origRemaining: expectOrig.advanceExplainStatus === 'pending' ? expectOrig.amount : 0 };
 }
 
 function openLegacyExplainRepairModal(){
-  if(!isAdmin()){ toast('Chỉ Admin được dùng công cụ này.'); return; }
+  if(!isSuperAdmin()){ toast('Chỉ tài khoản Super Admin được dùng công cụ này.'); return; }
   ensureLegacyRepairModal();
   const allTx = allTxWithCollection();
   const advances = ORDERS.filter(isAdvanceOrder);
@@ -1633,6 +1713,7 @@ function openLegacyExplainRepairModal(){
         ${p.dups.map(t=> txLine(t, '<span class="tag tag-out">Xóa trùng</span>')).join('')}
         ${p.zeroed.map(t=> txLine(t, '<span class="tag tag-gold">Dòng 0đ</span>')).join('')}
         ${p.missing.map(a=> txLine(a, '<span class="tag tag-blue">Tạo bổ sung</span>')).join('')}
+        ${p.origFix ? `<div class="helper-text" style="margin-top:6px;">ℹ️ Khoản tạm ứng gốc sẽ được chỉnh lại: ${p.origRemaining > 0 ? `còn <strong>${fmtVND(p.origRemaining)}</strong> chưa giải chi — vẫn tính vào tổng Chi (trước đây phần này bị bỏ sót khỏi báo cáo)` : 'đã giải chi đủ'}.</div>` : ''}
         ${p.ambiguous.length ? `<div class="helper-text" style="margin-top:6px;">⚠️ ${p.ambiguous.length} dòng có ghi chú trùng với lệnh khác cùng người nhận + lý do — KHÔNG tự xử lý, dùng nút 🧹 của từng lệnh nếu cần dọn tay.</div>` : ''}
       </td></tr>`;
     }).join('') + `</tbody>`
@@ -1715,8 +1796,8 @@ async function runLegacyExplainRepair(){
       if(newAllocs.length) orderUpd.explainedAt = o.explainedAt || firebase.firestore.FieldValue.serverTimestamp();
       batch.update(db.collection('paymentOrders').doc(o.id), orderUpd);
       const originalTx = o.transactionId ? allTxWithCollection().find(t=> t.id===o.transactionId) : null;
-      if(originalTx && newAllocs.length && originalTx.advanceExplainStatus !== 'explained'){
-        batch.update(db.collection(originalTx._col).doc(originalTx.id), { advanceExplainStatus:'explained', movedToTransactionId: o.id });
+      if(originalTx && newAllocs.length){
+        batch.update(db.collection(originalTx._col).doc(originalTx.id), { ...advanceOriginalTxState(o, newAllocs), movedToTransactionId: o.id });
       }
       await batch.commit();
       fixedOrders++;
