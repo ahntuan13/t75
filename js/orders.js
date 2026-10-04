@@ -19,6 +19,8 @@ function listenOrders(){
     ORDERS = snap.docs.map(d=> ({id:d.id, ...d.data()}));
     renderOrdersTable();
     renderAdvanceTable();
+    // chờ Thu chi / Chi phí gián tiếp tải xong rồi mới rà các khoản Giải chi cũ chưa duyệt
+    [4000, 15000].forEach(ms=> setTimeout(()=>{ try{ autoApproveExplainTx(); }catch(_){} }, ms));
     if(window.renderApprovalBanner) renderApprovalBanner();
     if(window.renderNotifications) renderNotifications();
   }, (err)=> console.error('orders listen error', err));
@@ -997,6 +999,36 @@ function explainTxOfOrder(o){
   const ids = new Set((o.explainAllocations||[]).map(a=> a.transactionId).filter(Boolean));
   return allTxWithCollection().filter(t=> t.id !== o.transactionId && (t.sourceOrderId === o.id || ids.has(t.id)));
 }
+// Các trường "đã duyệt" gắn cho khoản Thu Chi do Giải chi sinh ra (kế thừa người duyệt của lệnh tạm ứng gốc)
+function explainApprovedFields(o){
+  return {
+    approvalStatus: 'approved',
+    approvedBy: (o && o.approvedBy) || (auth.currentUser ? auth.currentUser.email : ''),
+    approvedAt: (o && o.approvedAt) || firebase.firestore.FieldValue.serverTimestamp(),
+  };
+}
+// Dữ liệu CŨ: các khoản Giải chi đang "Chưa duyệt"/"Chờ duyệt" ở Thu chi -> tự chuyển sang Đã duyệt (1 lần, chạy ngầm).
+// Khoản đã bị TỪ CHỐI thì giữ nguyên, không tự duyệt lại.
+let autoApproveExplainRunning = false;
+async function autoApproveExplainTx(){
+  if(autoApproveExplainRunning || !auth.currentUser || isSubAdmin()) return;
+  const isExplainTx = (t)=> !!t.sourceOrderId || isExplainGeneratedNote(t.note) || (typeof t.note==='string' && t.note.startsWith('Giải chi từ Lệnh tạm ứng'));
+  const todo = allTxWithCollection().filter(t=> t.type==='OUT' && isExplainTx(t) && Number(t.amount) > 0 && t.approvalStatus !== 'approved' && t.approvalStatus !== 'rejected');
+  if(!todo.length) return;
+  autoApproveExplainRunning = true;
+  try{
+    for(let i=0; i<todo.length; i+=400){
+      const batch = db.batch();
+      todo.slice(i, i+400).forEach(t=>{
+        const o = t.sourceOrderId ? ORDERS.find(x=> x.id === t.sourceOrderId) : null;
+        batch.update(db.collection(t._col).doc(t.id), explainApprovedFields(o));
+      });
+      await batch.commit();
+    }
+    logActivity('update', {projectName:'Giải chi tạm ứng', content:`Tự chuyển ${todo.length} khoản Giải chi sang Đã duyệt`, type:'OUT'});
+  }catch(err){ console.warn('autoApproveExplainTx', err); }
+  finally{ autoApproveExplainRunning = false; }
+}
 function genAllocKey(){ return 'a' + Date.now().toString(36) + Math.random().toString(36).slice(2,8); }
 
 function renderExplainBlockHtml(id){
@@ -1260,7 +1292,6 @@ function openOrderExplainModal(orderId){
     setExpImagePreview(id, 'invoice', currentExpInvoiceImages[id]);
     setExpImagePreview(id, 'transfer', currentExpTransferImages[id]);
   });
-  document.getElementById('exp-approval-target').value = '';
   updateExplainAmountCheck();
   openModal('modal-order-explain');
 }
@@ -1321,12 +1352,6 @@ document.getElementById('save-explain-btn')?.addEventListener('click', async ()=
   const totalAlloc = blocks.reduce((s,b)=> s + b.amount, 0);
   if(totalAlloc > Number(o.amount||0) && !confirm(`Tổng giải chi (${fmtVND(totalAlloc)}) đang VƯỢT số tiền tạm ứng (${fmtVND(o.amount)}).\n\nVẫn lưu?`)) return;
 
-  const approvalTarget = document.getElementById('exp-approval-target').value;
-  let approverEmail = '';
-  if(approvalTarget){
-    approverEmail = APPROVERS.gdEmail || '';
-    if(!approverEmail){ toast('Chưa cài đặt email Giám đốc — vào mục Người dùng để nhập trước.'); return; }
-  }
 
   const saveBtn = document.getElementById('save-explain-btn');
   explainSaving = true;
@@ -1382,10 +1407,9 @@ document.getElementById('save-explain-btn')?.addEventListener('click', async ()=
         txData.invoiceStatus = b.invoiceImage ? 'issued' : 'pending';
         txData.transferStatus = b.transferImage ? 'done' : 'pending';
       }
-      if(approvalTarget){
-        Object.assign(txData, { approvalStatus:'pending', approverRole: approvalTarget, approverEmail,
-          approvalSubmittedAt: firebase.firestore.FieldValue.serverTimestamp(), approvedBy:'', approvedAt:'' });
-      }
+      // Giải chi của 1 lệnh tạm ứng ĐÃ DUYỆT -> khoản Thu Chi sinh ra được tính là ĐÃ DUYỆT luôn,
+      // không phải duyệt lại lần 2 ở Thu chi dự án / Chi phí gián tiếp.
+      if(!existing || existing.approvalStatus !== 'approved') Object.assign(txData, explainApprovedFields(o));
 
       let ref;
       if(existing && existing._col === targetCollection){
@@ -1782,6 +1806,7 @@ async function runLegacyExplainRepair(){
           note: legacyNote, invoiceImage: a.invoiceImage||'', transferImage: a.transferImage||'',
           invoiceStatus: a.invoiceImage ? 'issued' : 'pending', transferStatus: a.transferImage ? 'done' : 'pending',
           sourceOrderId: o.id, sourceAllocKey: allocKey,
+          ...explainApprovedFields(o),
           createdAt: firebase.firestore.FieldValue.serverTimestamp(), createdBy: auth.currentUser.email,
         });
         newAllocs.push({ ...a, date, allocKey, transactionId: ref.id, transactionCollection: col });

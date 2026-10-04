@@ -15,7 +15,7 @@
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
 <meta name="apple-mobile-web-app-title" content="T75">
 
-<link rel="stylesheet" href="css/style.css?v=v2026-10-04-2">
+<link rel="stylesheet" href="css/style.css?v=v2026-10-04-3">
 </head>
 <body>
 
@@ -793,13 +793,8 @@
           <button type="button" class="btn btn-ghost btn-sm" id="exp-add-block-btn">+ Thêm khung Giải chi</button>
         </div>
 
-        <div class="field full" style="border-top:1px solid var(--line);padding-top:14px;margin-top:6px;">
-          <label style="font-size:13px;font-weight:700;color:var(--ink);">✅ Phê duyệt Giám đốc</label>
-          <div class="helper-text" style="margin-bottom:8px;">Gửi các khoản giải trình này cho Giám đốc duyệt (áp dụng cho toàn bộ các khoản Thu Chi được tạo ra bên dưới).</div>
-          <select id="exp-approval-target">
-            <option value="">-- Chưa gửi duyệt --</option>
-            <option value="GD">Gửi duyệt (GĐ/Người duyệt phụ)</option>
-          </select>
+        <div class="field full" style="border-top:1px solid var(--line);padding-top:12px;margin-top:6px;">
+          <div class="helper-text">✅ Lệnh tạm ứng đã được duyệt nên các khoản Giải chi được <strong>tính là Đã duyệt ngay khi lưu</strong> — không cần duyệt lại ở Thu chi dự án / Chi phí gián tiếp.</div>
         </div>
         <div class="field full"><label>Tổng đã phân bổ / Số tiền lệnh gốc</label><div class="helper-text" id="exp-total-check" style="font-size:13px;"></div></div>
       </div>
@@ -1008,23 +1003,23 @@
 <script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/html2pdf.js@0.10.1/dist/html2pdf.bundle.min.js"></script>
-<script src="js/firebase-config.js?v=v2026-10-04-2"></script>
-<script src="js/utils.js?v=v2026-10-04-2"></script>
-<script src="js/onedrive.js?v=v2026-10-04-2"></script>
-<script src="js/activitylog.js?v=v2026-10-04-2"></script>
-<script src="js/auth.js?v=v2026-10-04-2"></script>
-<script src="js/projects.js?v=v2026-10-04-2"></script>
-<script src="js/transactions.js?v=v2026-10-04-2"></script>
-<script src="js/fixedcosts.js?v=v2026-10-04-2"></script>
-<script src="js/notifications.js?v=v2026-10-04-2"></script>
-<script src="js/invoice-ocr.js?v=v2026-10-04-2"></script>
-<script src="js/import.js?v=v2026-10-04-2"></script>
-<script src="js/invoices-transfers.js?v=v2026-10-04-2"></script>
-<script src="js/reports.js?v=v2026-10-04-2"></script>
-<script src="js/orders.js?v=v2026-10-04-2"></script>
-<script src="js/payroll.js?v=v2026-10-04-2"></script>
-<script src="js/users.js?v=v2026-10-04-2"></script>
-<script src="js/app.js?v=v2026-10-04-2"></script>
+<script src="js/firebase-config.js?v=v2026-10-04-3"></script>
+<script src="js/utils.js?v=v2026-10-04-3"></script>
+<script src="js/onedrive.js?v=v2026-10-04-3"></script>
+<script src="js/activitylog.js?v=v2026-10-04-3"></script>
+<script src="js/auth.js?v=v2026-10-04-3"></script>
+<script src="js/projects.js?v=v2026-10-04-3"></script>
+<script src="js/transactions.js?v=v2026-10-04-3"></script>
+<script src="js/fixedcosts.js?v=v2026-10-04-3"></script>
+<script src="js/notifications.js?v=v2026-10-04-3"></script>
+<script src="js/invoice-ocr.js?v=v2026-10-04-3"></script>
+<script src="js/import.js?v=v2026-10-04-3"></script>
+<script src="js/invoices-transfers.js?v=v2026-10-04-3"></script>
+<script src="js/reports.js?v=v2026-10-04-3"></script>
+<script src="js/orders.js?v=v2026-10-04-3"></script>
+<script src="js/payroll.js?v=v2026-10-04-3"></script>
+<script src="js/users.js?v=v2026-10-04-3"></script>
+<script src="js/app.js?v=v2026-10-04-3"></script>
 <script>
   // Đăng ký Service Worker để có thể "Cài đặt ứng dụng" (PWA) — chỉ đăng ký khi trình duyệt hỗ trợ.
   if('serviceWorker' in navigator){
