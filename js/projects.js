@@ -133,6 +133,16 @@ function renderProjectHdBlocks(){
         <div class="field"><label>Doanh thu dự toán</label><input type="text" id="proj-hd${i}-revenue-budget" placeholder="0"></div>
         <div class="field"><label>Ngày ký</label><input type="date" id="proj-hd${i}-date"></div>
       </div>
+      <div class="exp-row">
+        <div class="field"><label>Ngày hoàn thành</label><input type="date" id="proj-hd${i}-completion"></div>
+        <div class="field"><label>Thời gian bảo hành</label>
+          <select id="proj-hd${i}-warranty">
+            <option value="">— Không áp dụng —</option>
+            <option value="1">1 năm</option><option value="2">2 năm</option><option value="3">3 năm</option><option value="4">4 năm</option><option value="5">5 năm</option>
+          </select>
+        </div>
+        <div class="field"><label>Hết hạn bảo hành</label><input type="text" id="proj-hd${i}-warranty-end" readonly placeholder="tự tính" style="background:var(--bg-soft);"></div>
+      </div>
       <div class="exp-row" style="align-items:flex-start;">
         <div class="field">
           <label>📎 Hợp đồng</label>
@@ -150,6 +160,24 @@ function renderProjectHdBlocks(){
     </div>`).join('');
 }
 renderProjectHdBlocks(); // phải dựng TRƯỚC khi gắn sự kiện cho các ô bên dưới
+// Hết hạn bảo hành = Ngày hoàn thành + số năm bảo hành (chỉ để xem, tự tính)
+function hdWarrantyEnd(completionDate, years){
+  const y = Number(years);
+  if(!completionDate || !y) return '';
+  const [yy, mm, dd] = completionDate.split('-').map(Number);
+  const d = new Date(yy + y, mm - 1, dd);
+  return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+}
+function updateHdWarrantyEnd(i){
+  const el = document.getElementById(`proj-hd${i}-warranty-end`);
+  if(!el) return;
+  const end = hdWarrantyEnd(document.getElementById(`proj-hd${i}-completion`).value, document.getElementById(`proj-hd${i}-warranty`).value);
+  el.value = end ? fmtDate(end) : '';
+}
+document.getElementById('proj-hd-blocks')?.addEventListener('change', (e)=>{
+  const m = e.target.id && e.target.id.match(/^proj-hd(\d)-(completion|warranty)$/);
+  if(m) updateHdWarrantyEnd(Number(m[1]));
+});
 document.getElementById('proj-hd-blocks')?.addEventListener('click', (e)=>{
   const pick = e.target.closest('[data-hd-pick-file]')?.dataset.hdPickFile;
   if(pick){ document.getElementById(`proj-hd${pick}-file`).click(); return; }
@@ -364,6 +392,11 @@ function openProjectModal(id){
     setMoneyInputValue(document.getElementById(`proj-hd${i}-cost-budget`), info ? info.costBudget : '');
     setMoneyInputValue(document.getElementById(`proj-hd${i}-revenue-budget`), info ? info.revenueBudget : '');
     document.getElementById(`proj-hd${i}-date`).value = info ? (info.signDate||'') : '';
+    // Dự án cũ nhập Ngày hoàn thành / Bảo hành ở phần chung -> đưa sẵn vào HĐ 1 để không phải gõ lại
+    const legacy = (i === 1) ? p : {};
+    document.getElementById(`proj-hd${i}-completion`).value = (info && info.completionDate) || legacy.completionDate || '';
+    document.getElementById(`proj-hd${i}-warranty`).value = (info && info.warrantyYears) || legacy.warrantyYears || '';
+    updateHdWarrantyEnd(i);
     document.getElementById(`proj-hd${i}-file`).value = '';
     renderContractInfoStatus(i);
   }
@@ -399,8 +432,10 @@ document.getElementById('save-project-btn').addEventListener('click', async ()=>
       const signDate = document.getElementById(`proj-hd${i}-date`).value;
       const info = currentContractInfo[i-1];
       const paymentFiles = (info && Array.isArray(info.paymentFiles)) ? info.paymentFiles : [];
-      if(!name && !value && !costBudget && !revenueBudget && !signDate && !(info && info.fileUrl) && !paymentFiles.length) return null;
-      return { name, value, costBudget, revenueBudget, signDate, fileUrl: info ? (info.fileUrl||'') : '', fileName: info ? (info.fileName||'') : '', paymentFiles };
+      const completionDate = document.getElementById(`proj-hd${i}-completion`).value;
+      const warrantyYears = document.getElementById(`proj-hd${i}-warranty`).value;
+      if(!name && !value && !costBudget && !revenueBudget && !signDate && !completionDate && !warrantyYears && !(info && info.fileUrl) && !paymentFiles.length) return null;
+      return { name, value, costBudget, revenueBudget, signDate, completionDate, warrantyYears, warrantyEndDate: hdWarrantyEnd(completionDate, warrantyYears), fileUrl: info ? (info.fileUrl||'') : '', fileName: info ? (info.fileName||'') : '', paymentFiles };
     }),
     // xóa field cũ (single-file) để tránh dữ liệu thừa/nhầm lẫn khi đọc lại
     contractFileUrl: firebase.firestore.FieldValue.delete(),
