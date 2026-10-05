@@ -59,8 +59,8 @@ function renderProjectsTable(){
       : p.status==='warranty' ? '<span class="tag tag-gold">Còn 5% bảo hành</span>'
       : '<span class="tag tag-in">Đang thực hiện</span>';
     return `<tr>
-      <td><strong>${escapeHtml(p.name)}</strong><div class="helper-text">${escapeHtml(p.customer||'')}${p.taxCode? ' • MST: '+escapeHtml(p.taxCode):''}${projectContractLabel(p)}</div>${projectHdFilesHtml(p)}</td>
-      <td>${escapeHtml(p.code||'—')}${(Array.isArray(p.contractFiles)&&p.contractFiles.length) ? ` <a href="${p.contractFiles[0].url}" target="_blank" class="tag tag-blue" title="Xem file hợp đồng (${p.contractFiles.length} file)">📎 HĐ${p.contractFiles.length>1?' ×'+p.contractFiles.length:''}</a>` : ((p.contractFileUrl||p.contractFile||p.contractLink) ? ` <a href="${p.contractFileUrl||p.contractFile||p.contractLink}" target="_blank" class="tag tag-blue" title="Xem file hợp đồng">📎 HĐ</a>` : '')}</td>
+      <td><strong>${escapeHtml(p.name)}</strong><div class="helper-text">${p.code ? 'Mã: '+escapeHtml(p.code)+' • ' : ''}${escapeHtml(p.customer||'')}${p.taxCode? ' • MST: '+escapeHtml(p.taxCode):''}${projectContractLabel(p)}</div></td>
+      <td class="proj-files-cell">${projectFilesCellHtml(p)}</td>
       <td>${statusTag}</td>
       <td class="num">${fmtVND(p.contractValue)}</td>
       <td class="num">${fmtVND(p.costBudget)}</td>
@@ -90,7 +90,7 @@ function renderProjectsTable(){
       <td></td>
     </tr>`;
   table.innerHTML = `<thead>
-    <tr><th>Dự án</th><th>Mã</th><th>Trạng thái</th><th>Giá trị HĐ</th><th>Chi phí dự toán</th><th>Doanh thu dự toán</th><th>Đã thu (thực tế)</th><th>Đã chi (thực tế)</th><th>Chênh lệch</th><th></th></tr>
+    <tr><th>Dự án</th><th>File đính kèm</th><th>Trạng thái</th><th>Giá trị HĐ</th><th>Chi phí dự toán</th><th>Doanh thu dự toán</th><th>Đã thu (thực tế)</th><th>Đã chi (thực tế)</th><th>Chênh lệch</th><th></th></tr>
     ${totalsRow}
   </thead><tbody>${rows}</tbody>`;
 }
@@ -105,16 +105,30 @@ function projectContractLabel(p){
   const label = names.length ? names.join(', ') : (p.contractNumber || '');
   return label ? ' • HĐ: ' + escapeHtml(label) : '';
 }
-// Link nhanh tới file Hợp đồng + các Hồ sơ thanh toán của từng HĐ, hiện ngay dưới tên dự án
-function projectHdFilesHtml(p){
-  const rows = (Array.isArray(p.contractInfo) ? p.contractInfo : []).map((c, idx)=>{
-    if(!c) return '';
-    const links = [];
-    if(c.fileUrl) links.push(`<a href="${c.fileUrl}" target="_blank" rel="noopener" class="tag tag-blue" title="${escapeHtml(c.fileName||'Hợp đồng')}">📎 Hợp đồng</a>`);
-    (c.paymentFiles||[]).forEach((f, j)=> links.push(`<a href="${f.url}" target="_blank" rel="noopener" class="tag tag-gold" title="${escapeHtml(f.name||'')}">📎 HSTT lần ${j+1}</a>`));
-    return links.length ? `<div style="margin-top:4px;font-size:11.5px;"><span class="helper-text">HĐ ${idx+1}:</span> ${links.join(' ')}</div>` : '';
-  }).join('');
-  return rows;
+// Cột "File đính kèm" ở bảng Dự án — liệt kê theo loại, mỗi file 1 dòng, bấm vào tên để mở:
+//   HĐ 1: <file hợp đồng>   ·   HSTT 1: <hồ sơ thanh toán lần 1>   ·   Khác 1: <file đính kèm khác>
+function projectFilesCellHtml(p){
+  const infos = Array.isArray(p.contractInfo) ? p.contractInfo : [];
+  const row = (label, cls, url, name)=>
+    `<div class="proj-file-row"><span class="proj-file-label ${cls}">${label}:</span><a href="${url}" target="_blank" rel="noopener" title="${escapeHtml(name||'')}">${escapeHtml(name || 'Xem file')}</a></div>`;
+  const out = [];
+  // 1) Hợp đồng của từng HĐ
+  infos.forEach((c, idx)=>{ if(c && c.fileUrl) out.push(row(`HĐ ${idx+1}`, 'hd', c.fileUrl, c.fileName || `Hợp đồng ${idx+1}`)); });
+  // 2) Hồ sơ thanh toán: đánh số lần 1, 2, 3… theo từng HĐ; dự án có HSTT ở nhiều HĐ thì ghi kèm HĐ nào cho khỏi nhầm
+  const hdWithHstt = infos.filter(c=> c && Array.isArray(c.paymentFiles) && c.paymentFiles.length).length;
+  infos.forEach((c, idx)=>{
+    (c && Array.isArray(c.paymentFiles) ? c.paymentFiles : []).forEach((f, j)=>
+      out.push(row(hdWithHstt > 1 ? `HSTT ${j+1} (HĐ ${idx+1})` : `HSTT ${j+1}`, 'hstt', f.url, f.name || `Hồ sơ thanh toán ${j+1}`)));
+  });
+  // Hồ sơ thanh toán chung của dự án (đính kèm kiểu cũ, chưa gắn vào HĐ nào)
+  (Array.isArray(p.paymentDossierFiles) ? p.paymentDossierFiles : []).forEach((f, j)=>
+    out.push(row(`HSTT chung ${j+1}`, 'hstt', f.url, f.name || `Hồ sơ thanh toán ${j+1}`)));
+  // 3) File đính kèm khác (+ file/link hợp đồng kiểu cũ)
+  const others = (Array.isArray(p.contractFiles) && p.contractFiles.length) ? p.contractFiles
+    : ((p.contractFileUrl || p.contractFile) ? [{ url: p.contractFileUrl || p.contractFile, name: p.contractFileName || 'Hợp đồng' }] : []);
+  others.forEach((f, j)=> out.push(row(`Khác ${j+1}`, 'other', f.url, f.name || `File ${j+1}`)));
+  if(p.contractLink) out.push(row('Link', 'other', p.contractLink, 'Link hợp đồng (Drive)'));
+  return out.length ? out.join('') : '<span class="helper-text">—</span>';
 }
 
 // Dựng 5 khung "Thông tin HĐ 1..5" (mỗi khung: thông tin HĐ + file HỢP ĐỒNG + các file HỒ SƠ THANH TOÁN lần 1, 2, 3…)

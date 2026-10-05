@@ -567,3 +567,13 @@ tr.tx-row-explained td:not(:last-child){text-decoration:line-through;}
 .payee-ac-item .n{font-weight:600;font-size:13.5px;color:var(--ink);}
 .payee-ac-item .d{font-size:11.5px;color:var(--ink-faint);}
 .payee-ac-item mark{background:transparent;color:var(--primary);font-weight:800;}
+
+/* Bảng Dự án — cột "File đính kèm": mỗi file 1 dòng, nhãn loại + tên file (cắt ngắn bằng … nếu dài) */
+td.proj-files-cell{min-width:210px;max-width:260px !important;vertical-align:top;}
+.proj-file-row{display:flex;gap:6px;align-items:baseline;font-size:12px;line-height:1.7;}
+.proj-file-label{flex:0 0 auto;font-weight:700;white-space:nowrap;}
+.proj-file-label.hd{color:var(--blue);}
+.proj-file-label.hstt{color:#9a6b00;}
+.proj-file-label.other{color:var(--ink-faint);}
+.proj-file-row a{flex:1 1 auto;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--ink);text-decoration:underline;text-decoration-color:var(--line);}
+.proj-file-row a:hover{color:var(--primary);text-decoration-color:var(--primary);}
