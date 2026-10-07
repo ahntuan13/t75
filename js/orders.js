@@ -439,6 +439,15 @@ async function decideOrderApproval(id, decision){
   const label = decision==='approved' ? 'DUYỆT' : 'TỪ CHỐI';
   if(!confirm(`Xác nhận ${label} "${o.reason}" — ${fmtVND(o.amount)}?`)) return;
   try{
+    await applyOrderDecision(o, decision);
+    toast(decision==='approved' ? 'Đã duyệt' : 'Đã từ chối');
+  }catch(err){ toast('Lỗi: '+err.message); }
+}
+// Phần lõi của việc Duyệt/Từ chối 1 lệnh (không hỏi xác nhận, không báo toast) — dùng chung cho duyệt từng lệnh
+// và duyệt NHIỀU lệnh cùng lúc. Ném lỗi ra ngoài nếu ghi thất bại.
+async function applyOrderDecision(o, decision){
+  const id = o.id;
+  {
     const orderUpdate = {
       approvalStatus: decision,
       approvedBy: auth.currentUser.email,
@@ -495,10 +504,111 @@ async function decideOrderApproval(id, decision){
     }
 
     await db.collection('paymentOrders').doc(id).update(orderUpdate);
-    toast(decision==='approved' ? 'Đã duyệt' : 'Đã từ chối');
-    logActivity('approval_decide', {projectName: isAdvanceOrder(o)?'Lệnh tạm ứng':'Lệnh chi', content: o.reason, amount: o.amount, type:'OUT', note: decision==='approved'?'Đã duyệt':'Đã từ chối'});
-  }catch(err){ toast('Lỗi: '+err.message); }
+    logActivity('approval_decide', {projectName: isAdvanceOrder(o)?'Lệnh tạm ứng':(isIncomeOrder(o)?'Lệnh thu':'Lệnh chi'), content: o.reason, amount: o.amount, type: isIncomeOrder(o)?'IN':'OUT', note: decision==='approved'?'Đã duyệt':'Đã từ chối'});
+  }
 }
+
+// =============================================================
+// ✅ DUYỆT NHIỀU LỆNH CÙNG LÚC — tick chọn các lệnh ở bảng, bấm "Duyệt các lệnh đã chọn",
+// xem lại danh sách + tổng tiền rồi bấm 1 nút để duyệt hết. Chỉ người có quyền duyệt (GĐ/người duyệt phụ) thấy nút.
+// =============================================================
+function checkedOrderIds(table){ return new Set([...table.querySelectorAll('.order-select-cb:checked')].map(cb=> cb.dataset.orderId)); }
+function restoreCheckedOrderIds(table, ids){
+  if(!ids || !ids.size) return;
+  table.querySelectorAll('.order-select-cb').forEach(cb=>{ if(ids.has(cb.dataset.orderId)) cb.checked = true; });
+}
+function canCurrentUserApprove(){
+  const myEmail = (auth.currentUser && auth.currentUser.email || '').toLowerCase();
+  return !!myEmail && isAuthorizedApprover(myEmail);
+}
+function refreshBulkApproveButtons(){
+  [['orders-table','btn-approve-orders-selected'], ['advance-table','btn-approve-advance-selected']].forEach(([tableId, btnId])=>{
+    const btn = document.getElementById(btnId);
+    const table = document.getElementById(tableId);
+    if(!btn || !table) return;
+    const can = canCurrentUserApprove();
+    btn.style.display = can ? '' : 'none';
+    if(!can) return;
+    const ids = [...table.querySelectorAll('.order-select-cb:checked')].map(cb=> cb.dataset.orderId);
+    const pending = ids.filter(id=> { const o = ORDERS.find(x=> x.id===id); return o && (o.approvalStatus||'none') === 'pending'; });
+    btn.textContent = pending.length ? `✅ Duyệt ${pending.length} lệnh đã chọn` : '✅ Duyệt các lệnh đã chọn';
+    const all = table.querySelector('.order-select-all');
+    const cbs = [...table.querySelectorAll('.order-select-cb')];
+    if(all) all.checked = cbs.length > 0 && cbs.every(cb=> cb.checked);
+  });
+}
+['orders-table','advance-table'].forEach(tableId=>{
+  document.getElementById(tableId)?.addEventListener('change', (e)=>{
+    if(e.target.classList.contains('order-select-all')){
+      document.getElementById(tableId).querySelectorAll('.order-select-cb').forEach(cb=> cb.checked = e.target.checked);
+    }
+    if(e.target.classList.contains('order-select-all') || e.target.classList.contains('order-select-cb')) refreshBulkApproveButtons();
+  });
+});
+let bulkApproveOrders = [];
+let bulkApproveRunning = false;
+function openBulkApproveModal(tableId){
+  if(!canCurrentUserApprove()){ toast('Tài khoản này không có quyền duyệt lệnh.'); return; }
+  const table = document.getElementById(tableId);
+  const picked = [...table.querySelectorAll('.order-select-cb:checked')].map(cb=> ORDERS.find(x=> x.id === cb.dataset.orderId)).filter(Boolean);
+  if(!picked.length){ toast('Chưa tick chọn lệnh nào — tick ô ở đầu dòng các lệnh cần duyệt trước.'); return; }
+  bulkApproveOrders = picked.filter(o=> (o.approvalStatus||'none') === 'pending');
+  const skipped = picked.filter(o=> (o.approvalStatus||'none') !== 'pending');
+  if(!bulkApproveOrders.length){ toast('Các lệnh đã chọn không có lệnh nào đang "Chờ duyệt" (lệnh chưa gửi duyệt hoặc đã duyệt/từ chối thì không duyệt được).'); return; }
+  const typeLabel = (o)=> isAdvanceOrder(o) ? (ORDER_TYPE_LABELS[o.orderType]||'Tạm ứng') : (isIncomeOrder(o) ? 'Lệnh thu' : 'Lệnh chi');
+  const sum = (list)=> list.reduce((s,o)=> s + Number(o.amount||0), 0);
+  const chi = bulkApproveOrders.filter(o=> !isIncomeOrder(o)), thu = bulkApproveOrders.filter(isIncomeOrder);
+  document.getElementById('bulk-approve-summary').innerHTML =
+    `Sẽ duyệt <strong>${bulkApproveOrders.length}</strong> lệnh` +
+    (chi.length ? ` · Tổng CHI: <strong style="color:var(--red)">${fmtVND(sum(chi))}</strong> (${chi.length} lệnh)` : '') +
+    (thu.length ? ` · Tổng THU: <strong style="color:var(--teal)">${fmtVND(sum(thu))}</strong> (${thu.length} lệnh)` : '') +
+    `<br>Kiểm tra lại danh sách bên dưới rồi bấm "Duyệt tất cả". Mỗi lệnh được duyệt sẽ tự ghi vào Thu chi dự án / Chi phí gián tiếp như khi duyệt từng lệnh.`;
+  document.getElementById('bulk-approve-table').innerHTML =
+    `<thead><tr><th>#</th><th>Ngày</th><th>Loại</th><th>Người nhận</th><th>Lý do</th><th>Dự án</th><th>Số tiền</th><th>Kết quả</th></tr></thead><tbody>` +
+    bulkApproveOrders.map((o, i)=> `<tr>
+      <td>${i+1}</td><td>${fmtDate(o.date)}</td><td>${escapeHtml(typeLabel(o))}</td>
+      <td><strong>${escapeHtml(o.payee||'')}</strong></td><td>${escapeHtml(o.reason||'')}</td><td>${escapeHtml(o.projectName||'—')}</td>
+      <td class="num"><strong>${fmtVND(o.amount)}</strong></td><td id="bulk-approve-result-${o.id}"><span class="helper-text">Chờ duyệt</span></td>
+    </tr>`).join('') + `</tbody>`;
+  document.getElementById('bulk-approve-skipped').textContent = skipped.length
+    ? `Bỏ qua ${skipped.length} lệnh đã chọn vì không ở trạng thái "Chờ duyệt": ${skipped.map(o=> o.reason).join('; ')}`
+    : '';
+  const btn = document.getElementById('bulk-approve-confirm-btn');
+  btn.disabled = false; btn.style.display = ''; btn.textContent = `✅ Duyệt tất cả ${bulkApproveOrders.length} lệnh`;
+  openModal('modal-bulk-approve');
+}
+document.getElementById('btn-approve-orders-selected')?.addEventListener('click', ()=> openBulkApproveModal('orders-table'));
+document.getElementById('btn-approve-advance-selected')?.addEventListener('click', ()=> openBulkApproveModal('advance-table'));
+document.getElementById('bulk-approve-confirm-btn')?.addEventListener('click', async ()=>{
+  if(bulkApproveRunning || !bulkApproveOrders.length) return;
+  bulkApproveRunning = true;
+  const btn = document.getElementById('bulk-approve-confirm-btn');
+  btn.disabled = true;
+  let ok = 0, fail = 0;
+  // Duyệt LẦN LƯỢT từng lệnh (không gộp 1 mẻ) — lệnh nào lỗi thì báo riêng lệnh đó, các lệnh khác vẫn được duyệt.
+  for(let i=0; i<bulkApproveOrders.length; i++){
+    const picked = bulkApproveOrders[i];
+    const cell = document.getElementById(`bulk-approve-result-${picked.id}`);
+    btn.textContent = `⏳ Đang duyệt ${i+1}/${bulkApproveOrders.length}...`;
+    const o = ORDERS.find(x=> x.id === picked.id) || picked; // lấy bản mới nhất
+    if((o.approvalStatus||'none') !== 'pending'){
+      if(cell) cell.innerHTML = '<span class="tag tag-gray">Bỏ qua (đã xử lý)</span>';
+      continue;
+    }
+    try{
+      await applyOrderDecision(o, 'approved');
+      ok++;
+      if(cell) cell.innerHTML = '<span class="tag tag-in">✅ Đã duyệt</span>';
+    }catch(err){
+      fail++;
+      if(cell) cell.innerHTML = `<span class="tag tag-out" title="${escapeHtml(err.message||'')}">❌ Lỗi</span><div class="helper-text">${escapeHtml(err.message||'')}</div>`;
+    }
+  }
+  bulkApproveRunning = false;
+  bulkApproveOrders = [];
+  toast(fail ? `Đã duyệt ${ok} lệnh, ${fail} lệnh lỗi — xem cột Kết quả` : `✅ Đã duyệt ${ok} lệnh`);
+  if(fail){ btn.style.display = 'none'; } else { closeModal('modal-bulk-approve'); }
+});
 
 // Kiểm tra + sửa liên kết cho ĐÚNG 1 lệnh cụ thể — dùng khi nghi ngờ 1 lệnh bị "lạc" (đã duyệt nhưng
 // giao dịch liên kết không nằm đúng chỗ). KHÔNG đoán mò — tự đi kiểm tra thật cả 2 collection.
@@ -800,7 +910,7 @@ function orderRowHtml(o){
     </tr>`;
 }
 const ORDER_THEAD = `<thead><tr>
-    <th></th><th>Ngày</th><th>Loại</th><th>Người nhận</th><th>Lý do</th><th>Dự án</th><th>Số tiền</th><th>Trạng thái</th><th>Duyệt</th><th>Đính kèm</th><th></th>
+    <th><input type="checkbox" class="order-select-all" title="Chọn tất cả"></th><th>Ngày</th><th>Loại</th><th>Người nhận</th><th>Lý do</th><th>Dự án</th><th>Số tiền</th><th>Trạng thái</th><th>Duyệt</th><th>Đính kèm</th><th></th>
   </tr></thead>`;
 
 function renderOrdersTable(){
@@ -811,7 +921,10 @@ function renderOrdersTable(){
     table.innerHTML = `<tr><td><div class="empty-state"><div class="big">📝</div>Chưa có lệnh chi nào.</div></td></tr>`;
     return;
   }
+  const keepChecked = checkedOrderIds(table); // giữ lại các ô đã tick khi bảng tự vẽ lại (có dữ liệu mới từ máy chủ)
   table.innerHTML = ORDER_THEAD + `<tbody>${rows.map(orderRowHtml).join('')}</tbody>`;
+  restoreCheckedOrderIds(table, keepChecked);
+  refreshBulkApproveButtons();
 }
 
 document.getElementById('orders-table')?.addEventListener('click', handleOrderTableClick);
@@ -854,7 +967,7 @@ function renderAdvanceTable(){
     return;
   }
   const thead = `<thead><tr>
-    <th></th><th>Ngày</th><th>Loại</th><th>Người nhận</th><th>Lý do</th><th>Dự án</th><th>Số tiền</th><th>Còn lại chưa giải chi</th><th>Trạng thái</th><th>Duyệt</th><th>Đính kèm</th><th></th>
+    <th><input type="checkbox" class="order-select-all" title="Chọn tất cả"></th><th>Ngày</th><th>Loại</th><th>Người nhận</th><th>Lý do</th><th>Dự án</th><th>Số tiền</th><th>Còn lại chưa giải chi</th><th>Trạng thái</th><th>Duyệt</th><th>Đính kèm</th><th></th>
   </tr></thead>`;
   const advanceRowHtml = (o)=>{
     const myEmail = (auth.currentUser && auth.currentUser.email || '').toLowerCase();
@@ -894,7 +1007,10 @@ function renderAdvanceTable(){
       </td>
     </tr>`;
   };
+  const keepChecked = checkedOrderIds(table);
   table.innerHTML = thead + `<tbody>${rows.map(advanceRowHtml).join('')}</tbody>`;
+  restoreCheckedOrderIds(table, keepChecked);
+  refreshBulkApproveButtons();
 }
 
 document.getElementById('advance-table')?.addEventListener('click', handleOrderTableClick);

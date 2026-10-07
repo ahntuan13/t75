@@ -15,7 +15,7 @@
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
 <meta name="apple-mobile-web-app-title" content="T75">
 
-<link rel="stylesheet" href="css/style.css?v=v2026-10-05-1">
+<link rel="stylesheet" href="css/style.css?v=v2026-10-07-1">
 </head>
 <body>
 
@@ -41,7 +41,9 @@
         <input type="password" id="login-password" required placeholder="••••••••">
       </div>
       <button type="submit" class="btn btn-primary btn-block">Đăng nhập</button>
+      <div style="text-align:center;margin-top:12px;"><a href="#" id="forgot-password-link" style="font-size:13px;">Quên mật khẩu?</a></div>
       <div class="err-msg" id="login-err"></div>
+      <div class="helper-text" id="login-info" style="text-align:center;margin-top:8px;color:var(--teal);"></div>
     </form>
   </div>
 </div>
@@ -110,9 +112,10 @@
         </button>
         <div class="user-chip">
           <div class="av" id="user-avatar">?</div>
-          <div class="who">
+          <div class="who" id="user-chip-who" title="Bấm để đổi mật khẩu" style="cursor:pointer;">
             <div class="em" id="user-email">—</div>
             <div class="role" id="user-role-label">Thành viên</div>
+            <div class="role" style="color:var(--primary);">🔑 Đổi mật khẩu</div>
           </div>
           <button class="logout-btn" id="logout-btn" title="Đăng xuất">⏻</button>
         </div>
@@ -353,6 +356,7 @@
         <div class="topbar">
           <div><h2>Lệnh thu / chi</h2><div class="sub">Đề nghị & duyệt chi tiền</div></div>
           <div class="topbar-actions">
+            <button class="btn btn-primary" id="btn-approve-orders-selected" style="display:none;">✅ Duyệt các lệnh đã chọn</button>
             <button class="btn btn-ghost" id="btn-print-orders-selected">🖨 In các lệnh đã chọn</button>
             <button class="btn btn-ghost" id="btn-add-income">+ Tạo lệnh thu</button>
             <button class="btn btn-primary" id="btn-add-order">+ Tạo lệnh chi</button>
@@ -377,6 +381,7 @@
           <div><h2>Lệnh tạm ứng</h2><div class="sub">Xem lại các lệnh Tạm ứng thanh toán / Tạm ứng lương</div></div>
           <div class="topbar-actions">
             <button class="btn btn-ghost" id="btn-repair-legacy-explain" style="display:none;" title="Chỉ Super Admin — sửa trùng lặp/liên kết Giải chi của các lệnh tạm ứng CŨ">🛠 Sửa dữ liệu Giải chi cũ</button>
+            <button class="btn btn-primary" id="btn-approve-advance-selected" style="display:none;">✅ Duyệt các lệnh đã chọn</button>
             <button class="btn btn-ghost" id="btn-print-advance-selected">🖨 In các lệnh đã chọn</button>
             <button class="btn btn-primary" id="btn-add-advance">+ Tạo lệnh tạm ứng</button>
           </div>
@@ -631,7 +636,7 @@
         <div class="field full"><label>Ghi chú</label><textarea id="project-note" rows="2"></textarea></div>
       </div>
     </div>
-    <div class="modal-foot"><button class="btn btn-ghost" data-close>Hủy</button><button class="btn btn-primary" id="save-project-btn">Lưu dự án</button></div>
+    <div class="modal-foot"><div id="project-save-error" style="flex:1;color:var(--red);font-size:13px;font-weight:600;text-align:left;"></div><button class="btn btn-ghost" data-close>Hủy</button><button class="btn btn-primary" id="save-project-btn">Lưu dự án</button></div>
   </div>
 </div>
 
@@ -963,6 +968,33 @@
   </div>
 </div>
 
+<div class="modal-backdrop" id="modal-change-password">
+  <div class="modal" style="max-width:440px;">
+    <div class="modal-head"><h3>🔑 Đổi mật khẩu</h3><button class="modal-close" data-close>✕</button></div>
+    <div class="modal-body">
+      <p class="helper-text" style="margin-top:0;">Tài khoản: <strong id="cp-email"></strong></p>
+      <div class="field full"><label>Mật khẩu hiện tại *</label><input type="password" id="cp-current" autocomplete="current-password"></div>
+      <div class="field full"><label>Mật khẩu mới * (ít nhất 6 ký tự)</label><input type="password" id="cp-new" autocomplete="new-password"></div>
+      <div class="field full"><label>Nhập lại mật khẩu mới *</label><input type="password" id="cp-confirm" autocomplete="new-password"></div>
+      <label style="display:flex;align-items:center;gap:6px;font-size:13px;font-weight:500;"><input type="checkbox" id="cp-show" style="width:auto;"> Hiện mật khẩu</label>
+      <div id="cp-error" style="color:var(--red);font-size:13px;font-weight:600;margin-top:10px;"></div>
+    </div>
+    <div class="modal-foot"><button class="btn btn-ghost" data-close>Hủy</button><button class="btn btn-primary" id="cp-save-btn">Đổi mật khẩu</button></div>
+  </div>
+</div>
+
+<div class="modal-backdrop" id="modal-bulk-approve">
+  <div class="modal" style="max-width:860px;width:100%;">
+    <div class="modal-head"><h3>✅ Duyệt nhiều lệnh cùng lúc</h3><button class="modal-close" data-close>✕</button></div>
+    <div class="modal-body">
+      <div id="bulk-approve-summary" class="tx-view-note" style="margin-bottom:12px;"></div>
+      <div class="table-wrap" style="max-height:380px;overflow:auto;"><table class="data" id="bulk-approve-table"></table></div>
+      <div id="bulk-approve-skipped" class="helper-text" style="margin-top:10px;"></div>
+    </div>
+    <div class="modal-foot"><button class="btn btn-ghost" data-close>Hủy</button><button class="btn btn-primary" id="bulk-approve-confirm-btn">✅ Duyệt tất cả</button></div>
+  </div>
+</div>
+
 <div class="modal-backdrop" id="modal-user">
   <div class="modal">
     <div class="modal-head"><h3 id="user-modal-title">Gán quyền người dùng</h3><button class="modal-close" data-close>✕</button></div>
@@ -1003,23 +1035,23 @@
 <script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/html2pdf.js@0.10.1/dist/html2pdf.bundle.min.js"></script>
-<script src="js/firebase-config.js?v=v2026-10-05-1"></script>
-<script src="js/utils.js?v=v2026-10-05-1"></script>
-<script src="js/onedrive.js?v=v2026-10-05-1"></script>
-<script src="js/activitylog.js?v=v2026-10-05-1"></script>
-<script src="js/auth.js?v=v2026-10-05-1"></script>
-<script src="js/projects.js?v=v2026-10-05-1"></script>
-<script src="js/transactions.js?v=v2026-10-05-1"></script>
-<script src="js/fixedcosts.js?v=v2026-10-05-1"></script>
-<script src="js/notifications.js?v=v2026-10-05-1"></script>
-<script src="js/invoice-ocr.js?v=v2026-10-05-1"></script>
-<script src="js/import.js?v=v2026-10-05-1"></script>
-<script src="js/invoices-transfers.js?v=v2026-10-05-1"></script>
-<script src="js/reports.js?v=v2026-10-05-1"></script>
-<script src="js/orders.js?v=v2026-10-05-1"></script>
-<script src="js/payroll.js?v=v2026-10-05-1"></script>
-<script src="js/users.js?v=v2026-10-05-1"></script>
-<script src="js/app.js?v=v2026-10-05-1"></script>
+<script src="js/firebase-config.js?v=v2026-10-07-1"></script>
+<script src="js/utils.js?v=v2026-10-07-1"></script>
+<script src="js/onedrive.js?v=v2026-10-07-1"></script>
+<script src="js/activitylog.js?v=v2026-10-07-1"></script>
+<script src="js/auth.js?v=v2026-10-07-1"></script>
+<script src="js/projects.js?v=v2026-10-07-1"></script>
+<script src="js/transactions.js?v=v2026-10-07-1"></script>
+<script src="js/fixedcosts.js?v=v2026-10-07-1"></script>
+<script src="js/notifications.js?v=v2026-10-07-1"></script>
+<script src="js/invoice-ocr.js?v=v2026-10-07-1"></script>
+<script src="js/import.js?v=v2026-10-07-1"></script>
+<script src="js/invoices-transfers.js?v=v2026-10-07-1"></script>
+<script src="js/reports.js?v=v2026-10-07-1"></script>
+<script src="js/orders.js?v=v2026-10-07-1"></script>
+<script src="js/payroll.js?v=v2026-10-07-1"></script>
+<script src="js/users.js?v=v2026-10-07-1"></script>
+<script src="js/app.js?v=v2026-10-07-1"></script>
 <script>
   // Đăng ký Service Worker để có thể "Cài đặt ứng dụng" (PWA) — chỉ đăng ký khi trình duyệt hỗ trợ.
   if('serviceWorker' in navigator){

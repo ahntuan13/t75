@@ -374,6 +374,7 @@ function openProjectModal(id){
     return;
   }
   document.getElementById('project-modal-title').textContent = id ? 'Sửa dự án' : 'Thêm dự án';
+  const saveErr = document.getElementById('project-save-error'); if(saveErr) saveErr.textContent = '';
   document.getElementById('project-id').value = id || '';
   const p = id ? projectById(id) : {};
   document.getElementById('project-name').value = p.name || '';
@@ -460,22 +461,63 @@ document.getElementById('save-project-btn').addEventListener('click', async ()=>
   // Ghi lại ngày bắt đầu giữ bảo hành đúng lúc dự án CHUYỂN SANG "Còn giữ 5% bảo hành" (chỉ ghi 1 lần)
   const before = id ? (projectById(id) || {}) : {};
   if(data.status === 'warranty' && !before.warrantyStartDate) data.warrantyStartDate = todayISO();
+
+  if(projectSaving) return; // đang lưu dở — chặn bấm 2 lần (từng gây tạo trùng dự án khi form chưa kịp đóng)
+  const btn = document.getElementById('save-project-btn');
+  const errBox = document.getElementById('project-save-error');
+  if(errBox) errBox.textContent = '';
+  projectSaving = true;
+  btn.disabled = true; btn.textContent = '⏳ Đang lưu...';
+  const friendly = (err)=> (err && err.code === 'permission-denied')
+    ? 'Tài khoản này không có quyền lưu dự án (tạo dự án mới chỉ dành cho Admin). Nếu bạn là Admin: kiểm tra đã Publish firestore.rules mới nhất trên Firebase chưa.'
+    : 'Lỗi khi lưu dự án: ' + ((err && err.message) || err);
   try{
+    let write;
     if(id){
-      await db.collection('projects').doc(id).update(data);
-      toast('Đã cập nhật dự án');
-      logActivity('update', {projectName: data.name, content: 'Sửa thông tin dự án', type:'OUT'});
+      write = db.collection('projects').doc(id).update(stripUndefinedDeep(data));
     } else {
       delete data.contractFileUrl; delete data.contractFile; delete data.contractFileName; delete data.contractFileType;
       data.createdAt = firebase.firestore.FieldValue.serverTimestamp();
       data.createdBy = auth.currentUser.email;
-      await db.collection('projects').add(data);
-      toast('Đã thêm dự án');
-      logActivity('create', {projectName: data.name, content: 'Tạo dự án mới', type:'OUT'});
+      write = db.collection('projects').doc().set(stripUndefinedDeep(data));
     }
+    // Firestore ghi vào máy NGAY, nhưng lời hứa (promise) chỉ xong khi MÁY CHỦ xác nhận. Mạng chậm/chập chờn thì
+    // máy chủ xác nhận rất lâu -> form đứng yên không đóng dù dữ liệu đã ghi. Vì vậy: chờ tối đa 6 giây, quá thì
+    // đóng form và báo "đang đồng bộ"; nếu sau đó máy chủ từ chối thì hiện cảnh báo rõ ràng.
+    const outcome = await Promise.race([
+      write.then(()=> 'ok'),
+      new Promise(resolve=> setTimeout(()=> resolve('slow'), 6000)),
+    ]);
+    if(outcome === 'slow'){
+      write.then(()=> toast(`✅ Dự án "${data.name}" đã đồng bộ lên máy chủ`))
+           .catch(err=> alert(`⚠️ Dự án "${data.name}" CHƯA lưu được lên máy chủ.\n\n${friendly(err)}`));
+      toast('Đã ghi trên máy — mạng đang chậm, đang đồng bộ lên máy chủ...');
+    } else {
+      toast(id ? 'Đã cập nhật dự án' : 'Đã thêm dự án');
+    }
+    logActivity(id ? 'update' : 'create', {projectName: data.name, content: id ? 'Sửa thông tin dự án' : 'Tạo dự án mới', type:'OUT'});
     closeModal('modal-project');
-  }catch(err){ toast('Lỗi: '+err.message); }
+  }catch(err){
+    console.error('save project error', err);
+    if(errBox) errBox.textContent = friendly(err);
+    toast(friendly(err));
+  }finally{
+    projectSaving = false;
+    btn.disabled = false; btn.textContent = 'Lưu dự án';
+  }
 });
+let projectSaving = false;
+// Bỏ mọi giá trị undefined (Firestore từ chối cả bản ghi nếu có 1 ô undefined) — chỉ đi sâu vào object/mảng thường,
+// giữ nguyên các giá trị đặc biệt của Firestore (serverTimestamp, delete, Timestamp...).
+function stripUndefinedDeep(v){
+  if(Array.isArray(v)) return v.map(x=> x === undefined ? null : stripUndefinedDeep(x));
+  if(v && typeof v === 'object' && Object.getPrototypeOf(v) === Object.prototype){
+    const out = {};
+    Object.keys(v).forEach(k=>{ if(v[k] !== undefined) out[k] = stripUndefinedDeep(v[k]); });
+    return out;
+  }
+  return v;
+}
 
 document.getElementById('projects-table').addEventListener('click', (e)=>{
   const editId = e.target.closest('[data-edit-project]')?.dataset.editProject;
